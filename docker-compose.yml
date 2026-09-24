@@ -12,7 +12,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
     ports:
-      - "5432:5432"
+      # Host port is configurable: a fixed 5432 collides with any other project already running
+      # PostgreSQL on this machine. The container port never changes, so DATABASE_URL inside the
+      # compose network is unaffected.
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
