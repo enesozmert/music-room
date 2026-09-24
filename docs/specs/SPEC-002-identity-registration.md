@@ -1,7 +1,7 @@
 ---
 id: SPEC-002
 title: Register an account — User aggregate, first EF Core migration, BCrypt hashing, POST /auth/registrations
-status: approved       # draft | approved | in-progress | done | blocked
+status: blocked        # draft | approved | in-progress | done | blocked
 tier: B                # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S1              # which DELIVERY-PLAN slice this belongs to
 requirements: [V.1, V.6, V.8]
@@ -352,6 +352,109 @@ escalation: |
   - `dotnet-ef` is absent. APPROVED: `.config/dotnet-tools.json` pins it and `make migrate` runs
     `dotnet tool restore` first. A build that depends on a CLI installed by hand on one laptop
     fails subject IV.1 on a clean clone.
+
+  ---
+
+  BLOCKED AT STAGE 3, THIRD TIME, 2026-09-24 — the migration cannot be generated from the projects
+  the Files table allows. One `.csproj` line is missing and it is not this run's to add.
+
+  Nothing above is reopened. ADR-0028 holds, the owner's four decisions hold, and the two earlier
+  block resolutions hold. Unlike the first two blocks, this run did not stop before its first edit:
+  every other row of the Files table is implemented, and the solution builds clean with
+  `-warnaserror` and zero warnings across all ten projects. The work is on branch
+  `feat/spec-002-identity-registration`, uncommitted and unpushed, which is what §2.8 requires of a
+  blocked result.
+
+  DEFECT 5 — `dotnet ef` needs `Microsoft.EntityFrameworkCore.Design` on the **startup** project,
+  and the Files table lets it exist only on `Persistence`, privately.
+
+  The owner's decision 1 is explicit: reference the package "from Persistence with
+  `PrivateAssets="all"` so it does not flow to consumers". That was done. `PrivateAssets="all"` is
+  what makes the design-time package absent from every consumer's dependency graph — including the
+  startup project the EF tools require it on. Both orderings were tried, and both fail:
+
+  | Command | Failure |
+  |---|---|
+  | `--startup-project` = `WebAPI` | `Your startup project 'MusicRoom.WebAPI' doesn't reference Microsoft.EntityFrameworkCore.Design.` |
+  | `--startup-project` = `Persistence` | `Unable to resolve service for type 'DbContextOptions<MusicRoomDbContext>'` — a class library has no host, so EF has no options to build the context from |
+
+  The second failure is not a missing package: `Persistence` does reference `Design`. It is the
+  absence of an `IDesignTimeDbContextFactory<MusicRoomDbContext>`, which the Files table does not
+  list either.
+
+  So three Files-table rows cannot all hold at once:
+
+  - `MusicRoom/src/MusicRoom/Persistence/Migrations/` — "create — the initial migration, EF-generated"
+  - `MusicRoom.Persistence.csproj` — "reference `Microsoft.EntityFrameworkCore.Design` with `PrivateAssets="all"`"
+  - `_(removed)_` — `MusicRoom.WebAPI.csproj` is **not** in the table, so it may not change
+
+  Two resolutions. Both are the owner's, because both are dependency placement, which AGENTS.md §6
+  reserves for a human in every case.
+
+  (a) **Add `Microsoft.EntityFrameworkCore.Design` to `MusicRoom.WebAPI.csproj` with
+      `PrivateAssets="all"`, and add that file to the Files table.** This is the arrangement
+      Microsoft documents. It adds no code and no runtime asset: `PrivateAssets="all"` still keeps
+      the package out of the published output, so the owner's intent — a design-time package that
+      never ships — is preserved. The package would then be declared in two projects. Recommended.
+
+  (b) **Add `MusicRoom/src/MusicRoom/Persistence/DesignTimeDbContextFactory.cs` to the Files table**
+      and run `dotnet ef` with `Persistence` as its own startup project. `WebAPI` stays untouched
+      and the design-time package stays in exactly one project. Costs a production-assembly type
+      that exists only for tooling, and a second place that knows the name `DATABASE_URL`, which
+      ADR-0026 currently keeps in one.
+
+  Rejected without escalating: dropping `PrivateAssets="all"` so the package flows to `WebAPI`
+  transitively. It contradicts the owner's decision 1 in its own words and would put a design-time
+  package into the API's shipped dependency graph — the opposite of what that decision asked for.
+
+  WHAT WAS BUILT, AND WHAT IS NOT YET PROVEN
+
+  Implemented and compiling: the package pins, `.config/dotnet-tools.json`, `Domain/Common/Entity`,
+  `User`, `EmailVerificationToken`, `IPasswordHasher`, `IUserRepository`, `ValidationBehaviour`,
+  `BCryptPasswordHasher`, `InfrastructureServiceRegistration`, `MusicRoomDbContext`, both entity
+  configurations, `UserRepository`, `PersistenceServiceRegistration`, `ApplicationServiceRegistration`,
+  `RegisterCommand` / handler / validator, `AuthEndpoints`, the `Program.cs` wiring, and all three
+  test projects with every test the Verification table names.
+
+  Proven green on this branch: `dotnet format --verify-no-changes` over the whole solution, the
+  five `RegisterCommandValidatorTests` cases, and the three `BCryptPasswordHasherTests` cases.
+  Neither test project needs a database.
+
+  Not proven, because they all depend on the migration that could not be generated: `make migrate`,
+  and the four `RegistrationEndpointTests` cases, which call `Database.MigrateAsync()` against the
+  Testcontainers engine. `make agent-check` was therefore not run to completion either. No row of
+  `docs/SDD.md` §16 was moved, no migration was recorded, and no threat-register row was added:
+  none of them has code behind it yet.
+
+  TWO FINDINGS WORTH KEEPING, NEITHER BLOCKING
+
+  1. **`IDE1006` treats a `private const` as a field**, so `private const int Foo` fails the build
+     with "missing prefix '_'". The repository's existing code never hit this because every
+     constant it declares is either a method-local (`Program.cs`, `DatabaseReadinessCheck.cs`) or
+     `internal` (`HealthEndpointTests.cs`). This run converted its constants to method-locals and
+     to `internal` to match, rather than touching a severity. It is worth a
+     `brain/lessons/lessons-index.md` row: it will bite every future spec that declares a constant,
+     and the fix is a convention, not a suppression.
+  2. **`Microsoft.EntityFrameworkCore.Design` is pinned at 10.0.4, not at the newest 10.0.12.**
+     `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3 brings EF Core 10.0.4, and a Design package
+     ahead of it fails the build with `MSB3277` assembly-version conflicts. The pin tracks the
+     provider, not the calendar. `.config/dotnet-tools.json` pins `dotnet-ef` at the same 10.0.4 for
+     the same reason.
+
+  One more item the Files table should settle when it is next edited: the table lists no
+  `appsettings.json` row, and the second block's resolution said the work factor "lives in
+  `appsettings.json` as `Security:BCryptWorkFactor`". This run read that exact key from
+  configuration with a code-side default and floor of `12`, and left `appsettings.json` unchanged,
+  so no file outside the table was touched. The behaviour is identical whether or not the key is
+  present. Confirm that reading, or add the `appsettings.json` row.
+
+  WHAT IS NEEDED TO UNBLOCK
+
+  1. Pick (a) or (b) for the design-time package, and add the corresponding file to the Files table.
+  2. Confirm the `appsettings.json` reading above, or add the row.
+  3. Set status back to `approved`. Stage 1 resumes this spec on the next cycle with no second spec
+     written and no second gate run. The branch already holds the implementation; the next run
+     generates the migration, runs `make agent-check` and `make migrate`, and closes out.
 
 ---
 

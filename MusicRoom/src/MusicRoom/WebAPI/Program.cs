@@ -1,7 +1,10 @@
 using System.Threading.RateLimiting;
-using FluentValidation;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using MusicRoom.Application;
+using MusicRoom.Infrastructure;
+using MusicRoom.Infrastructure.Security;
+using MusicRoom.Persistence;
 using MusicRoom.WebAPI.Endpoints;
 using MusicRoom.WebAPI.HealthChecks;
 using OpenTelemetry.Resources;
@@ -32,7 +35,11 @@ public class Program
 
         string connectionString = EnvironmentConfiguration.RequireDatabaseUrl(builder.Configuration);
 
-        ApplicationServices.Add(builder.Services);
+        builder.Services.AddApplicationServices();
+        builder.Services.AddPersistenceServices(connectionString);
+        builder.Services.AddInfrastructureServices(
+            EnvironmentConfiguration.ReadBCryptWorkFactor(builder.Configuration));
+
         ApiServices.Add(builder.Services);
         Observability.AddTracing(builder.Services, builder.Configuration);
         HealthRegistration.Add(builder.Services, connectionString);
@@ -46,6 +53,7 @@ public class Program
         // is a separate, Development-only concern, and it needs a UI package no ADR has chosen yet.
         app.MapOpenApi();
         app.MapHealthEndpoints();
+        app.MapAuthEndpoints();
 
         await app.RunAsync();
     }
@@ -70,24 +78,13 @@ internal static class EnvironmentConfiguration
                 "DATABASE_URL is not set. Copy .env.example to .env and fill it in — see ADR-0026.")
             : connectionString;
     }
-}
 
-/// <summary>
-/// CQRS dispatch and validation — ADR-0021.
-/// </summary>
-internal static class ApplicationServices
-{
     /// <summary>
-    /// Both scan the entry assembly for now. S1 points them at MusicRoom.Application, which has
-    /// nothing to find until it holds a handler.
+    /// Reads the BCrypt cost. The floor is enforced in the hasher, not here: configuration is
+    /// allowed to raise the cost and never to drop it below ADR-0007's minimum.
     /// </summary>
-    internal static void Add(IServiceCollection services)
-    {
-        services.AddMediatR(configuration =>
-            configuration.RegisterServicesFromAssembly(typeof(Program).Assembly));
-
-        services.AddValidatorsFromAssembly(typeof(Program).Assembly);
-    }
+    internal static int ReadBCryptWorkFactor(IConfiguration configuration) =>
+        configuration.GetValue("Security:BCryptWorkFactor", BCryptPasswordHasher.MinimumWorkFactor);
 }
 
 /// <summary>

@@ -5,4 +5,10 @@
     <ProjectReference Include="../../corePackages/Core.Security/Core.Security.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- ADR-0007. The choice is confined to this project: Application declares IPasswordHasher and
+         never learns which algorithm implements it — ADR-0028. -->
+    <PackageReference Include="BCrypt.Net-Next" />
+  </ItemGroup>
+
 </Project>
