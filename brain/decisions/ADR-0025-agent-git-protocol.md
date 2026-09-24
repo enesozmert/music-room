@@ -7,6 +7,11 @@ date: 2026-09-24
 
 # ADR-0025 — Git protocol for unattended agent runs
 
+> **Partially superseded by [[ADR-0027-agent-push-and-pr]] (2026-09-24).** The branch-and-commit
+> protocol below stands unchanged. The "never push" clause does not: the agent now pushes its own
+> spec branch and opens a **draft** pull request after verification passes. Everything else in the
+> forbidden list still applies.
+
 ## Context
 
 [[prompt-library]] Part 2 lets an agent implement a spec without supervision. The guardrail block

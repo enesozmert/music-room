@@ -34,7 +34,8 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0022-observability-stack]] | Serilog with OpenTelemetry | Accepted |
 | [[ADR-0023-catalog-cache]] | Two-level catalog cache | Accepted |
 | [[ADR-0024-expiry-and-cleanup]] | Lazy expiry checks, one cleanup service | Accepted |
-| [[ADR-0025-agent-git-protocol]] | Git protocol for unattended agent runs | Accepted |
+| [[ADR-0025-agent-git-protocol]] | Git protocol for unattended agent runs | Accepted, push clause superseded by ADR-0027 |
 | [[ADR-0026-environment-bring-up]] | Environment bring-up sequence | Accepted |
+| [[ADR-0027-agent-push-and-pr]] | Agent pushes its branch and opens a draft pull request | Accepted |
 
 Related: [[MEMORY]] · [[system-overview]] · [[standards-router]]

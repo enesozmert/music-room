@@ -360,14 +360,19 @@ Representative flows. Steps are design intent, not implemented code.
 ### 10.1 Registration with email and password
 
 ```
-1. Client POST /api/v1/auth/register
-2. Validation behaviour rejects malformed input
-3. Handler hashes the password (Argon2id), persists an unverified User
+1. Client POST /api/v1/auth/registrations
+2. Validation behaviour rejects malformed input, including the 12-64 character
+   and 72-byte UTF-8 password limits that BCrypt requires
+3. Handler hashes the password with BCrypt at cost >= 12, persists an unverified User
 4. Infrastructure sends a verification mail with a single-use, hashed, 24h token
-5. Response 201; the account cannot use services until verified
-6. Client GET/POST the verification endpoint with the token
+5. Response 202, always -- identical whether or not the address is already registered.
+   A 409 here would be an account-enumeration oracle; the mailbox tells the real story.
+   The account cannot use services until verified
+6. Client POST /api/v1/auth/email-verifications with the token
 7. Handler marks the account verified and consumes the token
 ```
+
+Algorithm: [[ADR-0007-password-hashing-bcrypt]]. Paths and status codes: [[endpoint-inventory]] §1.
 
 ### 10.2 Social login
 

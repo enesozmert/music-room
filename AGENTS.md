@@ -77,12 +77,23 @@ the project subject forbids committing third-party source.
 
 `brain/decisions/ADR-0025-agent-git-protocol.md`:
 
+`brain/decisions/ADR-0025-agent-git-protocol.md` and
+`brain/decisions/ADR-0027-agent-push-and-pr.md`:
+
 - One branch per spec: `feat/spec-<nnn>-<slug>`, created after the spec is approved.
 - One commit per spec, only after verification passes. Conventional Commits; name the spec id in
   the body.
-- **Never push.** Never `reset --hard`, `rebase`, force anything, or touch a remote or a tag.
-- A blocked spec leaves its work uncommitted on the branch. The diff is the evidence.
+- **After `RESULT: pass` only**: push that branch and open a **draft** pull request with
+  `gh pr create --draft`. One pull request per spec.
+- **Never** push to `main` or any branch other than the spec's own. Never `--force`, never
+  `reset --hard`, never `rebase`, never delete a remote branch or tag.
+- **Never** mark a pull request ready for review, merge it, enable auto-merge, or approve it.
+  Those two decisions belong to a human.
+- A blocked or environment result pushes nothing. The work stays local and the diff is the evidence.
 - Refuse to start a run on a dirty working tree.
+
+`main` carries branch protection with `enforce_admins: true`, so a direct push is refused
+mechanically, not by convention.
 
 ## 6. Escalate instead of guessing
 
