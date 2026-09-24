@@ -2,7 +2,7 @@
 aliases: [prompt-library-tr, prompt-kutuphanesi]
 kind: prompt-library
 lang: tr
-version: 2.4.0
+version: 2.5.0
 updated: 2026-09-24
 ---
 
@@ -294,7 +294,21 @@ Her aşama tek prompt. Ayrı olmalarının sebebi: bir koşu durdurulabilsin, in
 
 ## 2.2 Aşama 1 — sıradaki işi seç
 
+**Seçmeden önce devam et.** İnsanın sonradan onayladığı blocked bir spec sıradaki iştir; aynı iş
+için ikinci bir spec yazmak onayı çöpe atar ve kaydı ikiye böler.
+
 ```
+Önce: docs/specs/ dizinini listele ve her SPEC-*.md dosyasının frontmatter'ını oku.
+
+Herhangi birinin status: approved ise, en küçük numaralı olanı al, şunu yazdır
+
+  RESUME: <spec yolu>
+
+ve doğrudan aşama 3'e geç. Yeni spec yazma. Gate'i tekrar çalıştırma — insan zaten cevapladı,
+cevapları escalation bloğunda. Onları oku; bağlayıcıdır.
+
+Aksi halde yeni iş seç:
+
 brain/MEMORY.md, sonra docs/DELIVERY-PLAN.md ve docs/SDD.md bölüm 16 dosyalarını oku.
 
 Sıradaki tek iş birimini belirle: en erken tamamlanmamış slice, ve onun içinde tek başına

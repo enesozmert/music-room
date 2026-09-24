@@ -1,7 +1,7 @@
 ---
 aliases: [prompt-library]
 kind: prompt-library
-version: 2.4.0
+version: 2.5.0
 updated: 2026-09-24
 ---
 
@@ -300,7 +300,21 @@ Every stage is one prompt. Stages are separate so a run can be resumed, inspecte
 
 ## 2.2 Stage 1 — pick the next work item
 
+**Resume before you pick.** A blocked spec that a human has since approved is the next unit of
+work; writing a second spec for the same thing wastes the approval and forks the record.
+
 ```
+First: list docs/specs/ and read the frontmatter of every SPEC-*.md.
+
+If any spec has status: approved, take the lowest-numbered one, output
+
+  RESUME: <spec path>
+
+and go straight to stage 3. Do not write a new spec. Do not re-run the gate — a human already
+answered it, and their answers are in the escalation block. Read them; they are binding.
+
+Otherwise, pick new work:
+
 Read brain/MEMORY.md, then docs/DELIVERY-PLAN.md and docs/SDD.md section 16.
 
 Identify the single next unit of work: the earliest incomplete slice, and within it the smallest
