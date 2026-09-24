@@ -35,6 +35,8 @@ A lesson earns a line here only if it would otherwise be rediscovered the expens
 | L-024 | A draft pull request is the cheapest human gate in an automated pipeline: GitHub refuses to merge it, so "ready for review" becomes an explicit human decision with no extra tooling. | [[ADR-0027-agent-push-and-pr]] |
 | L-025 | A non-interactive agent (`claude -p`) cannot ask for permission, so an ungranted write is silently refused and the whole cycle ends having produced nothing. Pass a settings file with scoped permissions and `--permission-prompts none`, or unattended runs only look like they are working. | observed 2026-09-24, first S1 cycle |
 | L-026 | In Claude Code permission settings, path rules must be written as `Edit(path)`. A `Write(path)` rule is silently ignored — `Edit` rules cover every file-editing tool. A deny list written with `Write(...)` is protection that does not exist. | observed 2026-09-24 |
+| L-027 | A required status check combined with a path filter blocks a pull request forever: the check never runs, so it can never pass. Either the required workflow has no path filter, or a same-named no-op job covers the excluded paths. | observed 2026-09-24, PR #3 |
+| L-028 | A control file the tool watches for must be git-ignored. `.agent/STOP` was not, so pulling the cord dirtied the tree and the driver — which refuses to start on a dirty tree — would not start again. | observed 2026-09-24 |
 | L-004 | `reference/` is read-only. It is there to learn the structure from, not to copy from. Backend code is written under `MusicRoom/` only. Copying a file across drags net6-era packages in and breaks subject IV.1 (no third-party source in the repo). | team decision, 2026-09-23 |
 
 ## How to add one

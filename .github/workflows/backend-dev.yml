@@ -3,14 +3,12 @@
 
 name: backend-dev
 
+# No path filter on pull_request. `gate` is a REQUIRED status check on main, and a required
+# check that does not run leaves the pull request blocked forever — a docs-only change would
+# never be mergeable. The build is short; paying for it on every pull request is cheaper than a
+# class of permanently stuck branches.
 on:
   pull_request:
-    paths:
-      - "MusicRoom/**"
-      - ".github/workflows/backend-*.yml"
-      - "Makefile"
-      - "docker-compose.yml"
-      - ".editorconfig"
   push:
     branches-ignore:
       - main
