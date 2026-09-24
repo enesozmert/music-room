@@ -32,11 +32,24 @@ Three independent layers, because a prompt alone is not a control:
 2. **The guardrail block** — `PROMPTS.md` section 2.8, pasted into every unattended prompt.
 3. **The driver** — a cycle cap, a `STOP` file, a refusal to start on a dirty working tree, and a
    refusal to continue on an unrecognised result line.
-4. **The git protocol** — [[ADR-0025-agent-git-protocol]]: one branch and one commit per spec,
-   never a push. Rollback is `git branch -D feat/spec-<nnn>-<slug>`.
+4. **The git protocol** — [[ADR-0025-agent-git-protocol]] and [[ADR-0027-agent-push-and-pr]]:
+   one branch, one commit and one **draft** pull request per spec. Never a push to `main`, never a
+   merge. Rollback is `git branch -D feat/spec-<nnn>-<slug>` plus `gh pr close`.
+5. **Branch protection on `main`** with `enforce_admins: true` — direct pushes, force pushes and
+   branch deletion are refused by GitHub, not by a prompt. The agent runs with the owner's token,
+   so without admin enforcement the rule would have been decorative.
 
-Add a fifth if you run this often: a Claude Code `PreToolUse` hook that mechanically refuses
+Add a sixth if you run this often: a Claude Code `PreToolUse` hook that mechanically refuses
 writes under `reference/`. See `PROMPTS.md` section 3.1.
+
+## Reviewing what a run produced
+
+```bash
+gh pr list --draft                       # one draft per passing spec
+gh pr diff <number>
+gh pr ready <number>                     # you decide this
+gh pr merge <number> --merge             # and this
+```
 
 ## What autonomy does not cover
 

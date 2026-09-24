@@ -1,7 +1,7 @@
 ---
 aliases: [prompt-library]
 kind: prompt-library
-version: 2.2.0
+version: 2.3.0
 updated: 2026-09-24
 ---
 
@@ -389,8 +389,12 @@ For the spec just completed:
 - add a docs/owasp/THREAT-REGISTER.md row for any security finding left unfixed
 - add a brain/lessons/lessons-index.md row only if something durable was learned
 - regenerate docs/api/openapi.json if an endpoint changed
-- commit the work on the spec's branch with a Conventional Commits message naming the spec id.
-  Do not push.
+- commit the work on the spec's branch with a Conventional Commits message naming the spec id
+- push that branch and open a draft pull request:
+  `gh pr create --draft --title "<type>(<scope>): <subject>" --body-file <a file you write>`
+  The body states: the spec id, the subject requirements advanced, the verification commands and
+  their result, the OWASP checklist outcome, and anything a reviewer must check by hand.
+  Do not mark it ready for review. Do not merge.
 - output a 5-line summary: unit, files changed, tests added, requirements advanced, what is next
 ```
 
@@ -426,9 +430,14 @@ Guardrails, absolute:
 - Never mark a docs/SDD.md section 16 row "done" without code that exists.
 - Never write or modify an ADR. Draft one and stop if a decision is needed.
 - Never add or upgrade a dependency.
-- Git: create one branch feat/spec-<nnn>-<slug> after approval, make one commit after
-  verification passes, and nothing else. Never push. Never reset --hard, rebase, force, tag, or
-  touch a remote. Refuse to start on a dirty working tree.
+- Git: create one branch feat/spec-<nnn>-<slug> after approval, and make one commit after
+  verification passes. After RESULT: pass only, push that branch and open a DRAFT pull request
+  with gh pr create --draft. One pull request per spec.
+- Never push to main or to any branch but the spec's own. Never --force, reset --hard, rebase,
+  delete a remote branch or tag. Never mark a pull request ready for review, merge it, enable
+  auto-merge, or approve it.
+- A blocked or environment result pushes nothing.
+- Refuse to start on a dirty working tree.
 - If .agent/STOP exists, stop immediately and output RESULT: halted.
 ```
 

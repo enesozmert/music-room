@@ -31,6 +31,8 @@ A lesson earns a line here only if it would otherwise be rediscovered the expens
 | L-020 | Submodules are a submission risk at 42: a stale pointer or a forgotten `--recursive` means the evaluator sees missing code. One repository, one clone, one submission. | [[ADR-0020-monorepo-layout]] |
 | L-021 | An unattended agent needs a git protocol, not just a prohibition. Branch and commit per spec gives per-unit rollback; "never commit" turns five cycles into one unreviewable pile. A clean tree is a precondition, not a nicety. | [[ADR-0025-agent-git-protocol]] |
 | L-022 | Name configuration after the role, not the vendor: `DATABASE_URL`, not `SUPABASE_DB_URL`. A variable named after a provider couples the application to it for no reason. | [[ADR-0026-environment-bring-up]] |
+| L-023 | Branch protection with `enforce_admins: false` is decorative when the agent runs with the repository owner's token — an admin bypasses it. Admin enforcement is what turns the rule into a mechanism. | [[ADR-0027-agent-push-and-pr]] |
+| L-024 | A draft pull request is the cheapest human gate in an automated pipeline: GitHub refuses to merge it, so "ready for review" becomes an explicit human decision with no extra tooling. | [[ADR-0027-agent-push-and-pr]] |
 | L-004 | `reference/` is read-only. It is there to learn the structure from, not to copy from. Backend code is written under `MusicRoom/` only. Copying a file across drags net6-era packages in and breaks subject IV.1 (no third-party source in the repo). | team decision, 2026-09-23 |
 
 ## How to add one

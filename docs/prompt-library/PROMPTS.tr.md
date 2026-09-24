@@ -2,7 +2,7 @@
 aliases: [prompt-library-tr, prompt-kutuphanesi]
 kind: prompt-library
 lang: tr
-version: 2.2.0
+version: 2.3.0
 updated: 2026-09-24
 ---
 
@@ -383,7 +383,12 @@ Az önce tamamlanan spec için:
 - düzeltilmemiş güvenlik bulgusu varsa docs/owasp/THREAT-REGISTER.md satırı ekle
 - kalıcı bir şey öğrenildiyse brain/lessons/lessons-index.md satırı ekle
 - endpoint değiştiyse docs/api/openapi.json dosyasını yeniden üret
-- işi spec'in dalına, spec kimliğini gövdede anan Conventional Commits mesajıyla commit et. Push etme.
+- işi spec'in dalına, spec kimliğini gövdede anan Conventional Commits mesajıyla commit et
+- o dalı push et ve draft pull request aç:
+  `gh pr create --draft --title "<type>(<scope>): <subject>" --body-file <yazdığın dosya>`
+  Gövde şunları içerir: spec kimliği, ilerleyen subject gereksinimleri, doğrulama komutları ve
+  sonuçları, OWASP checklist sonucu, ve inceleyenin elle kontrol etmesi gerekenler.
+  Ready for review yapma. Merge etme.
 - 5 satırlık özet yazdır: birim, değişen dosyalar, eklenen testler, ilerleyen gereksinimler, sıradaki
 ```
 
@@ -419,9 +424,13 @@ Guardrails, mutlak:
 - Kodu olmayan bir docs/SDD.md bölüm 16 satırını "done" yapma.
 - ADR yazma veya değiştirme. Karar gerekiyorsa taslak çıkar ve dur.
 - Bağımlılık ekleme veya yükseltme.
-- Git: onaydan sonra tek bir feat/spec-<nnn>-<slug> dalı aç, doğrulama geçince tek commit at,
-  başka hiçbir şey yapma. Asla push etme. reset --hard, rebase, force, tag, remote yok.
-  Kirli working tree ile koşuyu başlatma.
+- Git: onaydan sonra tek bir feat/spec-<nnn>-<slug> dalı aç, doğrulama geçince tek commit at.
+  Sadece RESULT: pass olduğunda o dalı push et ve gh pr create --draft ile DRAFT pull request aç.
+  Spec başına bir PR.
+- main'e veya spec'in kendi dalı dışında hiçbir dala push etme. --force, reset --hard, rebase,
+  uzak dal veya tag silme yok. PR'ı ready for review yapma, merge etme, auto-merge açma, onaylama.
+- blocked veya environment sonucunda hiçbir şey push edilmez.
+- Kirli working tree ile koşuyu başlatma.
 - .agent/STOP varsa hemen dur ve RESULT: halted yazdır.
 ```
 

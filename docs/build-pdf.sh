@@ -18,6 +18,10 @@ ENGINE=""
 for e in tectonic typst xelatex pdflatex weasyprint; do
   command -v "$e" >/dev/null && ENGINE="$e" && break
 done
+# Reproducible output: without a fixed epoch every rebuild rewrites all 29 PDFs with a new
+# timestamp, so `git status` fills with churn that hides real changes.
+export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-1704067200}"
+
 [ -n "$ENGINE" ] || { echo "no PDF engine found — install tectonic or typst. PDFs stay pending." >&2; exit 1; }
 
 render() {
