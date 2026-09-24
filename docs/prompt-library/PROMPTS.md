@@ -1,7 +1,7 @@
 ---
 aliases: [prompt-library]
 kind: prompt-library
-version: 2.3.0
+version: 2.4.0
 updated: 2026-09-24
 ---
 
@@ -467,6 +467,20 @@ Features with no equivalent in other tools. Use them; do not port them into Part
 | **`/code-review`** | the built-in review; still feed it the standards with prompt 12 |
 
 ### Autonomous run, Claude Code
+
+From a terminal, not from inside a session:
+
+```bash
+make agent-run            # scoped permissions + live output
+make agent-run CYCLES=5
+```
+
+A bare `claude -p` **cannot ask for permission**, so every ungranted write is refused and the cycle
+ends with nothing on disk. `.agent/permissions.json` and `--permission-prompts none` are what make
+an unattended run actually produce work. Path rules in that file must use `Edit(...)`;
+`Write(path)` rules are silently ignored.
+
+From inside an interactive session instead:
 
 ```
 /loop Read AGENTS.md. Run one full cycle of docs/prompt-library/PROMPTS.md Part 2:

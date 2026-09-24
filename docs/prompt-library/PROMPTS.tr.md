@@ -2,7 +2,7 @@
 aliases: [prompt-library-tr, prompt-kutuphanesi]
 kind: prompt-library
 lang: tr
-version: 2.3.0
+version: 2.4.0
 updated: 2026-09-24
 ---
 
@@ -460,6 +460,20 @@ Başka araçta karşılığı olmayan özellikler. Kullan; Bölüm 1'e taşıma.
 | **`/code-review`** | yerleşik inceleme; yine de prompt 12 ile standartları besle |
 
 ### Otonom koşu, Claude Code
+
+Terminalden, oturum içinden değil:
+
+```bash
+make agent-run            # kapsamlı izinler + canlı çıktı
+make agent-run CYCLES=5
+```
+
+Düz `claude -p` **izin soramaz**, verilmemiş her yazma reddedilir ve döngü diskte hiçbir şey
+bırakmadan biter. `.agent/permissions.json` ve `--permission-prompts none` insansız koşunun
+gerçekten iş üretmesini sağlayan şey. O dosyadaki yol kuralları `Edit(...)` olmalı;
+`Write(yol)` kuralları sessizce yok sayılıyor.
+
+İnteraktif oturum içinden:
 
 ```
 /loop AGENTS.md dosyasını oku. docs/prompt-library/PROMPTS.md Bölüm 2'nin tam bir döngüsünü

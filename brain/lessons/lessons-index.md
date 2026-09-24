@@ -33,6 +33,8 @@ A lesson earns a line here only if it would otherwise be rediscovered the expens
 | L-022 | Name configuration after the role, not the vendor: `DATABASE_URL`, not `SUPABASE_DB_URL`. A variable named after a provider couples the application to it for no reason. | [[ADR-0026-environment-bring-up]] |
 | L-023 | Branch protection with `enforce_admins: false` is decorative when the agent runs with the repository owner's token — an admin bypasses it. Admin enforcement is what turns the rule into a mechanism. | [[ADR-0027-agent-push-and-pr]] |
 | L-024 | A draft pull request is the cheapest human gate in an automated pipeline: GitHub refuses to merge it, so "ready for review" becomes an explicit human decision with no extra tooling. | [[ADR-0027-agent-push-and-pr]] |
+| L-025 | A non-interactive agent (`claude -p`) cannot ask for permission, so an ungranted write is silently refused and the whole cycle ends having produced nothing. Pass a settings file with scoped permissions and `--permission-prompts none`, or unattended runs only look like they are working. | observed 2026-09-24, first S1 cycle |
+| L-026 | In Claude Code permission settings, path rules must be written as `Edit(path)`. A `Write(path)` rule is silently ignored — `Edit` rules cover every file-editing tool. A deny list written with `Write(...)` is protection that does not exist. | observed 2026-09-24 |
 | L-004 | `reference/` is read-only. It is there to learn the structure from, not to copy from. Backend code is written under `MusicRoom/` only. Copying a file across drags net6-era packages in and breaks subject IV.1 (no third-party source in the repo). | team decision, 2026-09-23 |
 
 ## How to add one

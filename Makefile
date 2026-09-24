@@ -33,6 +33,17 @@ openapi: ## regenerate docs/api/openapi.json from the code
 		MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj \
 		-p:GenerateOpenApiDocument=true
 
+CYCLES ?= 3
+
+agent-run: ## drive unattended agent cycles — permissions scoped, output live (CYCLES=n)
+	@command -v jq >/dev/null || { echo "jq is required for live output"; exit 1; }
+	AGENT_CMD="claude -p --settings .agent/permissions.json --permission-prompts none --output-format stream-json --verbose" \
+	AGENT_FILTER="jq -r --unbuffered '\
+	  if .type==\"assistant\" then (.message.content[]? | if .type==\"text\" then .text elif .type==\"tool_use\" then \"  -> \"+.name else empty end) \
+	  elif .type==\"result\" then \"\\n\"+(.result // \"\") \
+	  else empty end'" \
+	./.agent/run.sh $(CYCLES)
+
 agent-check: ## the full local gate; every spec's Verification section calls this
 	dotnet restore $(SOLUTION)
 	dotnet format $(SOLUTION) --verify-no-changes
