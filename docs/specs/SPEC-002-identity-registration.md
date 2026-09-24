@@ -73,6 +73,119 @@ escalation: |
      Tracked as issue O17. V.1 still requires real delivery before the defence — the logging
      implementation is a staging post, not the destination.
 
+  ---
+
+  BLOCKED AT STAGE 3, 2026-09-24 — the spec cannot be implemented as written.
+
+  The owner's four decisions above are not in question and nothing below reopens them. The run
+  resumed the approved spec, read AGENTS.md, ADR-0011, ADR-0007, the clean-architecture-cqrs,
+  ef-core-persistence, database-design-migrations, testing and authentication-authorization
+  standards, SDD §7.1, §8.2, §8.3, §10.1, §16 and the endpoint contract, and then stopped before
+  the first edit. No branch was created, no source file was written, no commit was made. The only
+  change on disk is this status transition and this note.
+
+  Two defects, both of them stop conditions in docs/prompt-library/PROMPTS.md §2.7. Each needs a
+  human answer; neither is an agent's to decide.
+
+  DEFECT 1 — the Files table places the common-column base where Domain cannot reach it.
+
+  Row: `MusicRoom/src/corePackages/Core.Persistence/Repositories/Entity.cs`, "create — `id`,
+  `created_at_utc`, `updated_at_utc` base, per SDD §8.3". Step 2 repeats it.
+
+  For `User` and `EmailVerificationToken` to carry those columns from that base, they must inherit
+  it, which means `MusicRoom.Domain.csproj` must reference `Core.Persistence.csproj`. Three
+  accepted sources forbid that reference, in the words of each:
+
+  - ADR-0011 Consequences: "The dependency rule from clean-architecture-cqrs is unchanged and
+    still enforced: arrows point inward, `Domain` references nothing." The same ADR scopes
+    corePackages to "cross-cutting packages, reused by the application projects" — Domain is not
+    one of them.
+  - clean-architecture-cqrs v1.2.0: "`Domain` MUST NOT reference any other project or any
+    infrastructure package", and the project table gives Domain "may reference: nothing".
+  - SDD §7.1: "`Domain` references no other project and no infrastructure package. A reference
+    pointing outward is a build-breaking defect, not a style issue."
+
+  This is where the shape copied from `reference/nArchitecture` and the dependency rule disagree.
+  nArchitecture does have `Core.Persistence/Repositories/Entity.cs` and its domain entities do
+  inherit it, so the file path in this spec is faithful to the reference; ADR-0011 copied the
+  layout while explicitly declining that one edge. Gate question 1 was answered "no" on the
+  reading that this spec implements ADR-0011 as written. It does not.
+
+  Three resolutions, all of them the owner's to pick:
+
+  (a) Keep ADR-0011 as it stands. Drop the `Entity.cs` row and declare `Id`, `CreatedAtUtc` and
+      `UpdatedAtUtc` on each Domain entity. Cheapest now; every later aggregate repeats three
+      properties, and the timestamp-stamping logic has no shared type to hang on.
+  (b) Keep ADR-0011 as it stands and put the base inside `Domain` itself — Domain still references
+      nothing, and one shared abstract type serves every aggregate. Costs a Files-table row that
+      the spec does not have and moves a domain-agnostic type out of corePackages, which ADR-0011
+      says is where domain-agnostic types belong.
+  (c) Amend ADR-0011 to permit `Domain -> Core.Persistence` for persistence-agnostic base types
+      only, and update clean-architecture-cqrs and SDD §7.1 to match. This is the nArchitecture
+      shape, and it is a real weakening of the rule the project intends to defend at evaluation.
+
+  The agent may draft the ADR for (c). It may not choose between (a), (b) and (c) — AGENTS.md §5
+  rule 5, and §6 first bullet: escalate when the task would require "a new or changed ADR, or
+  contradicting an accepted one".
+
+  DEFECT 2 — five project files must change and none of them is in the Files table.
+
+  Step 1 says "Reference them only from the projects that use them", and the owner's decision 1
+  says to reference Microsoft.EntityFrameworkCore.Design "from Persistence with
+  PrivateAssets="all"". Both instruct edits to `.csproj` files that the Files table does not list,
+  and §2.7 makes "a file outside the spec's Files table would change" a stop condition on its own.
+
+  | Project file | Why it must change |
+  |---|---|
+  | `MusicRoom/src/corePackages/Core.Security/Core.Security.csproj` | add the `BCrypt.Net-Next` PackageReference for `BCryptPasswordHasher` |
+  | `MusicRoom/src/MusicRoom/Application/MusicRoom.Application.csproj` | `RegisterCommandHandler` consumes `IPasswordHasher`, which the spec places in `Core.Security`; Application references only Domain, Core.Application and Core.CrossCuttingConcerns today |
+  | `MusicRoom/src/MusicRoom/Persistence/MusicRoom.Persistence.csproj` | add `Microsoft.EntityFrameworkCore.Design` with `PrivateAssets="all"`, per the owner's decision 1 |
+  | `MusicRoom/tests/MusicRoom.WebAPI.Tests/MusicRoom.WebAPI.Tests.csproj` | `RegistrationEndpointTests` is Testcontainers-backed and asserts on the row, so it needs the `Testcontainers.PostgreSql` PackageReference and a reference to Persistence |
+  | `MusicRoom/src/corePackages/Core.Persistence/Core.Persistence.csproj` | only if resolution (c) above is taken and `Entity.cs` lands here |
+
+  The Application row is not bookkeeping. Putting `IPasswordHasher` in `Core.Security` and calling
+  it from a handler creates `Application -> Core.Security`, a dependency edge no ADR, standard or
+  SDD section has yet drawn. ADR-0011 lists Core.Security as "JWT, hashing, token services", so the
+  edge is plainly intended, but it is the first one of its kind and it should be written down
+  rather than introduced by an unattended run.
+
+  WHAT IS NEEDED TO UNBLOCK
+
+  1. Pick (a), (b) or (c) for the common-column base. If (c), the ADR change lands first.
+  2. Confirm `Application -> Core.Security` is the intended edge for `IPasswordHasher`, or name
+     the project the interface should live in instead.
+  3. Add the four or five project files above to the Files table.
+  4. Set status back to `approved`. Stage 1 will resume this spec on the next cycle with no
+     second spec written and no second gate run.
+
+  Nothing else in the spec is in doubt. The package set, the two tables, the work-factor floor,
+  the 202 behaviour, the test list and the parallel `ux_users_email` test all stand as approved.
+
+  ---
+
+  BLOCK RESOLVED, 2026-09-24 — ADR-0028. The first implementation attempt stopped before its first
+  edit and was right to. Both defects were in this spec and in the documents behind it, not in the
+  reasoning that found them.
+
+  Defect 1, the common-column base. `Core.Persistence/Repositories/Entity.cs` would have forced
+  `MusicRoom.Domain` to reference a corePackage, which ADR-0011, clean-architecture-cqrs and
+  SDD §7.1 each forbid in the same words. RESOLVED: the base moves to
+  `MusicRoom/src/MusicRoom/Domain/Common/Entity.cs`. Identity and creation time are domain facts.
+  Accepted cost: the generic repository in Core.Persistence is generic over `where TEntity : class`
+  and cannot constrain on the base, because a corePackage stays domain-agnostic.
+
+  Defect 2, the undrawn edge. `IPasswordHasher` in `Core.Security` required `Application ->
+  Core.Security`, an edge no ADR or SDD section had drawn. RESOLVED: the interface is declared in
+  `MusicRoom.Application`, the BCrypt implementation lives in `MusicRoom.Infrastructure`. This is
+  what clean-architecture-cqrs already required, so no new edge exists. `Core.Security` keeps JWT
+  and token helpers for Infrastructure and WebAPI. A side benefit: the BCrypt choice no longer
+  leaks upward, so ADR-0007 can be superseded by touching Infrastructure alone.
+
+  Defect 2 also named five project files that had to change and were not listed. All five are in
+  the Files table now.
+
+  This spec is approved again. Stage 1 resumes it; no second spec, no second gate.
+
 ---
 
 # Register an account
@@ -126,12 +239,16 @@ Two "yes" answers. Tier B. `status: draft`, escalation filled, run stopped.
 
 | Path | Action |
 |---|---|
-| `MusicRoom/Directory.Packages.props` | change — pin `BCrypt.Net-Next`, `Testcontainers.PostgreSql` |
+| `MusicRoom/Directory.Packages.props` | change — pin `BCrypt.Net-Next`, `Testcontainers.PostgreSql`, `Microsoft.EntityFrameworkCore.Design` |
+| `MusicRoom/src/MusicRoom/Infrastructure/MusicRoom.Infrastructure.csproj` | change — reference `BCrypt.Net-Next` |
+| `MusicRoom/src/MusicRoom/Persistence/MusicRoom.Persistence.csproj` | change — reference `Microsoft.EntityFrameworkCore.Design` with `PrivateAssets="all"` |
+| `MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj` | change — reference `Persistence` and `Infrastructure` for composition |
+| `MusicRoom/tests/MusicRoom.WebAPI.Tests/MusicRoom.WebAPI.Tests.csproj` | change — reference `Testcontainers.PostgreSql` and `Persistence` |
 | `MusicRoom/src/MusicRoom/Domain/Entities/User.cs` | create |
 | `MusicRoom/src/MusicRoom/Domain/Entities/EmailVerificationToken.cs` | create |
-| `MusicRoom/src/corePackages/Core.Persistence/Repositories/Entity.cs` | create — `id`, `created_at_utc`, `updated_at_utc` base, per SDD §8.3 |
-| `MusicRoom/src/corePackages/Core.Security/Hashing/IPasswordHasher.cs` | create |
-| `MusicRoom/src/corePackages/Core.Security/Hashing/BCryptPasswordHasher.cs` | create |
+| `MusicRoom/src/MusicRoom/Domain/Common/Entity.cs` | create — `id`, `created_at_utc`, `updated_at_utc` base, per SDD §8.3 and ADR-0028. **Not** in `Core.Persistence`: `Domain` references nothing |
+| `MusicRoom/src/MusicRoom/Application/Abstractions/Security/IPasswordHasher.cs` | create — ADR-0028: Application declares service abstractions |
+| `MusicRoom/src/MusicRoom/Infrastructure/Security/BCryptPasswordHasher.cs` | create — ADR-0028: Infrastructure implements them |
 | `MusicRoom/src/MusicRoom/Application/Features/Auth/Commands/Register/RegisterCommand.cs` | create |
 | `MusicRoom/src/MusicRoom/Application/Features/Auth/Commands/Register/RegisterCommandHandler.cs` | create |
 | `MusicRoom/src/MusicRoom/Application/Features/Auth/Commands/Register/RegisterCommandValidator.cs` | create |
@@ -146,8 +263,8 @@ Two "yes" answers. Tier B. `status: draft`, escalation filled, run stopped.
 | `MusicRoom/src/MusicRoom/WebAPI/HealthChecks/DatabaseReadinessCheck.cs` | change — read through the `DbContext` now that one exists |
 | `MusicRoom/tests/MusicRoom.Application.Tests/MusicRoom.Application.Tests.csproj` | create |
 | `MusicRoom/tests/MusicRoom.Application.Tests/Features/Auth/RegisterCommandValidatorTests.cs` | create |
-| `MusicRoom/tests/Core.Security.Tests/Core.Security.Tests.csproj` | create |
-| `MusicRoom/tests/Core.Security.Tests/Hashing/BCryptPasswordHasherTests.cs` | create |
+| `MusicRoom/tests/MusicRoom.Infrastructure.Tests/MusicRoom.Infrastructure.Tests.csproj` | create |
+| `MusicRoom/tests/MusicRoom.Infrastructure.Tests/Security/BCryptPasswordHasherTests.cs` | create |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/RegistrationEndpointTests.cs` | create — Testcontainers-backed |
 | `MusicRoom/MusicRoom.sln` | change — add the two test projects |
 | `Makefile` | change — `make migrate` applies the migration instead of printing that none exists |
