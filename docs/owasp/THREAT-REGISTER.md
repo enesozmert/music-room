@@ -16,8 +16,8 @@ Evaluators ask what you did *not* protect against; this table is the answer.
 
 ## Status
 
-**Design-stage register.** 24 threats. Slice S0 landed the first verified rows; every other
-mitigation below is *designed*, not verified.
+**Design-stage register.** 25 threats. Slice S0 landed the first verified rows and S1 added T-25;
+every other mitigation below is *designed*, not verified.
 The Verified column stays empty until a test, a config artifact or a named code path proves it.
 
 ## Legend
@@ -51,6 +51,7 @@ Likelihood and Impact: L / M / H. Residual = what remains **after** the planned 
 | T-22 | Malicious controller skips the queue | L | M | only `controllerUserId` may advance; `expectedNowPlayingId` makes a replay idempotent; the owner can revoke control at any time | a legitimate controller can still skip freely — that is what control means | | — |
 | T-23 | Playback stalls because the controller device went offline | M | M | control takeover via `PUT /devices/{id}/control`; the owner can revoke | no server-side watchdog by design ([[ADR-0017-playback-session]]); recovery is manual (issue O13) | | — |
 | T-24 | Operational endpoints reachable by anyone who can reach the port | M | L | `/health` and `/health/ready` are anonymous by contract ([[endpoint-inventory]]) and report only check names and states — no version, host, connection string or exception text | an unauthenticated caller learns the service is up and whether its database is reachable, and can poll it: the endpoints carry no rate-limit policy, because a limiter that throttles a probe defeats the probe | | S0: readiness body asserted by test; no authentication is planned for these two |
+| T-25 | Registration endpoint has no rate limit, so `POST /api/v1/auth/registrations` can be driven in a loop | M | M | rate limits keyed on IP and on the submitted address (SDD §13.3), built once for registration, login, reset and resend together | **unmitigated today.** S1 shipped the endpoint without a limiter, deliberately: the control is shared with three endpoints that do not exist yet, and building it for one means building it twice. Until it lands, an unauthenticated caller can create rows at request rate and — once SPEC-003 sends mail — can burn the provider quota described in T-19. The `202`-on-both-paths behaviour means the loop learns nothing about who holds an account, so this is a resource-exhaustion threat, not an enumeration one | accepted for S1 by SPEC-002; **must** be closed before the defence, V.6 grades it | — |
 | T-21 | Voter location data stored unnecessarily | L | M | the submitted coordinate is used for the check and **not** persisted on the vote row; event centre stored at coarse precision | the coordinate exists in transit and in request logs unless excluded — add it to the never-logged list | | — |
 
 ## Explicitly out of scope

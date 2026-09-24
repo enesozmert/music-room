@@ -1,7 +1,7 @@
 ---
 id: SPEC-002
 title: Register an account — User aggregate, first EF Core migration, BCrypt hashing, POST /auth/registrations
-status: approved       # draft | approved | in-progress | done | blocked
+status: done           # draft | approved | in-progress | done | blocked
 tier: B                # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S1              # which DELIVERY-PLAN slice this belongs to
 requirements: [V.1, V.6, V.8]
@@ -547,6 +547,45 @@ escalation: |
   Work in progress is committed on `feat/spec-002-identity-registration` and **not pushed**, so the
   tree is clean and the driver can start again.
 
+  ---
+
+  DONE, 2026-09-24. The environment stop was resolved by a human: `.env` now exists, `make up`
+  brought the stack up, and the `db` service is healthy. Nothing in the code changed on this cycle
+  — the resume ran verification against the implementation the previous cycle had already built
+  and left committed.
+
+  `make migrate` — exit 0 against the compose PostgreSQL. `20260924195820_InitialIdentity` is
+  recorded in `__EFMigrationsHistory`; the API container had already applied it on start-up, so the
+  run reports "No migrations were applied. The database is already up to date." That the migration
+  applies to an empty database is proven independently and on every run by
+  `RegistrationEndpointTests`, which calls `Database.MigrateAsync()` against a fresh Testcontainers
+  engine.
+
+  `make agent-check` — every step green. `dotnet format --verify-no-changes` clean;
+  `build -warnaserror` 0 errors and 0 warnings across 12 projects; `dotnet test` 17 passed,
+  0 failed, **0 skipped**; the vulnerable-package scan clean in all 12 projects; `make openapi`
+  regenerated with no drift, so `git diff --exit-code -- docs/api/openapi.json` passes — the
+  document committed in the previous cycle matches what the code emits today.
+
+  No self-heal cycle was needed. Nothing outside the Files table was touched.
+
+  OWASP, walked for the registration surface: A02 — BCrypt at a work factor of at least 12, read
+  back out of the hash string by a test. A03 — every query goes through EF Core with parameters,
+  no concatenated SQL. A04 — the invariant is `ux_users_email` in the database, not a
+  read-then-write check in C#, and the 20-way parallel test proves the index arbitrates.
+  A07 — `202` on both the fresh and the duplicate path, so the endpoint is not an enumeration
+  oracle; **rate limiting is absent and is the one finding left unfixed**, now `T-25` in the threat
+  register with the reason and the deadline. A09, the audit log, is slice S2 by the delivery plan
+  and out of this spec.
+
+  Closed out: `docs/SDD.md` §16 (V.1 registration and V.8 per-layer tests moved to
+  *partly implemented*, V.4 now names the endpoint in the OpenAPI document),
+  `brain/migrations/migrations-index.md` row 1, `docs/owasp/THREAT-REGISTER.md` T-25, and lessons
+  L-035 (an internal constructor defeats DI) and L-036 (every EF migration needs a formatting pass).
+
+  Still out of scope and unchanged: the verification mail, `POST /auth/email-verifications`, login
+  and JWT, social login, and rate limiting. SPEC-003 is next and needs the mail provider API key.
+
 ---
 
 # Register an account
@@ -698,8 +737,8 @@ index is a concurrency hotspot, and a sequential test proves nothing about a rac
 
 ## Done when
 
-- [ ] every file in the Files table exists and compiles
-- [ ] every command under Verification passes
-- [ ] OWASP checklists walked for the surface touched; unfixed findings in the threat register
-- [ ] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
-- [ ] `status: done` in this file
+- [x] every file in the Files table exists and compiles — 12 projects, `build -warnaserror`, 0 warnings
+- [x] every command under Verification passes — `make agent-check` green, `make migrate` exit 0
+- [x] OWASP checklists walked for the surface touched; unfixed findings in the threat register — A02, A03, A04 and A07 walked; registration rate limiting deferred as `T-25`
+- [x] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status — V.1, V.4 and V.8
+- [x] `status: done` in this file
