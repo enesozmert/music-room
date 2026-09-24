@@ -586,6 +586,20 @@ escalation: |
   Still out of scope and unchanged: the verification mail, `POST /auth/email-verifications`, login
   and JWT, social login, and rate limiting. SPEC-003 is next and needs the mail provider API key.
 
+  NOT PUSHED — the run had no approval surface for `git push`. The spec is done and the work is
+  committed on `feat/spec-002-identity-registration` as `234f177`, but the session's permission
+  layer refused `git push`, so the branch is local and no draft pull request exists. This is an
+  environment limitation, not a code or spec defect, and it is the one close-out step of §2.6 that
+  did not run. A human finishes it with:
+
+      git push -u origin feat/spec-002-identity-registration
+      gh pr create --draft \
+        --title "feat(auth): register an account — POST /auth/registrations" \
+        --body-file .agent/runs/pr-body-spec-002.md
+
+  The body is written and waiting at that path, which is git-ignored. Do not mark the pull request
+  ready for review and do not merge it; both are the owner's calls (ADR-0027).
+
 ---
 
 # Register an account
