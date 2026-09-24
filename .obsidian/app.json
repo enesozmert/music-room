@@ -1,0 +1,21 @@
+{
+  "alwaysUpdateLinks": true,
+  "newLinkFormat": "shortest",
+  "useMarkdownLinks": false,
+  "attachmentFolderPath": "docs/assets",
+  "showUnsupportedFiles": false,
+  "userIgnoreFilters": [
+    "reference/",
+    "docs/subject/",
+    "bin/",
+    "obj/",
+    "node_modules/",
+    "MusicRoom/**/bin/",
+    "MusicRoom/**/obj/",
+    "docs/owasp/upstream/",
+    ".agent/runs/",
+    "MusicRoomApp/node_modules/",
+    "MusicRoomApp/ios/Pods/",
+    "MusicRoomApp/android/build/"
+  ]
+}

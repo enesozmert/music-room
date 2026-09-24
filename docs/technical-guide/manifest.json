@@ -1,0 +1,420 @@
+{
+  "name": "music-room engineering standards library",
+  "version": "2.3.0",
+  "generated": "2026-09-23",
+  "sourceOfTruth": "markdown",
+  "distributionArtifact": "pdf",
+  "pdfToolchain": "pandoc + tectonic (docs/build-pdf.sh)",
+  "index": "docs/technical-guide/README.md",
+  "brainRouter": "brain/standards-router.md",
+  "count": 19,
+  "standards": [
+    {
+      "id": "engineering-baseline",
+      "title": "Engineering Baseline",
+      "category": "00-foundations",
+      "version": "1.1.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend",
+        "mobile",
+        "tooling"
+      ],
+      "source": "00-foundations/engineering-baseline/STANDARD.md",
+      "pdf": "00-foundations/engineering-baseline/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "git-workflow",
+      "title": "Git & Branching Workflow",
+      "category": "00-foundations",
+      "version": "1.0.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend",
+        "mobile",
+        "tooling"
+      ],
+      "source": "00-foundations/git-workflow/STANDARD.md",
+      "pdf": "00-foundations/git-workflow/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "clean-architecture-cqrs",
+      "title": "Clean Architecture and CQRS",
+      "category": "10-backend",
+      "version": "1.2.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend"
+      ],
+      "source": "10-backend/clean-architecture-cqrs/STANDARD.md",
+      "pdf": "10-backend/clean-architecture-cqrs/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "dotnet-csharp",
+      "title": "C# and .NET Coding Standard",
+      "category": "10-backend",
+      "version": "1.3.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend"
+      ],
+      "source": "10-backend/dotnet-csharp/STANDARD.md",
+      "pdf": "10-backend/dotnet-csharp/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "ef-core-persistence",
+      "title": "EF Core Persistence",
+      "category": "10-backend",
+      "version": "1.1.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend"
+      ],
+      "source": "10-backend/ef-core-persistence/STANDARD.md",
+      "pdf": "10-backend/ef-core-persistence/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "signalr-realtime",
+      "title": "SignalR Realtime",
+      "category": "10-backend",
+      "version": "1.0.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend",
+        "mobile"
+      ],
+      "source": "10-backend/signalr-realtime/STANDARD.md",
+      "pdf": "10-backend/signalr-realtime/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "openapi-documentation",
+      "title": "OpenAPI Documentation",
+      "category": "20-api",
+      "version": "1.1.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend"
+      ],
+      "source": "20-api/openapi-documentation/STANDARD.md",
+      "pdf": "20-api/openapi-documentation/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "rest-api-design",
+      "title": "REST API Design",
+      "category": "20-api",
+      "version": "1.0.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend",
+        "mobile"
+      ],
+      "source": "20-api/rest-api-design/STANDARD.md",
+      "pdf": "20-api/rest-api-design/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "database-design-migrations",
+      "title": "Database Design and Migrations",
+      "category": "30-data",
+      "version": "1.1.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend"
+      ],
+      "source": "30-data/database-design-migrations/STANDARD.md",
+      "pdf": "30-data/database-design-migrations/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "application-security",
+      "title": "Application Security",
+      "category": "40-security",
+      "version": "1.1.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend",
+        "mobile"
+      ],
+      "source": "40-security/application-security/STANDARD.md",
+      "pdf": "40-security/application-security/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "authentication-authorization",
+      "title": "Authentication and Authorization",
+      "category": "40-security",
+      "version": "1.3.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend",
+        "mobile"
+      ],
+      "source": "40-security/authentication-authorization/STANDARD.md",
+      "pdf": "40-security/authentication-authorization/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "secrets-management",
+      "title": "Secrets Management",
+      "category": "40-security",
+      "version": "1.2.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend",
+        "mobile",
+        "tooling"
+      ],
+      "source": "40-security/secrets-management/STANDARD.md",
+      "pdf": "40-security/secrets-management/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "social-oauth",
+      "title": "Social Login via OpenID Connect (Google / Facebook)",
+      "category": "50-integration",
+      "version": "1.1.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend",
+        "mobile"
+      ],
+      "source": "50-integration/social-oauth/STANDARD.md",
+      "pdf": "50-integration/social-oauth/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "youtube-integration",
+      "title": "YouTube Integration",
+      "category": "50-integration",
+      "version": "1.1.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend",
+        "mobile"
+      ],
+      "source": "50-integration/youtube-integration/STANDARD.md",
+      "pdf": "50-integration/youtube-integration/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "load-testing",
+      "title": "Load Testing and Capacity",
+      "category": "60-quality",
+      "version": "1.1.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend"
+      ],
+      "source": "60-quality/load-testing/STANDARD.md",
+      "pdf": "60-quality/load-testing/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "logging-observability",
+      "title": "Logging and Observability",
+      "category": "60-quality",
+      "version": "1.3.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend"
+      ],
+      "source": "60-quality/logging-observability/STANDARD.md",
+      "pdf": "60-quality/logging-observability/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "testing",
+      "title": "Testing",
+      "category": "60-quality",
+      "version": "1.0.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend",
+        "mobile"
+      ],
+      "source": "60-quality/testing/STANDARD.md",
+      "pdf": "60-quality/testing/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "ci-cd-containerization",
+      "title": "CI/CD and Containerization",
+      "category": "70-delivery",
+      "version": "1.2.0",
+      "status": "active",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "backend",
+        "tooling"
+      ],
+      "source": "70-delivery/ci-cd-containerization/STANDARD.md",
+      "pdf": "70-delivery/ci-cd-containerization/STANDARD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "react-native-client",
+      "title": "React Native Client",
+      "category": "80-client",
+      "version": "0.2.0",
+      "status": "deferred",
+      "updated": "2026-09-23",
+      "appliesTo": [
+        "mobile"
+      ],
+      "source": "80-client/react-native-client/STANDARD.md",
+      "pdf": "80-client/react-native-client/STANDARD.pdf",
+      "pdfStatus": "generated"
+    }
+  ],
+  "companionDocuments": [
+    {
+      "id": "sdd",
+      "title": "Software Design Document",
+      "source": "docs/SDD.md",
+      "pdf": "docs/SDD.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "endpoint-inventory",
+      "title": "Endpoint Inventory",
+      "source": "docs/api/ENDPOINTS.md",
+      "pdf": "docs/api/ENDPOINTS.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "delivery-plan",
+      "title": "Delivery Plan",
+      "source": "docs/DELIVERY-PLAN.md",
+      "pdf": "docs/DELIVERY-PLAN.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "user-manual",
+      "title": "music-room — User Manual",
+      "source": "docs/USER-MANUAL.md",
+      "pdf": "docs/USER-MANUAL.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "prompt-library",
+      "title": "Prompt Library",
+      "source": "docs/prompt-library/PROMPTS.md",
+      "pdf": "docs/prompt-library/PROMPTS.pdf",
+      "pdfStatus": "generated"
+    },
+    {
+      "id": "prompt-library-tr",
+      "title": "Prompt Kütüphanesi (Türkçe)",
+      "source": "docs/prompt-library/PROMPTS.tr.md",
+      "pdf": "docs/prompt-library/PROMPTS.tr.pdf",
+      "pdfStatus": "generated",
+      "lang": "tr",
+      "canonical": "docs/prompt-library/PROMPTS.md"
+    }
+  ],
+  "conformanceLayer": {
+    "root": "docs/owasp",
+    "target": "OWASP ASVS 5.0.0 — L1 all applicable chapters, L2 for V6,V7,V8,V9,V10,V16 (142 of 345 requirements)",
+    "decision": "brain/decisions/ADR-0009-code-quality-gates.md",
+    "upstream": {
+      "project": "OWASP ASVS",
+      "version": "5.0.0",
+      "licence": "CC BY-SA 4.0",
+      "path": "docs/owasp/upstream/asvs-5.0.0",
+      "provenance": "docs/owasp/upstream/PROVENANCE.md"
+    },
+    "documents": [
+      {
+        "id": "owasp-index",
+        "title": "OWASP Conformance Layer — index",
+        "source": "docs/owasp/README.md",
+        "pdf": null,
+        "pdfStatus": "not-applicable"
+      },
+      {
+        "id": "asvs-conformance",
+        "title": "ASVS Conformance Target",
+        "source": "docs/owasp/ASVS-CONFORMANCE.md",
+        "pdf": "docs/owasp/ASVS-CONFORMANCE.pdf",
+        "pdfStatus": "generated"
+      },
+      {
+        "id": "owasp-top10-checklist",
+        "title": "OWASP Top 10 Review Checklist",
+        "source": "docs/owasp/TOP10-CHECKLIST.md",
+        "pdf": "docs/owasp/TOP10-CHECKLIST.pdf",
+        "pdfStatus": "generated"
+      },
+      {
+        "id": "owasp-api-top10-checklist",
+        "title": "OWASP API Security Top 10 Review Checklist",
+        "source": "docs/owasp/API-TOP10-CHECKLIST.md",
+        "pdf": "docs/owasp/API-TOP10-CHECKLIST.pdf",
+        "pdfStatus": "generated"
+      },
+      {
+        "id": "threat-register",
+        "title": "Threat Register",
+        "source": "docs/owasp/THREAT-REGISTER.md",
+        "pdf": "docs/owasp/THREAT-REGISTER.pdf",
+        "pdfStatus": "generated"
+      },
+      {
+        "id": "owasp-cheatsheets",
+        "title": "Applicable OWASP Cheat Sheets",
+        "source": "docs/owasp/CHEATSHEETS.md",
+        "pdf": null,
+        "pdfStatus": "not-applicable"
+      }
+    ]
+  },
+  "agentInterface": {
+    "sharedContract": "AGENTS.md",
+    "perTool": {
+      "claude-code": "CLAUDE.md",
+      "gemini-cli": "GEMINI.md"
+    },
+    "promptLibrary": {
+      "canonical": "docs/prompt-library/PROMPTS.md",
+      "tr": "docs/prompt-library/PROMPTS.tr.md"
+    },
+    "specs": {
+      "index": "docs/specs/README.md",
+      "template": "docs/specs/SPEC-TEMPLATE.md",
+      "selfApproval": "tier A only, seven-question gate must be all-no"
+    },
+    "unattendedDriver": ".agent/run.sh",
+    "resultEnvelope": [
+      "pass",
+      "blocked",
+      "environment",
+      "halted",
+      "nothing-to-do"
+    ],
+    "gitProtocol": "one branch and one commit per spec (feat/spec-<nnn>-<slug>); never push; refuse to start on a dirty tree (ADR-0025)"
+  }
+}

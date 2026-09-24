@@ -1,0 +1,29 @@
+# secrets — subject V.8: committed credentials fail the project
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# macOS
+.DS_Store
+
+# .NET
+bin/
+obj/
+*.user
+
+# node / React Native
+node_modules/
+MusicRoomApp/ios/Pods/
+MusicRoomApp/android/build/
+MusicRoomApp/android/.gradle/
+*.keystore
+!debug.keystore
+
+# vendored reference repo (own git history, study material only)
+reference/
+
+# agent run artifacts — transient, never committed
+.agent/runs/
+.agent/*.local
