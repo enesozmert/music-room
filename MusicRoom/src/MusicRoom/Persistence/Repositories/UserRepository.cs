@@ -15,7 +15,11 @@ internal sealed class UserRepository : IUserRepository
 
     /// <summary>Takes the scoped context.</summary>
     /// <param name="context">The unit of work for this request.</param>
-    internal UserRepository(MusicRoomDbContext context) => _context = context;
+    /// <remarks>
+    /// Public on an internal type: the container activates a registered implementation through a
+    /// public constructor only, and an internal one leaves <see cref="IUserRepository"/> unresolvable.
+    /// </remarks>
+    public UserRepository(MusicRoomDbContext context) => _context = context;
 
     /// <inheritdoc />
     public async Task<bool> TryRegisterAsync(

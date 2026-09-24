@@ -478,6 +478,75 @@ escalation: |
   `private const`, and the EF Design version must track the Npgsql provider's EF Core version
   rather than the newest published one.
 
+  ---
+
+  STOPPED ON THE ENVIRONMENT, 2026-09-24 — `.env` does not exist on this host, so `make migrate`
+  cannot run. Nothing is wrong with the code or with this spec.
+
+  Block 3's resolution held. `Microsoft.EntityFrameworkCore.Design` now sits on
+  `MusicRoom.WebAPI.csproj` as well, with `PrivateAssets="all"`, and `dotnet ef migrations add`
+  succeeded from the `WebAPI` startup project on the first attempt after that one line. The
+  migration `20260924195820_InitialIdentity` exists, creates `users` and
+  `email_verification_tokens`, and carries `ux_users_email`,
+  `ux_email_verification_tokens_token_hash` and `ix_email_verification_tokens_user_id`.
+
+  WHAT IS PROVEN GREEN ON THIS BRANCH
+
+  `make agent-check` runs restore, format, `build -warnaserror`, the whole suite, the vulnerable
+  package scan and OpenAPI regeneration. Every step passed:
+
+  - `dotnet format --verify-no-changes` — clean across all 12 projects
+  - `dotnet build -warnaserror` — 0 errors, 0 warnings
+  - `dotnet test` — all three test projects green, 0 skipped. That includes the five
+    `RegistrationEndpointTests` cases, which run against a real PostgreSQL through Testcontainers
+    and call `Database.MigrateAsync()`. **The migration is therefore already proven to apply to a
+    clean database** — which is exactly what the Verification table says `make migrate` proves.
+  - `dotnet list package --vulnerable --include-transitive` — no advisory in any project
+  - `make openapi` — regenerated; `POST /api/v1/auth/registrations` and `RegistrationRequest` are
+    in `docs/api/openapi.json` for the first time
+
+  The last line of `agent-check`, `git diff --exit-code -- docs/api/openapi.json`, reports the
+  regenerated document as a diff. That is the change this spec asks for, not a failure; it closes
+  when the file is committed.
+
+  WHAT IS NOT PROVEN, AND WHY IT IS NOT A CODE PROBLEM
+
+  `make migrate` needs `DATABASE_URL`, which lives in `.env`. `.env` is git-ignored and absent from
+  this host — `docker compose` refuses to interpolate `POSTGRES_USER`, `POSTGRES_PASSWORD` and
+  `POSTGRES_DB`, so the `db` service cannot start either. Docker itself is running (29.8.0).
+
+  The run did not create `.env`. Writing one means inventing a credential and writing a file outside
+  the Files table, and the §2.8 guardrail forbids both. This is the §2.7 row "a credential the slice
+  needs does not exist yet", reached on the local database rather than on the mail provider —
+  ADR-0026 is the bring-up decision behind it.
+
+  TWO FIXES MADE INSIDE THE FILES TABLE, BOTH WORTH READING
+
+  1. `UserRepository`'s constructor was `internal`, so the container could not activate it:
+     `A suitable constructor for type 'MusicRoom.Persistence.Repositories.UserRepository' could not
+     be located.` This surfaced the moment `dotnet ef` built the host — that is, it would have
+     surfaced on the first `Development` start-up, because `ValidateOnBuild` is on there. The
+     constructor is now `public` on an internal type. Worth a lesson row: an internal type is fine
+     for DI, an internal constructor is not.
+  2. The EF-generated migration failed four analyzer rules — `CHARSET`, `IDE0161`, `CA1062` twice,
+     and `S138` (`Up` was 52 lines against a 40-line limit). It was reformatted by hand: file-scoped
+     namespace, `ArgumentNullException.ThrowIfNull` in `Up` and `Down`, and the body split into
+     `CreateUsersTable`, `CreateEmailVerificationTokensTable` and `CreateIndexes`. No severity was
+     touched and no suppression was added. The emitted SQL is unchanged — same calls, same order,
+     same arguments. Every `dotnet ef migrations add` in this repository will need the same pass;
+     that is worth a lesson row of its own.
+
+  WHAT IS NEEDED TO FINISH
+
+  1. `cp .env.example .env` and fill it, then `make up`. A human does this; the agent may not.
+  2. Re-run the cycle. Stage 1 resumes this spec — status is back to `approved`, no second spec and
+     no second gate. The next run has only `make migrate` left to prove, then stage 5: SDD §16, the
+     migrations index, the threat-register row for deferred rate limiting, the commit, the push and
+     the draft pull request.
+
+  Work in progress is committed on `feat/spec-002-identity-registration` and **not pushed**, so the
+  tree is clean and the driver can start again.
+
 ---
 
 # Register an account

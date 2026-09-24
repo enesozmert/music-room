@@ -2,6 +2,8 @@
 # First run: git clone -> cp .env.example .env -> fill values -> make up
 
 SOLUTION := MusicRoom/MusicRoom.sln
+PERSISTENCE := MusicRoom/src/MusicRoom/Persistence/MusicRoom.Persistence.csproj
+WEBAPI := MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj
 
 .PHONY: up down migrate test lint load openapi agent-check
 
@@ -11,9 +13,17 @@ up: ## build and start the full stack
 down: ## stop and remove containers
 	docker compose down
 
-migrate: ## apply EF Core migrations
-	@echo "make migrate: nothing to apply. The first migration arrives with slice S1 (Identity)."
-	@echo "Until then there is no DbContext and no table — SPEC-001 out of scope."
+# `dotnet ef` runs on the host, so it takes DATABASE_URL from .env, which names localhost. The
+# compose file rewrites the same value to Host=db for the container. Sourcing .env keeps the
+# credential out of the command line and out of this file — secrets-management, ADR-0026.
+migrate: ## apply EF Core migrations to the database DATABASE_URL names
+	@test -f .env || { echo "make migrate: .env is missing. cp .env.example .env and fill it in — ADR-0026."; exit 1; }
+	dotnet tool restore
+	@set -a; . ./.env; set +a; \
+	dotnet ef database update \
+		--project $(PERSISTENCE) \
+		--startup-project $(WEBAPI) \
+		--context MusicRoomDbContext
 
 test: ## run the full test suite
 	dotnet test --solution $(SOLUTION)
