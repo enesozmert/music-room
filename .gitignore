@@ -24,6 +24,9 @@ MusicRoomApp/android/.gradle/
 # vendored reference repo (own git history, study material only)
 reference/
 
-# agent run artifacts — transient, never committed
+# agent run artifacts and controls — transient, never committed.
+# STOP must be ignored: an untracked control file makes the tree dirty, and the driver
+# refuses to start on a dirty tree, so pulling the cord would jam the next run.
 .agent/runs/
+.agent/STOP
 .agent/*.local

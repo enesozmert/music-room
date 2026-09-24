@@ -1,7 +1,7 @@
 ---
 aliases: [delivery-plan]
 kind: plan
-version: 1.7.0
+version: 1.8.0
 status: active
 updated: 2026-09-23
 ---
@@ -174,6 +174,7 @@ Each slice below cuts through all five projects and ends with something demonstr
 |---|---|---|---|
 | S0 | Walking skeleton | solution per [[ADR-0011-solution-layout]], `Directory.Packages.props` with the set in [[ADR-0021-backend-dependency-set]], `docker compose` with a **local PostgreSQL container** ([[ADR-0026-environment-bring-up]]), `Makefile`, CI, `/health`, `/health/ready`, published OpenAPI | IV.1, V.8 |
 | S1 | Identity | register (BCrypt cost >= 12), email verification, login, JWT + refresh rotation, password reset | V.1, V.6 |
+| S1a | Mail provider adapter | the real hosted-provider implementation of `IMailService`, once the account and API key exist — issue O17 | V.1 |
 | S2 | Audit + client context | required headers, middleware, audit behaviour, **SignalR hub filter**, audit table | V.6 |
 | S3 | Profile | three visibility tiers, per-field server-side filtering, music preferences | V.1 |
 | S4 | Catalog | YouTube adapter, `TrackRef`, caching, quota discipline | III |
@@ -192,8 +193,11 @@ Each slice below cuts through all five projects and ends with something demonstr
   day one than in slice S5.
 - **S0 to S3 run on a local PostgreSQL container; Supabase joins at S4**
   ([[ADR-0026-environment-bring-up]]). Same engine, same migrations, different connection string.
-- **External credentials are created just in time**: mail before S1, YouTube and the Supabase
-  project before S4, Google and Facebook before S8.
+- **External credentials are created just in time**: YouTube and the Supabase project before S4,
+  Google and Facebook before S8. **Mail moved to the end of S1** (owner decision, 2026-09-24):
+  SPEC-003 ships a Development-only logging `IMailService` so the verification flow is testable
+  immediately, and the provider adapter lands as its own small spec once the key exists. V.1 still
+  requires real delivery before the defence — the logging implementation is a staging post.
 - **S2 early.** The audit log touches every mutating endpoint. Added late, it means revisiting
   every controller and every handler. Added at slice 2, every later slice inherits it.
 - **S4 before S5.** Both services need track metadata. Building the adapter twice is waste.
