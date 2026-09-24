@@ -81,18 +81,17 @@ dotnet_diagnostic.CA1506.severity = error              # excessive class couplin
 dotnet_code_quality.CA1506.threshold = 30
 
 # SonarAnalyzer.CSharp: line counts and member counts, which CA rules cannot express.
-dotnet_diagnostic.S138.severity = error                # method has too many lines
-sonar.csharp.S138.max = 40
-dotnet_diagnostic.S1541.severity = error               # cyclomatic complexity
-sonar.csharp.S1541.maximumFunctionComplexityThreshold = 10
-dotnet_diagnostic.S107.severity = error                # too many parameters
-sonar.csharp.S107.max = 5
-dotnet_diagnostic.S134.severity = error                # nesting too deep
-sonar.csharp.S134.max = 3
-dotnet_diagnostic.S1448.severity = error               # too many methods in a type
-sonar.csharp.S1448.maximumMethodThreshold = 15
-dotnet_diagnostic.S104.severity = error                # file has too many lines
-sonar.csharp.S104.maximumFileLocThreshold = 300
+#
+# Severities live here. The numeric THRESHOLDS live in MusicRoom/SonarLint.xml, because
+# SonarAnalyzer reads rule parameters only through the Roslyn AdditionalFiles mechanism.
+# `sonar.csharp.*` keys in this file are silently ignored: they were here until 2026-09-24, and
+# S138 fired at its own default of 80 lines the whole time. Change a threshold in SonarLint.xml.
+dotnet_diagnostic.S138.severity = error                # method has too many lines (40)
+dotnet_diagnostic.S1541.severity = error               # cyclomatic complexity (10)
+dotnet_diagnostic.S107.severity = error                # too many parameters (5)
+dotnet_diagnostic.S134.severity = error                # nesting too deep (3)
+dotnet_diagnostic.S1448.severity = error               # too many methods in a type (15)
+dotnet_diagnostic.S104.severity = error                # file has too many lines (300)
 dotnet_diagnostic.S1200.severity = warning             # class coupling
 
 # ---- correctness rules escalated ----

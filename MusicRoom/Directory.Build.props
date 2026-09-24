@@ -1,0 +1,44 @@
+<Project>
+
+  <!--
+    Shared properties for every project in the solution.
+    Rules:     docs/technical-guide/10-backend/dotnet-csharp/STANDARD.md
+    Decisions: brain/decisions/ADR-0009-code-quality-gates.md
+               brain/decisions/ADR-0015-hosting-and-deployment.md
+    Severities live in the repository-root .editorconfig, never here and never in a .csproj.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <!-- openapi-documentation: descriptions come from the source, not a parallel document. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <RootNamespace>$(MSBuildProjectName)</RootNamespace>
+    <AssemblyName>$(MSBuildProjectName)</AssemblyName>
+  </PropertyGroup>
+
+  <!--
+    ADR-0009: the size and complexity limits must actually run. An analyzer that is documented but
+    not referenced is a suggestion. Both are build-time only and ship no runtime code.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" PrivateAssets="all" />
+    <PackageReference Include="SonarAnalyzer.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!--
+    SonarAnalyzer reads severities from .editorconfig but rule parameters only from SonarLint.xml,
+    through the Roslyn AdditionalFiles mechanism. Without this item the ADR-0009 thresholds are
+    inert and every Sonar rule falls back to its own default.
+  -->
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)SonarLint.xml" Visible="false" />
+  </ItemGroup>
+
+</Project>

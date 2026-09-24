@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ADR-0012: xUnit, NSubstitute, WebApplicationFactory. xUnit v3 runs as its own process. -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- xUnit v3 ships its own Microsoft.Testing.Platform runner. Microsoft.NET.Test.Sdk and
+         xunit.runner.visualstudio are the VSTest bridge, which the .NET 10 SDK has removed. -->
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+
+</Project>

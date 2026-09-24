@@ -9,7 +9,7 @@ Every component in this workspace. One row per component. Cards hold the detail.
 
 | Component | Type | Status | Stack | Card |
 |---|---|---|---|---|
-| MusicRoom.Backend | backend / REST + realtime API | planned, not scaffolded; all 3 services in scope | .NET 10, ASP.NET Core, EF Core, SignalR | [[musicroom-backend]] |
+| MusicRoom.Backend | backend / REST + realtime API | scaffolded (slice S0): solution, packages, compose, CI, health endpoints, generated OpenAPI. No domain code yet; all 3 services in scope | .NET 10, ASP.NET Core, EF Core, SignalR | [[musicroom-backend]] |
 | MusicRoom.Mobile | mobile client at `MusicRoomApp/` | parallel workstream, separate owner | React Native | [[musicroom-mobile]] |
 | nArchitecture | reference material — **read only, never edited** | external, frozen | .NET 6 Clean Architecture | [[reference-narchitecture]] |
 | docs/subject | authoritative requirements | fixed, v6 | PDF | [[subject-requirements]] |
@@ -20,7 +20,7 @@ Every component in this workspace. One row per component. Cards hold the detail.
 
 ```
 music-room/
-├── MusicRoom/            # backend source code (.NET 10). Currently empty.
+├── MusicRoom/            # backend source code (.NET 10). Solution, 9 projects, 1 test project.
 ├── MusicRoomApp/         # React Native client. Currently empty. Owner: UI developer.
 ├── brain/                # knowledge layer
 ├── docs/
