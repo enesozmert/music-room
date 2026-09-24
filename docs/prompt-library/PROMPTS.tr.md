@@ -2,7 +2,7 @@
 aliases: [prompt-library-tr, prompt-kutuphanesi]
 kind: prompt-library
 lang: tr
-version: 2.5.0
+version: 2.6.0
 updated: 2026-09-24
 ---
 
@@ -333,6 +333,22 @@ Her bölümü doldur. Özellikle:
 - Files: tam yollar; bu listenin dışına dokunulmayacak
 - Verification: geçmesi gereken komutlar ve her birinin neyi kanıtladığı
 - Gate: yedi sorunun hepsini dürüstçe yanıtla
+
+Gate'i yanıtlamadan önce FILES TABLOSUNU YÜRÜ. Üç döngü, tam görünüp tam olmayan tablolara
+harcandı. Oluşturacağın her dosya için:
+
+1. Hangi assembly'de duruyor, hangi assembly'ler ona referans vermeli? Bu referansların her biri
+   bir `.csproj` değişikliğidir — listele. docs/SDD.md bölüm 7.1'deki bağımlılık grafiğinde dışa
+   dönük bir referans eksik satır değil, yanlış tasarımdır: dur ve escalate et.
+2. Tip bir assembly sınırını geçiyor mu? O zaman public olur, kendi dosyası gerekir, ve tüketenin
+   görmeye izinli olduğu bir abstraction lazım. O dosyayı da adlandır.
+3. Onu gerçekten çağıran bir şey var mı? ValidationBehaviour'ı olmayan validator, repository'si
+   olmayan handler, kimsenin çağırmadığı registration — hepsi derlenip hiçbir şey yapmayan dosya.
+4. Henüz pinlenmemiş bir CLI, tool manifest veya paket gerekiyor mu? Bu gate 2'dir.
+5. Dört corePackage varsaydığın şeyi içeriyor mu? Boş olabilirler. Varsayma, bak.
+
+Cevapları spec'e yaz. Bu şekilde yürünmemiş bir Files tablosu bitmemiştir, ve onaylanması bir
+insanın turunu çöpe atar.
 
 Herhangi bir gate cevabı "yes" ise: status draft, escalation alanına hangi gate'in tetiklendiğini
 ve nedenini yaz, dur. Devam etme.

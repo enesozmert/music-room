@@ -1,7 +1,7 @@
 ---
 aliases: [prompt-library]
 kind: prompt-library
-version: 2.5.0
+version: 2.6.0
 updated: 2026-09-24
 ---
 
@@ -339,6 +339,22 @@ Fill every section. In particular:
 - Files: exact paths, nothing outside them will be touched
 - Verification: commands that must pass, and what each one proves
 - Gate: answer all seven questions honestly
+
+Before you answer the gate, WALK THE FILES TABLE. Three cycles were lost to tables that looked
+complete and were not. For every file you intend to create:
+
+1. Which assembly does it live in, and which assemblies must reference it? Every one of those
+   references is a `.csproj` change — list it. A reference that points outward in the dependency
+   graph of docs/SDD.md section 7.1 is not a missing row, it is a wrong design: stop and escalate.
+2. Does the type cross an assembly boundary? Then it is public and needs its own file, and the
+   consumer needs an abstraction it is allowed to see. Name that abstraction's file too.
+3. Does anything actually invoke it? A validator with no ValidationBehaviour, a handler with no
+   repository, a registration nothing calls — each is a file that compiles and does nothing.
+4. Does it need a CLI, a tool manifest, or a package that is not pinned yet? That is gate 2.
+5. Do the four corePackages contain what you assume? They may be empty. Check, do not assume.
+
+Write the answers into the spec. A Files table that has not been walked this way is not finished,
+and approving it wastes a human's turn.
 
 If any gate answer is "yes": set status to draft, fill escalation with which gate tripped and
 why, and stop. Do not continue.

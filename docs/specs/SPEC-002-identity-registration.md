@@ -186,6 +186,173 @@ escalation: |
 
   This spec is approved again. Stage 1 resumes it; no second spec, no second gate.
 
+  ---
+
+  BLOCKED AT STAGE 3 AGAIN, 2026-09-24 — the write path still has no abstraction to write through.
+
+  ADR-0028 is not in question and nothing below reopens it. Its two resolutions hold: the common
+  column base is `Domain/Common/Entity.cs`, and `IPasswordHasher` is declared in `Application` with
+  the BCrypt implementation in `Infrastructure`. The run resumed the approved spec, read AGENTS.md,
+  ADR-0028, ADR-0007, ADR-0011, ADR-0026, the clean-architecture-cqrs, ef-core-persistence,
+  database-design-migrations, testing, authentication-authorization, dotnet-csharp and
+  openapi-documentation standards, SDD §7.1, §8.2, §8.3, §10.1, §16, `.editorconfig`, the Makefile,
+  `docker-compose.yml` and every existing file under `MusicRoom/`. It then stopped before the first
+  source edit. Branch `feat/spec-002-identity-registration` exists; no source file was written, no
+  commit was made, nothing was pushed. The only change on disk is this status transition and this
+  note.
+
+  Two defects. Both are stop conditions in `docs/prompt-library/PROMPTS.md` §2.7. Neither is the
+  agent's to decide.
+
+  DEFECT 3 — `RegisterCommandHandler` cannot reach the database, because no persistence abstraction
+  appears anywhere in the Files table.
+
+  Step 6 says the handler "hashes, attempts the insert, and treats a unique-violation as success".
+  The Files table gives the handler exactly one injectable abstraction,
+  `Application/Abstractions/Security/IPasswordHasher.cs`. There is no repository interface, no unit
+  of work and no `DbContext` abstraction in the table, and none exists in the repository today:
+  all four `corePackages` projects contain a `.csproj` and no `.cs` file at all.
+
+  The handler cannot take `MusicRoomDbContext` instead. `Application` MUST NOT reference EF Core
+  (clean-architecture-cqrs v1.2.0, hard rules; SDD §7.1), and `MusicRoomDbContext` sits in
+  `Persistence`, which is outward from `Application`.
+
+  The interface also cannot be folded into a file the table already lists. It has to be `public`
+  for `Persistence` to implement it across the assembly boundary, and dotnet-csharp v1.3.0 states
+  "File name matches the single public type it contains. One public type per file." Declaring it
+  beside `RegisterCommandHandler` trades a Files-table violation for a standards violation.
+
+  Where it belongs is already settled and needs no new decision — ef-core-persistence v1.1.0:
+  "Interfaces in `Application`, implementations in `Persistence`." What is missing is only the
+  Files-table rows:
+
+  | Path | Action |
+  |---|---|
+  | `MusicRoom/src/MusicRoom/Application/Abstractions/Persistence/IUserRepository.cs` | create — the write path the handler consumes |
+  | `MusicRoom/src/MusicRoom/Persistence/Repositories/UserRepository.cs` | create — the EF Core implementation, which is also where the unique-violation is caught |
+
+  ef-core-persistence also asks for "a generic base repository" with entity-specific repositories
+  on top. For a single aggregate the two rows above are enough, and ADR-0028 already accepted that
+  a generic base in `Core.Persistence` can only constrain on `where TEntity : class`. Adding that
+  base now would be a third project and a fourth row; the recommendation is to defer it until a
+  second aggregate exists, and to say so in the spec so the next reader does not re-derive it.
+
+  DEFECT 4 — the readiness-check row asks `WebAPI` to touch `DbContext`, which a hard rule forbids.
+
+  Row: `MusicRoom/src/MusicRoom/WebAPI/HealthChecks/DatabaseReadinessCheck.cs`, "change — read
+  through the `DbContext` now that one exists". Step 8 repeats it: "move the readiness check onto
+  the `DbContext`".
+
+  `DatabaseReadinessCheck` is a `WebAPI` type. Three accepted sources forbid what the row asks, in
+  the same words each time:
+
+  - clean-architecture-cqrs v1.2.0, hard rules: "`WebAPI` MUST NOT touch `DbContext` directly."
+  - The same standard's project table gives `WebAPI` "controllers, SignalR hubs, middleware, DI
+    registration, OpenAPI" — no data access.
+  - SDD §7.1: "`WebAPI` never touches `DbContext` directly. A reference pointing outward is a
+    build-breaking defect, not a style issue."
+
+  This is the same shape as ADR-0028's defect 2: a layering edge the spec introduces in passing and
+  no document has drawn. Gate question 1 was answered "no" on the reading that this spec implements
+  the accepted layering. On this row it does not.
+
+  Three resolutions, all of them the owner's to pick:
+
+  (a) Drop the row. `DatabaseReadinessCheck` keeps opening an `NpgsqlConnection` and stays exactly
+      as SPEC-001 wrote it. Readiness then proves the socket, not the schema — which is what a
+      readiness probe is for, and what T-24 in the threat register already describes. Cheapest,
+      and no layering question arises.
+  (b) Declare a readiness abstraction in `Application` and implement it in `Persistence`, the same
+      shape ADR-0028 chose for `IPasswordHasher`. Readiness then proves the schema is reachable
+      through the mapped context. Costs two more Files-table rows and one more `Application`
+      abstraction whose only consumer is a health check.
+  (c) Use `AddDbContextCheck` from `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`.
+      Rejected as an agent suggestion rather than escalated: it is a new dependency (gate 2), and
+      registering it still names the `DbContext` type inside `WebAPI`, so it does not avoid the
+      layering question it appears to solve.
+
+  The recommendation is (a), with one sentence in the spec saying why readiness deliberately checks
+  the connection and not the schema. It is the only resolution that adds nothing.
+
+  NOT BLOCKING, BUT THE FILES TABLE SHOULD SAY SO
+
+  1. `MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj` is listed as "change — reference
+     `Persistence` and `Infrastructure` for composition". It already references both, from SPEC-001.
+     The row is a no-op; leaving it in place invites a reader to look for a diff that will not exist.
+  2. `BCryptPasswordHasher` needs a work factor "from configuration with a floor of 12". The run
+     intends to read it with a default of 12 in code, so that
+     `MusicRoom/src/MusicRoom/WebAPI/appsettings.json` — which the table does not list — needs no
+     change. Confirm that reading, or add the appsettings row.
+  3. Nothing registers `BCryptPasswordHasher`. The table lists `ApplicationServiceRegistration.cs`
+     and `PersistenceServiceRegistration.cs` but no `InfrastructureServiceRegistration.cs`, so the
+     run intends to register the concrete type from `Program.cs`, which is the composition root and
+     may legitimately do it. Confirm that, or add the row for symmetry with the other two layers.
+  4. `Application/Behaviours/ValidationBehaviour.cs` is not in the table, so `RegisterCommandValidator`
+     would never run: FluentValidation validators do not execute themselves, and
+     clean-architecture-cqrs puts validation at position 3 of the MediatR pipeline. The run intends
+     to validate inside `AuthEndpoints` and return `400`/`422` there, which keeps the diff smaller
+     and is defensible while exactly one command exists. Confirm that, or add the behaviour row —
+     but note that the endpoint-level choice must be revisited the moment a second command lands,
+     and the standard's "a cross-cutting concern that appears in more than two handlers belongs in a
+     behaviour" is the trigger.
+  5. `make migrate` and `dotnet ef migrations add` both need the `dotnet-ef` CLI. It is referenced by
+     ADR-0026 and the ef-core-persistence standard but is not installed on this host and the
+     repository has no `.config/dotnet-tools.json`. A local tool manifest is the reproducible answer
+     and would be a new file outside the table; a documented global install is the alternative and
+     costs nothing in the repository. Owner's call which one, because a manifest is also a pinned
+     tool version, which is close enough to a dependency to deserve the gate.
+  6. `make agent-check` runs `dotnet format --verify-no-changes` across the solution, and
+     EF-generated migration files routinely fail it. Expect one formatting pass over
+     `Persistence/Migrations/` inside the self-heal budget. Recorded here so it is not mistaken for
+     a code defect on the next cycle.
+
+  WHAT IS NEEDED TO UNBLOCK
+
+  1. Add the two rows in defect 3 to the Files table. No decision is required; the placement is
+     already fixed by ef-core-persistence and ADR-0028.
+  2. Pick (a), (b) or (c) for the readiness check in defect 4, and correct the row and step 8 to
+     match. If (b), the two extra rows land with it.
+  3. Answer the five confirmations above, or add the corresponding rows.
+  4. Set status back to `approved`. Stage 1 will resume this spec on the next cycle with no second
+     spec written and no second gate run.
+
+  Nothing else in the spec is in doubt. The package set, the two tables, the work-factor floor, the
+  202 behaviour, the test list and the parallel `ux_users_email` test all stand as approved.
+
+  ---
+
+  BLOCK 2 RESOLVED, 2026-09-24. The second implementation attempt stopped before its first source
+  edit and was right again. Both defects were in this spec.
+
+  Defect 3, the handler had nothing to write through. Step 6 inserts a row, but the Files table
+  gave the handler only `IPasswordHasher`. It cannot take `MusicRoomDbContext`, because
+  `Application` must not reference EF Core. ef-core-persistence already settles the placement, so
+  no decision was needed, only the missing rows: `IUserRepository` in Application,
+  `UserRepository` in Persistence.
+
+  Defect 4, the readiness row broke layering. Changing `DatabaseReadinessCheck.cs` to read through
+  the `DbContext` would put `WebAPI` in touch with EF Core, which clean-architecture-cqrs and
+  SDD §7.1 forbid in the same words as ADR-0028 defect 2. RESOLVED by dropping the row: the
+  existing `NpgsqlConnection` probe stays. Readiness answers "can I reach the database", not
+  "is the schema current" — a migration check belongs to startup, not to a liveness surface.
+
+  Five confirmations, all answered:
+  - The `MusicRoom.WebAPI.csproj` row was a no-op; it already references Persistence and
+    Infrastructure. Removed.
+  - Work factor lives in `appsettings.json` as `Security:BCryptWorkFactor`, and the hasher
+    enforces a floor of 12 in code. Configuration can raise it, never lower it below the ADR-0007
+    minimum.
+  - `BCryptPasswordHasher` is registered in a new `InfrastructureServiceRegistration.cs`, matching
+    the pattern the spec already uses for Persistence and Application.
+  - **No `ValidationBehaviour` exists**, so the validator in step 6 would never have run. All four
+    corePackages are empty of `.cs` files today. The behaviour is now a listed file in
+    `Core.Application`, and `Core.Application.csproj` gains MediatR and FluentValidation.
+    This is the first pipeline behaviour in the project; the other four from
+    clean-architecture-cqrs arrive with the slices that need them.
+  - `dotnet-ef` is absent. APPROVED: `.config/dotnet-tools.json` pins it and `make migrate` runs
+    `dotnet tool restore` first. A build that depends on a CLI installed by hand on one laptop
+    fails subject IV.1 on a clean clone.
+
 ---
 
 # Register an account
@@ -242,12 +409,18 @@ Two "yes" answers. Tier B. `status: draft`, escalation filled, run stopped.
 | `MusicRoom/Directory.Packages.props` | change — pin `BCrypt.Net-Next`, `Testcontainers.PostgreSql`, `Microsoft.EntityFrameworkCore.Design` |
 | `MusicRoom/src/MusicRoom/Infrastructure/MusicRoom.Infrastructure.csproj` | change — reference `BCrypt.Net-Next` |
 | `MusicRoom/src/MusicRoom/Persistence/MusicRoom.Persistence.csproj` | change — reference `Microsoft.EntityFrameworkCore.Design` with `PrivateAssets="all"` |
-| `MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj` | change — reference `Persistence` and `Infrastructure` for composition |
+| _(removed)_ | `MusicRoom.WebAPI.csproj` already references `Persistence` and `Infrastructure`. No change |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/MusicRoom.WebAPI.Tests.csproj` | change — reference `Testcontainers.PostgreSql` and `Persistence` |
 | `MusicRoom/src/MusicRoom/Domain/Entities/User.cs` | create |
 | `MusicRoom/src/MusicRoom/Domain/Entities/EmailVerificationToken.cs` | create |
 | `MusicRoom/src/MusicRoom/Domain/Common/Entity.cs` | create — `id`, `created_at_utc`, `updated_at_utc` base, per SDD §8.3 and ADR-0028. **Not** in `Core.Persistence`: `Domain` references nothing |
 | `MusicRoom/src/MusicRoom/Application/Abstractions/Security/IPasswordHasher.cs` | create — ADR-0028: Application declares service abstractions |
+| `MusicRoom/src/MusicRoom/Application/Abstractions/Persistence/IUserRepository.cs` | create — the handler's write path. ef-core-persistence: interfaces in `Application` |
+| `MusicRoom/src/MusicRoom/Persistence/Repositories/UserRepository.cs` | create — implementations in `Persistence` |
+| `MusicRoom/src/corePackages/Core.Application/Pipelines/Validation/ValidationBehaviour.cs` | create — without it FluentValidation never runs and the validator is decoration |
+| `MusicRoom/src/MusicRoom/Infrastructure/InfrastructureServiceRegistration.cs` | create — registers `BCryptPasswordHasher` |
+| `MusicRoom/src/corePackages/Core.Application/Core.Application.csproj` | change — reference MediatR and FluentValidation for the behaviour |
+| `.config/dotnet-tools.json` | create — pins `dotnet-ef`; `dotnet tool restore` makes a clean clone able to migrate |
 | `MusicRoom/src/MusicRoom/Infrastructure/Security/BCryptPasswordHasher.cs` | create — ADR-0028: Infrastructure implements them |
 | `MusicRoom/src/MusicRoom/Application/Features/Auth/Commands/Register/RegisterCommand.cs` | create |
 | `MusicRoom/src/MusicRoom/Application/Features/Auth/Commands/Register/RegisterCommandHandler.cs` | create |
@@ -260,7 +433,7 @@ Two "yes" answers. Tier B. `status: draft`, escalation filled, run stopped.
 | `MusicRoom/src/MusicRoom/Application/ApplicationServiceRegistration.cs` | create |
 | `MusicRoom/src/MusicRoom/WebAPI/Endpoints/AuthEndpoints.cs` | create |
 | `MusicRoom/src/MusicRoom/WebAPI/Program.cs` | change — register persistence and application, map the auth endpoints |
-| `MusicRoom/src/MusicRoom/WebAPI/HealthChecks/DatabaseReadinessCheck.cs` | change — read through the `DbContext` now that one exists |
+| _(removed)_ | `DatabaseReadinessCheck.cs` is **not** changed. `WebAPI` must not touch `DbContext` (clean-architecture-cqrs, SDD §7.1). The existing `NpgsqlConnection` probe stays: readiness proves the socket, not the schema |
 | `MusicRoom/tests/MusicRoom.Application.Tests/MusicRoom.Application.Tests.csproj` | create |
 | `MusicRoom/tests/MusicRoom.Application.Tests/Features/Auth/RegisterCommandValidatorTests.cs` | create |
 | `MusicRoom/tests/MusicRoom.Infrastructure.Tests/MusicRoom.Infrastructure.Tests.csproj` | create |
