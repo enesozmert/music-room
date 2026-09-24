@@ -43,7 +43,14 @@ escalation: |
 
   OWNER DECISIONS, 2026-09-24 — all four answered, this spec is approved.
 
-  1. Gate 2, packages: APPROVED. Pin BCrypt.Net-Next and Testcontainers.PostgreSql. The agent
+  1. Gate 2, packages: APPROVED — three, not two. Pin BCrypt.Net-Next and Testcontainers.PostgreSql,
+     and add Microsoft.EntityFrameworkCore.Design, which a second cycle correctly pointed out is
+     required by `dotnet ef migrations add` and is named by no ADR. It is Microsoft-owned,
+     design-time only, ships no runtime code, and carries the same justification SPEC-001 gave
+     Microsoft.Extensions.ApiDescription.Server. Reference it from Persistence with
+     PrivateAssets="all" so it does not flow to consumers.
+
+     Pin BCrypt.Net-Next and Testcontainers.PostgreSql. The agent
      chooses the current stable version of each; CI's `dotnet list package --vulnerable
      --include-transitive` is the gate on a bad one. Testcontainers is not deferred — ADR-0012
      rejects the in-memory provider precisely because it does not enforce a unique index, which is
