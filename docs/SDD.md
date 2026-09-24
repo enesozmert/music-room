@@ -727,7 +727,7 @@ table to walk through at defence.
 | V.2.3 | reorder race conditions | §12.1 #2, §12.2 | designed |
 | V.2 | at least 2 of the 3 services | §5.2, [[ADR-0010-service-scope]] | **designed** — all three |
 | V.3 | backend is the single source of truth | §4.2, §8.1 | designed |
-| V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **designed** -- built-in generator emits `openapi.json` once code exists |
+| V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **partly implemented** -- `docs/api/openapi.json` is generated from the code and committed; it documents the two health endpoints, which is every endpoint that exists |
 | V.5 | client is a remote control | §4.1, §9.1 | designed |
 | V.5 | configurable backend address | §9.1, [[musicroom-mobile]] | designed |
 | V.5 | social authentication on mobile | §10.2 | designed |
@@ -738,12 +738,12 @@ table to walk through at defence.
 | V.7 | measure and justify concurrent users | §14.4, [[ADR-0018-load-testing-tool]] | tool decided; measurement not started |
 | V.7 | declare server specification | §14.1, [[ADR-0015-hosting-and-deployment]], [[ADR-0016-supabase-plan-region]] | machine and region decided; measurement not started |
 | V.6 | OWASP conformance of all code | [[asvs-conformance]], §13 | target committed, evidence pending |
-| V.8 | per-layer tests | [[testing]], [[ADR-0012-test-stack]] | stack decided, tests not written |
-| V.8 | continuous integration | [[ci-cd-containerization]] | rules defined, pipeline not written |
+| V.8 | per-layer tests | [[testing]], [[ADR-0012-test-stack]] | **partly implemented** -- API integration layer only, 4 tests over the health endpoints. Domain, application, validation, persistence and realtime layers arrive with the slices that create them |
+| V.8 | continuous integration | [[ci-cd-containerization]] | **done** -- `.github/workflows/backend-dev.yml` and `backend-prod.yml`: restore, format, build -warnaserror, test, vulnerable-package scan, OpenAPI drift check; prod also builds the image. No deployment, by [[ADR-0015-hosting-and-deployment]] |
 | V.8 | credentials in a git-ignored `.env` | §14.3, `.env.example` | **done** |
-| V.8 | enforced code quality | [[dotnet-csharp]], `.editorconfig` | **done** — config written, fires once code exists |
+| V.8 | enforced code quality | [[dotnet-csharp]], `.editorconfig`, `MusicRoom/SonarLint.xml` | **done** -- proven live in S0: a 47-line method fails the build with `S138 ... greater than the 40 lines authorized`, and six parameters fail with `S107`. The thresholds moved to `SonarLint.xml`; in `.editorconfig` they were silently ignored |
 | IV.1 | no third-party source in the repo | §5.1, `.gitignore` excludes `reference/` | **done** |
-| IV.1 | dependencies install from a fresh clone | §14.2 | **not started** |
+| IV.1 | dependencies install from a fresh clone | §14.2, `Makefile`, `docker-compose.yml` | **done** -- clone, `cp .env.example .env`, fill, `make up`. Verified end to end: the API container serves `/health` and `/health/ready` against the compose PostgreSQL |
 | IV.2 | mobile app covers all operations | `MusicRoomApp/`, [[musicroom-mobile]] | parallel workstream, owned by the UI developer |
 | VII | submitted in the git repository | [[ADR-0020-monorepo-layout]] | **designed** -- one clone holds backend, client and documentation |
 | III | the SDK must not do our work | §4.2, §9.3 | designed |

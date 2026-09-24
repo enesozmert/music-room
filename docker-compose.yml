@@ -1,0 +1,42 @@
+# Local runtime — ci-cd-containerization, ADR-0026.
+# S0 to S3 run against the `db` service below. S4 onward points DATABASE_URL at Supabase and this
+# service stays for Testcontainers and offline work. Same engine, same migrations.
+#
+# No credential is written in this file. Every value comes from .env, which is git-ignored.
+
+services:
+  db:
+    image: postgres:18.2-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./MusicRoom
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      # Vendor-neutral by design — ADR-0026. Inside the compose network the host is `db`, so the
+      # .env value, which names localhost for `dotnet ef` on the host, is rewritten here.
+      DATABASE_URL: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      OTEL_EXPORTER_ENABLED: ${OTEL_EXPORTER_ENABLED:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:

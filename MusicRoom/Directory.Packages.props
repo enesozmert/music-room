@@ -1,0 +1,60 @@
+<Project>
+
+  <!--
+    Central package management. A version number appears exactly once in this solution.
+    The set is fixed by brain/decisions/ADR-0021-backend-dependency-set.md.
+    Adding a package is a decision, not a convenience.
+    Never copy a version from reference/nArchitecture — that tree is net6 and stale.
+  -->
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <ItemGroup Label="CQRS and validation — ADR-0021">
+    <!-- MediatR >= 13.0.0 carries the LuckyPennySoftware commercial agreement. The free Community
+         License covers this project; verified 2026-09-24, recorded in ADR-0021 Consequences. -->
+    <PackageVersion Include="MediatR" Version="14.2.0" />
+    <PackageVersion Include="FluentValidation" Version="12.1.1" />
+    <PackageVersion Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+  </ItemGroup>
+
+  <ItemGroup Label="API surface — ADR-0021">
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <!-- Beyond the ADR-0021 list, approved at the SPEC-001 gate: build-time emission of
+         docs/api/openapi.json. Build-only, Microsoft-owned, no runtime code. -->
+    <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup Label="Persistence — ADR-0021, ADR-0026">
+    <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup Label="Observability — ADR-0022">
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.19.1" />
+    <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.19.0" />
+    <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.19.1" />
+  </ItemGroup>
+
+  <ItemGroup Label="Analyzers — ADR-0009">
+    <PackageVersion Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="10.0.401" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.34.0.3385" />
+  </ItemGroup>
+
+  <ItemGroup Label="Tests — ADR-0012">
+    <PackageVersion Include="xunit.v3" Version="4.0.1" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+  </ItemGroup>
+
+  <!--
+    On the ADR-0021 list, deliberately not pinned yet: BCrypt.Net-Next (S1, password hashing) and
+    Testcontainers (S1, the first persistence test). A pinned version with no consumer is a version
+    nobody checks. Pin each when the code that uses it lands.
+  -->
+
+</Project>

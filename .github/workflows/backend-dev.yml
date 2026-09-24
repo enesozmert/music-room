@@ -1,0 +1,70 @@
+# Backend CI — dev configuration. Subject V.8, ADR-0015.
+# Same steps as backend-prod.yml, in Debug. The two differ in configuration only, never in code path.
+
+name: backend-dev
+
+on:
+  pull_request:
+    paths:
+      - "MusicRoom/**"
+      - ".github/workflows/backend-*.yml"
+      - "Makefile"
+      - "docker-compose.yml"
+      - ".editorconfig"
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - "MusicRoom/**"
+      - ".github/workflows/backend-*.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: "true"
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore MusicRoom/MusicRoom.sln
+
+      - name: Format
+        run: dotnet format MusicRoom/MusicRoom.sln --verify-no-changes
+
+      # Where the ADR-0009 size and complexity limits fire.
+      - name: Build
+        run: dotnet build MusicRoom/MusicRoom.sln -warnaserror --no-restore
+
+      - name: Test
+        run: dotnet test --solution MusicRoom/MusicRoom.sln --no-build --verbosity normal
+
+      - name: Vulnerable packages
+        run: |
+          dotnet list MusicRoom/MusicRoom.sln package --vulnerable --include-transitive \
+            > vulnerable.txt 2>&1
+          cat vulnerable.txt
+          if grep -qiE '\|\s*High|\|\s*Critical' vulnerable.txt; then
+            echo "::error::High or critical severity advisory in the dependency tree"
+            exit 1
+          fi
+
+      # openapi-documentation: the committed document must match the code that generated it.
+      # The generator boots the host, which refuses to start without DATABASE_URL. The value below
+      # is a placeholder, not a secret: generation never opens a socket.
+      - name: OpenAPI document is current
+        env:
+          DATABASE_URL: Host=localhost;Port=5432;Database=openapi;Username=openapi;Password=unused
+        run: |
+          dotnet build MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj \
+            --no-restore -p:GenerateOpenApiDocument=true
+          git diff --exit-code -- docs/api/openapi.json

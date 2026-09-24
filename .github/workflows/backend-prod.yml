@@ -1,0 +1,68 @@
+# Backend CI — prod configuration. Subject V.8, ADR-0015.
+# Release build, plus proof that the image compose runs is buildable.
+# It does NOT deploy and it does NOT push: the deployment target is a deferred ADR.
+
+name: backend-prod
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "MusicRoom/**"
+      - ".github/workflows/backend-*.yml"
+      - "Makefile"
+      - "docker-compose.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    env:
+      DOTNET_NOLOGO: "true"
+      BUILD_CONFIGURATION: Release
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore MusicRoom/MusicRoom.sln
+
+      - name: Format
+        run: dotnet format MusicRoom/MusicRoom.sln --verify-no-changes
+
+      - name: Build
+        run: dotnet build MusicRoom/MusicRoom.sln -c ${{ env.BUILD_CONFIGURATION }} -warnaserror --no-restore
+
+      - name: Test
+        run: dotnet test --solution MusicRoom/MusicRoom.sln -c ${{ env.BUILD_CONFIGURATION }} --no-build --verbosity normal
+
+      - name: Vulnerable packages
+        run: |
+          dotnet list MusicRoom/MusicRoom.sln package --vulnerable --include-transitive \
+            > vulnerable.txt 2>&1
+          cat vulnerable.txt
+          if grep -qiE '\|\s*High|\|\s*Critical' vulnerable.txt; then
+            echo "::error::High or critical severity advisory in the dependency tree"
+            exit 1
+          fi
+
+      # The generator boots the host, which refuses to start without DATABASE_URL. The value below
+      # is a placeholder, not a secret: generation never opens a socket.
+      - name: OpenAPI document is current
+        env:
+          DATABASE_URL: Host=localhost;Port=5432;Database=openapi;Username=openapi;Password=unused
+        run: |
+          dotnet build MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj \
+            --no-restore -p:GenerateOpenApiDocument=true
+          git diff --exit-code -- docs/api/openapi.json
+
+      # Proven buildable, never pushed. No registry and no token exist yet — ADR-0015.
+      - name: Container image builds
+        run: docker build -f MusicRoom/Dockerfile MusicRoom

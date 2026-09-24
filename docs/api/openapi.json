@@ -1,0 +1,80 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "MusicRoom.WebAPI | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "MusicRoom.WebAPI"
+        ],
+        "summary": "Liveness",
+        "description": "Returns 200 while the process is serving. Touches no dependency.",
+        "operationId": "GetHealth",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": [
+          "HealthEndpoints"
+        ],
+        "summary": "Readiness",
+        "description": "Returns 200 when every dependency is reachable, 503 when one is not.",
+        "operationId": "GetHealthReady",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "MusicRoom.WebAPI"
+    },
+    {
+      "name": "HealthEndpoints"
+    }
+  ]
+}

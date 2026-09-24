@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../Application/MusicRoom.Application.csproj" />
+    <ProjectReference Include="../../corePackages/Core.Security/Core.Security.csproj" />
+  </ItemGroup>
+
+</Project>

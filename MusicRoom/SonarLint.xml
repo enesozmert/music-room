@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Numeric thresholds for the SonarAnalyzer.CSharp rules named in
+  brain/decisions/ADR-0009-code-quality-gates.md.
+
+  The severities stay in the repository-root .editorconfig, which remains the single severity
+  authority. They have to be split: SonarAnalyzer reads severities from .editorconfig but reads
+  rule PARAMETERS only from this file, through the Roslyn AdditionalFiles mechanism. The
+  `sonar.csharp.*` keys that used to sit in .editorconfig were inert — S138 fired at its own
+  default of 80 lines while .editorconfig declared 40.
+
+  Do not raise a value here to make a build pass. Fix the code, or change the limit through an ADR.
+-->
+<AnalysisInput>
+  <Rules>
+
+    <!-- Method body length: 40 hard, 20 target. -->
+    <Rule>
+      <Key>S138</Key>
+      <Parameters>
+        <Parameter>
+          <Key>max</Key>
+          <Value>40</Value>
+        </Parameter>
+      </Parameters>
+    </Rule>
+
+    <!-- Cyclomatic complexity per method. -->
+    <Rule>
+      <Key>S1541</Key>
+      <Parameters>
+        <Parameter>
+          <Key>maximumFunctionComplexityThreshold</Key>
+          <Value>10</Value>
+        </Parameter>
+      </Parameters>
+    </Rule>
+
+    <!-- Parameters per method, excluding CancellationToken. -->
+    <Rule>
+      <Key>S107</Key>
+      <Parameters>
+        <Parameter>
+          <Key>max</Key>
+          <Value>5</Value>
+        </Parameter>
+      </Parameters>
+    </Rule>
+
+    <!-- Nesting depth. -->
+    <Rule>
+      <Key>S134</Key>
+      <Parameters>
+        <Parameter>
+          <Key>max</Key>
+          <Value>3</Value>
+        </Parameter>
+      </Parameters>
+    </Rule>
+
+    <!-- Methods per type. A CQRS handler has exactly one public method. -->
+    <Rule>
+      <Key>S1448</Key>
+      <Parameters>
+        <Parameter>
+          <Key>maximumMethodThreshold</Key>
+          <Value>15</Value>
+        </Parameter>
+      </Parameters>
+    </Rule>
+
+    <!-- Lines per file. -->
+    <Rule>
+      <Key>S104</Key>
+      <Parameters>
+        <Parameter>
+          <Key>maximumFileLocThreshold</Key>
+          <Value>300</Value>
+        </Parameter>
+      </Parameters>
+    </Rule>
+
+  </Rules>
+</AnalysisInput>
