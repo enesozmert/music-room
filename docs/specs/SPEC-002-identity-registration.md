@@ -1,7 +1,7 @@
 ---
 id: SPEC-002
 title: Register an account — User aggregate, first EF Core migration, BCrypt hashing, POST /auth/registrations
-status: blocked        # draft | approved | in-progress | done | blocked
+status: approved       # draft | approved | in-progress | done | blocked
 tier: B                # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S1              # which DELIVERY-PLAN slice this belongs to
 requirements: [V.1, V.6, V.8]
@@ -456,6 +456,28 @@ escalation: |
      written and no second gate run. The branch already holds the implementation; the next run
      generates the migration, runs `make agent-check` and `make migrate`, and closes out.
 
+  ---
+
+  BLOCK 3 RESOLVED, 2026-09-24 — defect 5, dependency placement.
+
+  `dotnet ef` resolves `Microsoft.EntityFrameworkCore.Design` from the **startup** project, not
+  from the project holding the `DbContext`. Owner decision 1 put it on `Persistence` with
+  `PrivateAssets="all"`, which is exactly what prevents it flowing to `WebAPI`. Both orderings
+  failed, as reported:
+
+    startup = WebAPI       -> doesn't reference Microsoft.EntityFrameworkCore.Design
+    startup = Persistence  -> Unable to resolve service for type DbContextOptions<MusicRoomDbContext>
+
+  RESOLVED, option (a): add the package to `MusicRoom.WebAPI.csproj`, also with
+  `PrivateAssets="all"`. It is design-time only and ships no runtime code, so it appears on both
+  projects and flows out of neither. Option (b), an `IDesignTimeDbContextFactory`, was rejected:
+  it is a second construction path for the `DbContext` that exists only to satisfy a CLI, and it
+  drifts from `Program.cs` the moment configuration changes.
+
+  Two findings the cycle asked to be recorded, now lessons L-031 and L-032: `IDE1006` covers
+  `private const`, and the EF Design version must track the Npgsql provider's EF Core version
+  rather than the newest published one.
+
 ---
 
 # Register an account
@@ -512,6 +534,7 @@ Two "yes" answers. Tier B. `status: draft`, escalation filled, run stopped.
 | `MusicRoom/Directory.Packages.props` | change — pin `BCrypt.Net-Next`, `Testcontainers.PostgreSql`, `Microsoft.EntityFrameworkCore.Design` |
 | `MusicRoom/src/MusicRoom/Infrastructure/MusicRoom.Infrastructure.csproj` | change — reference `BCrypt.Net-Next` |
 | `MusicRoom/src/MusicRoom/Persistence/MusicRoom.Persistence.csproj` | change — reference `Microsoft.EntityFrameworkCore.Design` with `PrivateAssets="all"` |
+| `MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj` | change — reference `Microsoft.EntityFrameworkCore.Design` with `PrivateAssets="all"`. `dotnet ef` looks for it on the **startup** project, and `PrivateAssets` on Persistence is precisely what stops it arriving there |
 | _(removed)_ | `MusicRoom.WebAPI.csproj` already references `Persistence` and `Infrastructure`. No change |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/MusicRoom.WebAPI.Tests.csproj` | change — reference `Testcontainers.PostgreSql` and `Persistence` |
 | `MusicRoom/src/MusicRoom/Domain/Entities/User.cs` | create |

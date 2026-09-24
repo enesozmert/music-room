@@ -1,7 +1,7 @@
 ---
 aliases: [sdd, software-design-document]
 kind: design-document
-version: 0.8.0
+version: 0.9.0
 status: draft
 updated: 2026-09-23
 ---
@@ -627,6 +627,7 @@ engineering decision; an unwritten one is an oversight.
 | Client | user devices | React Native, built in parallel by the second team member |
 | CI | GitHub Actions, separate `dev` and `prod` configurations, plus an independent client job | builds and tests; **does not deploy** |
 | Observability | Serilog to stdout; OpenTelemetry exporter configuration-driven, **off by default** -- [[ADR-0022-observability-stack]] | switched on for a load run |
+| Secrets | `EnvSecretProvider` by default; `InfisicalSecretProvider` behind the same abstraction, vault self-hosted in the compose stack under a `vault` profile -- [[ADR-0029-containerised-dev-and-secret-vault]] | the vault lands at S1a; the abstraction lands earlier |
 
 The defence runs on the local stack. No remote deployment target is chosen yet; Vercel cannot host
 this API (serverless, no long-lived process, no persistent WebSocket).
@@ -647,6 +648,15 @@ Issue O10, built in slice S0 of [[delivery-plan]]; rules in [[ci-cd-containeriza
 and tests but does not deploy -- [[ADR-0015-hosting-and-deployment]].
 
 ### 14.3 Configuration
+
+Development is **fully containerised**: `docker compose up` brings up the stack and the host needs
+Docker and nothing else -- [[ADR-0029-containerised-dev-and-secret-vault]]. No documented step
+requires a locally installed SDK, database client or CLI; `dotnet-ef` is pinned through
+`.config/dotnet-tools.json`.
+
+Secrets are read through a provider abstraction, so a vault can replace the environment without
+touching a call site. A vault **shrinks** `.env` to the vault's own bootstrap credentials; it does
+not remove it, and subject V.8 still applies to what remains.
 
 All configuration from environment variables, named after the role rather than the vendor
 (`DATABASE_URL`, not a provider name) -- [[ADR-0026-environment-bring-up]]. External credentials
@@ -773,6 +783,7 @@ defence, not more.
 | O11 | remote deployment target | a live demo URL | [[ADR-0015-hosting-and-deployment]]. Fly.io, Railway, Render, Azure Container Apps. **Not Vercel** |
 | O12 | fluent assertion library | test readability | add only if xUnit's built-ins prove insufficient |
 | O13 | silent-controller recovery | a stalled playback session | [[ADR-0017-playback-session]] accepted no watchdog; takeover is the manual path. Revisit only if it bites in testing |
+| O18 | self-hosted Infisical vault | API keys sitting readable in `.env` | [[ADR-0029-containerised-dev-and-secret-vault]]: the provider abstraction lands early, the vault at S1a with O17. Self-hosted Infisical needs its own PostgreSQL, Redis and encryption key — roughly five compose services instead of two. Beyond subject V.8, so it must not delay S1 to S9 |
 | O17 | real mail provider adapter | V.1 email verification actually reaching a mailbox | owner decision 2026-09-24: SPEC-003 ships a Development-only logging `IMailService`; the hosted-provider adapter is a separate spec at the end of S1. A logging implementation cannot satisfy V.1 at the defence |
 | O14 | music preferences have no consumer | nothing | V.1 requires storing and updating them, which is met. Note for defence: storage-only today |
 | O15 | MediatR licence terms | adding the package | [[ADR-0021-backend-dependency-set]]: verify the current free-tier terms before `dotnet add package` and record the result. Fallback is a hand-written dispatcher |

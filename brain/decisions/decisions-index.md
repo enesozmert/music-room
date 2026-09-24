@@ -38,5 +38,6 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0026-environment-bring-up]] | Environment bring-up sequence | Accepted |
 | [[ADR-0027-agent-push-and-pr]] | Agent pushes its branch and opens a draft pull request | Accepted |
 | [[ADR-0028-domain-owns-its-base-types]] | Domain owns its base types; Application owns its service abstractions | Accepted |
+| [[ADR-0029-containerised-dev-and-secret-vault]] | Fully containerised development, and a secret vault for API keys | Accepted |
 
 Related: [[MEMORY]] · [[system-overview]] · [[standards-router]]

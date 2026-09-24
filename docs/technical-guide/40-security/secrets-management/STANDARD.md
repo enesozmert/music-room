@@ -2,7 +2,7 @@
 standard: secrets-management
 aliases: [secrets-management]
 title: Secrets Management
-version: 1.2.0
+version: 1.3.0
 status: active
 updated: 2026-09-23
 applies-to: [backend, mobile, tooling]
@@ -26,6 +26,14 @@ This is the single rule in the subject with a stated automatic-failure consequen
 ## Project policy
 
 ### Storage
+
+Secrets are read through a **provider abstraction**, never from a call site that knows where they
+come from (`brain/decisions/ADR-0029-containerised-dev-and-secret-vault.md`). Two implementations:
+`EnvSecretProvider` by default, and `InfisicalSecretProvider` against a self-hosted vault from S1b.
+
+**A vault shrinks `.env`; it does not remove it.** The vault needs its own bootstrap credentials,
+and those live in `.env` like everything else. Subject V.8 applies to whatever remains there, and
+a committed bootstrap token fails the project exactly as a committed API key would.
 
 - Every secret is read from the environment. No secret appears in source, in `appsettings.json`,
   in a test fixture, in a migration, in a Dockerfile, or in a comment.

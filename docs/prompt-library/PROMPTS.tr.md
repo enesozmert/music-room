@@ -2,7 +2,7 @@
 aliases: [prompt-library-tr, prompt-kutuphanesi]
 kind: prompt-library
 lang: tr
-version: 2.6.0
+version: 2.7.0
 updated: 2026-09-24
 ---
 
@@ -397,8 +397,13 @@ tablosunu genişletmek.
 3 döngü sonunda hâlâ hatalıysa veya kalan tek çözüm yasak listedeyse:
   status'u blocked yap
   escalation'a hatayı ve denediğin düzeltmeleri yaz
+  Elindekini spec'in dalına `wip(spec-<nnn>): ...` mesajıyla COMMIT et; working tree temiz kalsın
+    ve sonraki döngü devam edebilsin. Blocked spec'i push etme.
   RESULT: blocked yazdır
   dur.
+
+Bloğu commit etmek başarı iddiası değildir. Kanıt kirli ağaçta değil git'te durur, ve kirli ağaçta
+başlamayı reddeden sürücü, insan ortalığı toplamadan tekrar çalışabilir.
 
 Environment hataları (Docker kapalı, ağ yok) asla kod problemi değildir. RESULT: environment
 yazdır ve hemen dur.

@@ -69,6 +69,8 @@ Three independent layers, because a prompt alone is not a control:
 3. **The driver** — a cycle cap, a `STOP` file, a refusal to start on a dirty working tree, and a
    refusal to continue on an unrecognised result line.
 4. **The git protocol** — [[ADR-0025-agent-git-protocol]] and [[ADR-0027-agent-push-and-pr]]:
+   a blocked spec commits its work in progress on its own branch with a `wip(spec-<nnn>):`
+   message and does not push, so the tree stays clean and the next cycle can resume;
    one branch, one commit and one **draft** pull request per spec. Never a push to `main`, never a
    merge. Rollback is `git branch -D feat/spec-<nnn>-<slug>` plus `gh pr close`.
 5. **Branch protection on `main`** with `enforce_admins: true` — direct pushes, force pushes and
