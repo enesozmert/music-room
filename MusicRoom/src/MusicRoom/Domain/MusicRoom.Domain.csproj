@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The innermost layer. It references nothing — clean-architecture-cqrs. -->
+
+</Project>

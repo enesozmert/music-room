@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <UserSecretsId>musicroom-webapi</UserSecretsId>
+    <!--
+      openapi-documentation: the document is generated from the code and committed, so a reader does
+      not have to run the service. Emitted on build, then copied to docs/api/openapi.json by the
+      CopyOpenApiDocument target below.
+
+      Off by default, on with -p:GenerateOpenApiDocument=true. The generator boots the real host to
+      read the document, and this host refuses to start without DATABASE_URL — by design, ADR-0026.
+      Making generation the default would make every `dotnet build` depend on an environment
+      variable it does not otherwise need. `make openapi` and the CI step supply a placeholder
+      connection string; nothing connects, because only a request to /health/ready opens a socket.
+    -->
+    <OpenApiGenerateDocumentsOnBuild>false</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiGenerateDocumentsOnBuild Condition="'$(GenerateOpenApiDocument)' == 'true'">true</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/obj/openapi</OpenApiDocumentsDirectory>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Application/MusicRoom.Application.csproj" />
+    <ProjectReference Include="../Persistence/MusicRoom.Persistence.csproj" />
+    <ProjectReference Include="../Infrastructure/MusicRoom.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+  </ItemGroup>
+
+  <Target Name="CopyOpenApiDocument" AfterTargets="Build"
+          Condition="'$(OpenApiGenerateDocumentsOnBuild)' == 'true' AND Exists('$(OpenApiDocumentsDirectory)/MusicRoom.WebAPI.json')">
+    <Copy SourceFiles="$(OpenApiDocumentsDirectory)/MusicRoom.WebAPI.json"
+          DestinationFiles="$(MSBuildProjectDirectory)/../../../../docs/api/openapi.json" />
+  </Target>
+
+</Project>

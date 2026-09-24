@@ -1,0 +1,17 @@
+# Never let a credential or build output reach an image layer — ci-cd-containerization,
+# secrets-management. .env is the one that matters most.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+bin/
+obj/
+.git/
+.github/
+node_modules/
+reference/
+**/.DS_Store
+Dockerfile
+.dockerignore
