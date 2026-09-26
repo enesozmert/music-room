@@ -29,6 +29,16 @@
 
   <ItemGroup Label="Persistence — ADR-0021, ADR-0026">
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
+    <!-- Required by `dotnet ef migrations add` and `dotnet ef database update`. Named by no ADR;
+         approved at the SPEC-002 gate on the same grounds as Microsoft.Extensions.ApiDescription.Server:
+         Microsoft-owned, design-time only, no runtime code. Referenced with PrivateAssets="all".
+         The version tracks the EF Core that Npgsql 10.0.3 brings in, not the newest published one:
+         a Design package ahead of the runtime assemblies produces an MSB3277 conflict. -->
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.4" />
+  </ItemGroup>
+
+  <ItemGroup Label="Security — ADR-0007, ADR-0021">
+    <PackageVersion Include="BCrypt.Net-Next" Version="4.2.0" />
   </ItemGroup>
 
   <ItemGroup Label="Observability — ADR-0022">
@@ -49,12 +59,9 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+    <!-- ADR-0012 rejects the in-memory provider: it does not enforce a unique index, which is what
+         the ux_users_email concurrency test has to prove. A real engine in a container does. -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
   </ItemGroup>
-
-  <!--
-    On the ADR-0021 list, deliberately not pinned yet: BCrypt.Net-Next (S1, password hashing) and
-    Testcontainers (S1, the first persistence test). A pinned version with no consumer is a version
-    nobody checks. Pin each when the code that uses it lands.
-  -->
 
 </Project>

@@ -10,6 +10,9 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj" />
+    <!-- The registration test asserts on the stored row, so it reads the mapped context directly.
+         The endpoint under test still never touches it — clean-architecture-cqrs. -->
+    <ProjectReference Include="../../src/MusicRoom/Persistence/MusicRoom.Persistence.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -18,6 +21,7 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.PostgreSql" />
   </ItemGroup>
 
 </Project>

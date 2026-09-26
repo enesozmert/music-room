@@ -30,7 +30,7 @@ Rules this document obeys: [[rest-api-design]] · [[openapi-documentation]] · [
 | Collections | `{ "items": [...], "page": 1, "pageSize": 20, "total": 137 }`, `pageSize` capped at 100 |
 | Ids in JSON | strings, always |
 | Auth | `Authorization: Bearer <access token>` |
-| Mutation headers | `X-Client-Platform`, `X-Client-Device`, `X-Client-App-Version` — **required**, missing means `400` |
+| Mutation headers | `X-Client-Platform`, `X-Client-Device`, `X-Client-App-Version` — **required**, missing means `400`. **Not enforced yet**: the middleware that validates them arrives with the audit log in slice S2, and until then a mutation without them succeeds. Verified on the S1 registration endpoint, 2026-09-24. Build clients as if the rule were live |
 | Optimistic concurrency | `ETag` on the resource, `If-Match` on the mutation, mismatch means `412` |
 
 ### Authorisation notation

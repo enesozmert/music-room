@@ -27,6 +27,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" />
+    <!--
+      Design-time only. `dotnet ef` resolves this package from the *startup* project, and
+      PrivateAssets="all" on Persistence is precisely what stops it arriving here transitively —
+      SPEC-002 defect 5. Declared on both projects, shipped by neither.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />

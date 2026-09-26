@@ -1,9 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Cross-cutting package — ADR-0011. Empty until a genuinely domain-agnostic type exists.
-    A type that mentions a playlist, an event or a vote belongs in MusicRoom.Domain or
-    MusicRoom.Application, never here.
+    Cross-cutting package — ADR-0011. A type that mentions a playlist, an event or a vote belongs in
+    MusicRoom.Domain or MusicRoom.Application, never here. The validation behaviour qualifies: it
+    knows MediatR and FluentValidation, and nothing about this product.
   -->
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="FluentValidation" />
+  </ItemGroup>
 
 </Project>

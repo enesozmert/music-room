@@ -1,7 +1,7 @@
 ---
 id: SPEC-002
 title: Register an account — User aggregate, first EF Core migration, BCrypt hashing, POST /auth/registrations
-status: approved       # draft | approved | in-progress | done | blocked
+status: done           # draft | approved | in-progress | done | blocked
 tier: B                # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S1              # which DELIVERY-PLAN slice this belongs to
 requirements: [V.1, V.6, V.8]
@@ -353,6 +353,253 @@ escalation: |
     `dotnet tool restore` first. A build that depends on a CLI installed by hand on one laptop
     fails subject IV.1 on a clean clone.
 
+  ---
+
+  BLOCKED AT STAGE 3, THIRD TIME, 2026-09-24 — the migration cannot be generated from the projects
+  the Files table allows. One `.csproj` line is missing and it is not this run's to add.
+
+  Nothing above is reopened. ADR-0028 holds, the owner's four decisions hold, and the two earlier
+  block resolutions hold. Unlike the first two blocks, this run did not stop before its first edit:
+  every other row of the Files table is implemented, and the solution builds clean with
+  `-warnaserror` and zero warnings across all ten projects. The work is on branch
+  `feat/spec-002-identity-registration`, uncommitted and unpushed, which is what §2.8 requires of a
+  blocked result.
+
+  DEFECT 5 — `dotnet ef` needs `Microsoft.EntityFrameworkCore.Design` on the **startup** project,
+  and the Files table lets it exist only on `Persistence`, privately.
+
+  The owner's decision 1 is explicit: reference the package "from Persistence with
+  `PrivateAssets="all"` so it does not flow to consumers". That was done. `PrivateAssets="all"` is
+  what makes the design-time package absent from every consumer's dependency graph — including the
+  startup project the EF tools require it on. Both orderings were tried, and both fail:
+
+  | Command | Failure |
+  |---|---|
+  | `--startup-project` = `WebAPI` | `Your startup project 'MusicRoom.WebAPI' doesn't reference Microsoft.EntityFrameworkCore.Design.` |
+  | `--startup-project` = `Persistence` | `Unable to resolve service for type 'DbContextOptions<MusicRoomDbContext>'` — a class library has no host, so EF has no options to build the context from |
+
+  The second failure is not a missing package: `Persistence` does reference `Design`. It is the
+  absence of an `IDesignTimeDbContextFactory<MusicRoomDbContext>`, which the Files table does not
+  list either.
+
+  So three Files-table rows cannot all hold at once:
+
+  - `MusicRoom/src/MusicRoom/Persistence/Migrations/` — "create — the initial migration, EF-generated"
+  - `MusicRoom.Persistence.csproj` — "reference `Microsoft.EntityFrameworkCore.Design` with `PrivateAssets="all"`"
+  - `_(removed)_` — `MusicRoom.WebAPI.csproj` is **not** in the table, so it may not change
+
+  Two resolutions. Both are the owner's, because both are dependency placement, which AGENTS.md §6
+  reserves for a human in every case.
+
+  (a) **Add `Microsoft.EntityFrameworkCore.Design` to `MusicRoom.WebAPI.csproj` with
+      `PrivateAssets="all"`, and add that file to the Files table.** This is the arrangement
+      Microsoft documents. It adds no code and no runtime asset: `PrivateAssets="all"` still keeps
+      the package out of the published output, so the owner's intent — a design-time package that
+      never ships — is preserved. The package would then be declared in two projects. Recommended.
+
+  (b) **Add `MusicRoom/src/MusicRoom/Persistence/DesignTimeDbContextFactory.cs` to the Files table**
+      and run `dotnet ef` with `Persistence` as its own startup project. `WebAPI` stays untouched
+      and the design-time package stays in exactly one project. Costs a production-assembly type
+      that exists only for tooling, and a second place that knows the name `DATABASE_URL`, which
+      ADR-0026 currently keeps in one.
+
+  Rejected without escalating: dropping `PrivateAssets="all"` so the package flows to `WebAPI`
+  transitively. It contradicts the owner's decision 1 in its own words and would put a design-time
+  package into the API's shipped dependency graph — the opposite of what that decision asked for.
+
+  WHAT WAS BUILT, AND WHAT IS NOT YET PROVEN
+
+  Implemented and compiling: the package pins, `.config/dotnet-tools.json`, `Domain/Common/Entity`,
+  `User`, `EmailVerificationToken`, `IPasswordHasher`, `IUserRepository`, `ValidationBehaviour`,
+  `BCryptPasswordHasher`, `InfrastructureServiceRegistration`, `MusicRoomDbContext`, both entity
+  configurations, `UserRepository`, `PersistenceServiceRegistration`, `ApplicationServiceRegistration`,
+  `RegisterCommand` / handler / validator, `AuthEndpoints`, the `Program.cs` wiring, and all three
+  test projects with every test the Verification table names.
+
+  Proven green on this branch: `dotnet format --verify-no-changes` over the whole solution, the
+  five `RegisterCommandValidatorTests` cases, and the three `BCryptPasswordHasherTests` cases.
+  Neither test project needs a database.
+
+  Not proven, because they all depend on the migration that could not be generated: `make migrate`,
+  and the four `RegistrationEndpointTests` cases, which call `Database.MigrateAsync()` against the
+  Testcontainers engine. `make agent-check` was therefore not run to completion either. No row of
+  `docs/SDD.md` §16 was moved, no migration was recorded, and no threat-register row was added:
+  none of them has code behind it yet.
+
+  TWO FINDINGS WORTH KEEPING, NEITHER BLOCKING
+
+  1. **`IDE1006` treats a `private const` as a field**, so `private const int Foo` fails the build
+     with "missing prefix '_'". The repository's existing code never hit this because every
+     constant it declares is either a method-local (`Program.cs`, `DatabaseReadinessCheck.cs`) or
+     `internal` (`HealthEndpointTests.cs`). This run converted its constants to method-locals and
+     to `internal` to match, rather than touching a severity. It is worth a
+     `brain/lessons/lessons-index.md` row: it will bite every future spec that declares a constant,
+     and the fix is a convention, not a suppression.
+  2. **`Microsoft.EntityFrameworkCore.Design` is pinned at 10.0.4, not at the newest 10.0.12.**
+     `Npgsql.EntityFrameworkCore.PostgreSQL` 10.0.3 brings EF Core 10.0.4, and a Design package
+     ahead of it fails the build with `MSB3277` assembly-version conflicts. The pin tracks the
+     provider, not the calendar. `.config/dotnet-tools.json` pins `dotnet-ef` at the same 10.0.4 for
+     the same reason.
+
+  One more item the Files table should settle when it is next edited: the table lists no
+  `appsettings.json` row, and the second block's resolution said the work factor "lives in
+  `appsettings.json` as `Security:BCryptWorkFactor`". This run read that exact key from
+  configuration with a code-side default and floor of `12`, and left `appsettings.json` unchanged,
+  so no file outside the table was touched. The behaviour is identical whether or not the key is
+  present. Confirm that reading, or add the `appsettings.json` row.
+
+  WHAT IS NEEDED TO UNBLOCK
+
+  1. Pick (a) or (b) for the design-time package, and add the corresponding file to the Files table.
+  2. Confirm the `appsettings.json` reading above, or add the row.
+  3. Set status back to `approved`. Stage 1 resumes this spec on the next cycle with no second spec
+     written and no second gate run. The branch already holds the implementation; the next run
+     generates the migration, runs `make agent-check` and `make migrate`, and closes out.
+
+  ---
+
+  BLOCK 3 RESOLVED, 2026-09-24 — defect 5, dependency placement.
+
+  `dotnet ef` resolves `Microsoft.EntityFrameworkCore.Design` from the **startup** project, not
+  from the project holding the `DbContext`. Owner decision 1 put it on `Persistence` with
+  `PrivateAssets="all"`, which is exactly what prevents it flowing to `WebAPI`. Both orderings
+  failed, as reported:
+
+    startup = WebAPI       -> doesn't reference Microsoft.EntityFrameworkCore.Design
+    startup = Persistence  -> Unable to resolve service for type DbContextOptions<MusicRoomDbContext>
+
+  RESOLVED, option (a): add the package to `MusicRoom.WebAPI.csproj`, also with
+  `PrivateAssets="all"`. It is design-time only and ships no runtime code, so it appears on both
+  projects and flows out of neither. Option (b), an `IDesignTimeDbContextFactory`, was rejected:
+  it is a second construction path for the `DbContext` that exists only to satisfy a CLI, and it
+  drifts from `Program.cs` the moment configuration changes.
+
+  Two findings the cycle asked to be recorded, now lessons L-031 and L-032: `IDE1006` covers
+  `private const`, and the EF Design version must track the Npgsql provider's EF Core version
+  rather than the newest published one.
+
+  ---
+
+  STOPPED ON THE ENVIRONMENT, 2026-09-24 — `.env` does not exist on this host, so `make migrate`
+  cannot run. Nothing is wrong with the code or with this spec.
+
+  Block 3's resolution held. `Microsoft.EntityFrameworkCore.Design` now sits on
+  `MusicRoom.WebAPI.csproj` as well, with `PrivateAssets="all"`, and `dotnet ef migrations add`
+  succeeded from the `WebAPI` startup project on the first attempt after that one line. The
+  migration `20260924195820_InitialIdentity` exists, creates `users` and
+  `email_verification_tokens`, and carries `ux_users_email`,
+  `ux_email_verification_tokens_token_hash` and `ix_email_verification_tokens_user_id`.
+
+  WHAT IS PROVEN GREEN ON THIS BRANCH
+
+  `make agent-check` runs restore, format, `build -warnaserror`, the whole suite, the vulnerable
+  package scan and OpenAPI regeneration. Every step passed:
+
+  - `dotnet format --verify-no-changes` — clean across all 12 projects
+  - `dotnet build -warnaserror` — 0 errors, 0 warnings
+  - `dotnet test` — all three test projects green, 0 skipped. That includes the five
+    `RegistrationEndpointTests` cases, which run against a real PostgreSQL through Testcontainers
+    and call `Database.MigrateAsync()`. **The migration is therefore already proven to apply to a
+    clean database** — which is exactly what the Verification table says `make migrate` proves.
+  - `dotnet list package --vulnerable --include-transitive` — no advisory in any project
+  - `make openapi` — regenerated; `POST /api/v1/auth/registrations` and `RegistrationRequest` are
+    in `docs/api/openapi.json` for the first time
+
+  The last line of `agent-check`, `git diff --exit-code -- docs/api/openapi.json`, reports the
+  regenerated document as a diff. That is the change this spec asks for, not a failure; it closes
+  when the file is committed.
+
+  WHAT IS NOT PROVEN, AND WHY IT IS NOT A CODE PROBLEM
+
+  `make migrate` needs `DATABASE_URL`, which lives in `.env`. `.env` is git-ignored and absent from
+  this host — `docker compose` refuses to interpolate `POSTGRES_USER`, `POSTGRES_PASSWORD` and
+  `POSTGRES_DB`, so the `db` service cannot start either. Docker itself is running (29.8.0).
+
+  The run did not create `.env`. Writing one means inventing a credential and writing a file outside
+  the Files table, and the §2.8 guardrail forbids both. This is the §2.7 row "a credential the slice
+  needs does not exist yet", reached on the local database rather than on the mail provider —
+  ADR-0026 is the bring-up decision behind it.
+
+  TWO FIXES MADE INSIDE THE FILES TABLE, BOTH WORTH READING
+
+  1. `UserRepository`'s constructor was `internal`, so the container could not activate it:
+     `A suitable constructor for type 'MusicRoom.Persistence.Repositories.UserRepository' could not
+     be located.` This surfaced the moment `dotnet ef` built the host — that is, it would have
+     surfaced on the first `Development` start-up, because `ValidateOnBuild` is on there. The
+     constructor is now `public` on an internal type. Worth a lesson row: an internal type is fine
+     for DI, an internal constructor is not.
+  2. The EF-generated migration failed four analyzer rules — `CHARSET`, `IDE0161`, `CA1062` twice,
+     and `S138` (`Up` was 52 lines against a 40-line limit). It was reformatted by hand: file-scoped
+     namespace, `ArgumentNullException.ThrowIfNull` in `Up` and `Down`, and the body split into
+     `CreateUsersTable`, `CreateEmailVerificationTokensTable` and `CreateIndexes`. No severity was
+     touched and no suppression was added. The emitted SQL is unchanged — same calls, same order,
+     same arguments. Every `dotnet ef migrations add` in this repository will need the same pass;
+     that is worth a lesson row of its own.
+
+  WHAT IS NEEDED TO FINISH
+
+  1. `cp .env.example .env` and fill it, then `make up`. A human does this; the agent may not.
+  2. Re-run the cycle. Stage 1 resumes this spec — status is back to `approved`, no second spec and
+     no second gate. The next run has only `make migrate` left to prove, then stage 5: SDD §16, the
+     migrations index, the threat-register row for deferred rate limiting, the commit, the push and
+     the draft pull request.
+
+  Work in progress is committed on `feat/spec-002-identity-registration` and **not pushed**, so the
+  tree is clean and the driver can start again.
+
+  ---
+
+  DONE, 2026-09-24. The environment stop was resolved by a human: `.env` now exists, `make up`
+  brought the stack up, and the `db` service is healthy. Nothing in the code changed on this cycle
+  — the resume ran verification against the implementation the previous cycle had already built
+  and left committed.
+
+  `make migrate` — exit 0 against the compose PostgreSQL. `20260924195820_InitialIdentity` is
+  recorded in `__EFMigrationsHistory`; the API container had already applied it on start-up, so the
+  run reports "No migrations were applied. The database is already up to date." That the migration
+  applies to an empty database is proven independently and on every run by
+  `RegistrationEndpointTests`, which calls `Database.MigrateAsync()` against a fresh Testcontainers
+  engine.
+
+  `make agent-check` — every step green. `dotnet format --verify-no-changes` clean;
+  `build -warnaserror` 0 errors and 0 warnings across 12 projects; `dotnet test` 17 passed,
+  0 failed, **0 skipped**; the vulnerable-package scan clean in all 12 projects; `make openapi`
+  regenerated with no drift, so `git diff --exit-code -- docs/api/openapi.json` passes — the
+  document committed in the previous cycle matches what the code emits today.
+
+  No self-heal cycle was needed. Nothing outside the Files table was touched.
+
+  OWASP, walked for the registration surface: A02 — BCrypt at a work factor of at least 12, read
+  back out of the hash string by a test. A03 — every query goes through EF Core with parameters,
+  no concatenated SQL. A04 — the invariant is `ux_users_email` in the database, not a
+  read-then-write check in C#, and the 20-way parallel test proves the index arbitrates.
+  A07 — `202` on both the fresh and the duplicate path, so the endpoint is not an enumeration
+  oracle; **rate limiting is absent and is the one finding left unfixed**, now `T-25` in the threat
+  register with the reason and the deadline. A09, the audit log, is slice S2 by the delivery plan
+  and out of this spec.
+
+  Closed out: `docs/SDD.md` §16 (V.1 registration and V.8 per-layer tests moved to
+  *partly implemented*, V.4 now names the endpoint in the OpenAPI document),
+  `brain/migrations/migrations-index.md` row 1, `docs/owasp/THREAT-REGISTER.md` T-25, and lessons
+  L-035 (an internal constructor defeats DI) and L-036 (every EF migration needs a formatting pass).
+
+  Still out of scope and unchanged: the verification mail, `POST /auth/email-verifications`, login
+  and JWT, social login, and rate limiting. SPEC-003 is next and needs the mail provider API key.
+
+  NOT PUSHED — the run had no approval surface for `git push`. The spec is done and the work is
+  committed on `feat/spec-002-identity-registration` as `234f177`, but the session's permission
+  layer refused `git push`, so the branch is local and no draft pull request exists. This is an
+  environment limitation, not a code or spec defect, and it is the one close-out step of §2.6 that
+  did not run. A human finishes it with:
+
+      git push -u origin feat/spec-002-identity-registration
+      gh pr create --draft \
+        --title "feat(auth): register an account — POST /auth/registrations" \
+        --body-file .agent/runs/pr-body-spec-002.md
+
+  The body is written and waiting at that path, which is git-ignored. Do not mark the pull request
+  ready for review and do not merge it; both are the owner's calls (ADR-0027).
+
 ---
 
 # Register an account
@@ -409,6 +656,7 @@ Two "yes" answers. Tier B. `status: draft`, escalation filled, run stopped.
 | `MusicRoom/Directory.Packages.props` | change — pin `BCrypt.Net-Next`, `Testcontainers.PostgreSql`, `Microsoft.EntityFrameworkCore.Design` |
 | `MusicRoom/src/MusicRoom/Infrastructure/MusicRoom.Infrastructure.csproj` | change — reference `BCrypt.Net-Next` |
 | `MusicRoom/src/MusicRoom/Persistence/MusicRoom.Persistence.csproj` | change — reference `Microsoft.EntityFrameworkCore.Design` with `PrivateAssets="all"` |
+| `MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj` | change — reference `Microsoft.EntityFrameworkCore.Design` with `PrivateAssets="all"`. `dotnet ef` looks for it on the **startup** project, and `PrivateAssets` on Persistence is precisely what stops it arriving there |
 | _(removed)_ | `MusicRoom.WebAPI.csproj` already references `Persistence` and `Infrastructure`. No change |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/MusicRoom.WebAPI.Tests.csproj` | change — reference `Testcontainers.PostgreSql` and `Persistence` |
 | `MusicRoom/src/MusicRoom/Domain/Entities/User.cs` | create |
@@ -503,8 +751,8 @@ index is a concurrency hotspot, and a sequential test proves nothing about a rac
 
 ## Done when
 
-- [ ] every file in the Files table exists and compiles
-- [ ] every command under Verification passes
-- [ ] OWASP checklists walked for the surface touched; unfixed findings in the threat register
-- [ ] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
-- [ ] `status: done` in this file
+- [x] every file in the Files table exists and compiles — 12 projects, `build -warnaserror`, 0 warnings
+- [x] every command under Verification passes — `make agent-check` green, `make migrate` exit 0
+- [x] OWASP checklists walked for the surface touched; unfixed findings in the threat register — A02, A03, A04 and A07 walked; registration rate limiting deferred as `T-25`
+- [x] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status — V.1, V.4 and V.8
+- [x] `status: done` in this file

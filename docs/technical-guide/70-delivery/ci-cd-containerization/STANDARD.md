@@ -2,7 +2,7 @@
 standard: ci-cd-containerization
 aliases: [ci-cd-containerization]
 title: CI/CD and Containerization
-version: 1.2.0
+version: 1.3.0
 status: active
 updated: 2026-09-23
 applies-to: [backend, tooling]
@@ -26,6 +26,12 @@ How the project builds, how it runs locally, and what a pull request must pass.
 
 ### Local runtime
 
+- **Development is fully containerised** (`brain/decisions/ADR-0029-containerised-dev-and-secret-vault.md`).
+  A contributor needs Docker and nothing else on the host. No documented step may require a locally
+  installed SDK, database client or CLI — anything tool-shaped is pinned in
+  `.config/dotnet-tools.json` and restored.
+- Optional compose profiles keep the everyday stack small: `vault` adds self-hosted Infisical and
+  its dependencies, and is off by default.
 - `docker compose` brings up the API and a local PostgreSQL container for development and tests.
   No host installation of a database engine is required — `psql` is not installed on the team's
   machine, and it does not need to be.

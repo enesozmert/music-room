@@ -1,7 +1,7 @@
 ---
 aliases: [prompt-library]
 kind: prompt-library
-version: 2.6.0
+version: 2.7.0
 updated: 2026-09-24
 ---
 
@@ -403,8 +403,14 @@ spec's Files table.
 If it still fails after 3 cycles, or if the only remaining fix is forbidden:
   set status to blocked
   write escalation with the failure and the fixes you tried
+  COMMIT what you have on the spec's branch with a `wip(spec-<nnn>): ...` message, so the
+    working tree is clean and the next cycle can resume. Do not push a blocked spec.
   output RESULT: blocked
   stop.
+
+Committing a block is not claiming success. The evidence is preserved in git instead of in a dirty
+tree, and the driver — which refuses to start on a dirty tree — can run again without a human
+first tidying up.
 
 Environment failures (Docker not running, no network) are never a code problem. Report them as
 RESULT: environment and stop immediately.

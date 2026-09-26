@@ -1,7 +1,7 @@
 ---
 aliases: [sdd, software-design-document]
 kind: design-document
-version: 0.8.0
+version: 0.9.0
 status: draft
 updated: 2026-09-23
 ---
@@ -627,6 +627,7 @@ engineering decision; an unwritten one is an oversight.
 | Client | user devices | React Native, built in parallel by the second team member |
 | CI | GitHub Actions, separate `dev` and `prod` configurations, plus an independent client job | builds and tests; **does not deploy** |
 | Observability | Serilog to stdout; OpenTelemetry exporter configuration-driven, **off by default** -- [[ADR-0022-observability-stack]] | switched on for a load run |
+| Secrets | `EnvSecretProvider` by default; `InfisicalSecretProvider` behind the same abstraction, vault self-hosted in the compose stack under a `vault` profile -- [[ADR-0029-containerised-dev-and-secret-vault]] | the vault lands at S1a; the abstraction lands earlier |
 
 The defence runs on the local stack. No remote deployment target is chosen yet; Vercel cannot host
 this API (serverless, no long-lived process, no persistent WebSocket).
@@ -647,6 +648,15 @@ Issue O10, built in slice S0 of [[delivery-plan]]; rules in [[ci-cd-containeriza
 and tests but does not deploy -- [[ADR-0015-hosting-and-deployment]].
 
 ### 14.3 Configuration
+
+Development is **fully containerised**: `docker compose up` brings up the stack and the host needs
+Docker and nothing else -- [[ADR-0029-containerised-dev-and-secret-vault]]. No documented step
+requires a locally installed SDK, database client or CLI; `dotnet-ef` is pinned through
+`.config/dotnet-tools.json`.
+
+Secrets are read through a provider abstraction, so a vault can replace the environment without
+touching a call site. A vault **shrinks** `.env` to the vault's own bootstrap credentials; it does
+not remove it, and subject V.8 still applies to what remains.
 
 All configuration from environment variables, named after the role rather than the vendor
 (`DATABASE_URL`, not a provider name) -- [[ADR-0026-environment-bring-up]]. External credentials
@@ -717,7 +727,7 @@ table to walk through at defence.
 
 | Subject | Requirement | Design element | Status |
 |---|---|---|---|
-| V.1 | email+password or social registration | §10.1, §10.2, §13.1 | designed |
+| V.1 | email+password or social registration | §10.1, §10.2, §13.1 | **partly implemented** -- `POST /api/v1/auth/registrations` persists an unverified `User` with a BCrypt hash at work factor >= 12, `ux_users_email` arbitrates the race, and both a fresh and an already-registered address answer `202` so the endpoint is not an enumeration oracle. Social registration is designed only. Rate limiting is deferred and recorded as T-25 |
 | V.1 | link a social account | §10.2, Identity context | designed |
 | V.1 | email verification + forgot password | §10.1, §13.1 | designed |
 | V.1 | three profile visibility tiers | §6.2, §13.2 | designed |
@@ -732,7 +742,7 @@ table to walk through at defence.
 | V.2.3 | reorder race conditions | §12.1 #2, §12.2 | designed |
 | V.2 | at least 2 of the 3 services | §5.2, [[ADR-0010-service-scope]] | **designed** — all three |
 | V.3 | backend is the single source of truth | §4.2, §8.1 | designed |
-| V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **partly implemented** -- `docs/api/openapi.json` is generated from the code and committed; it documents the two health endpoints, which is every endpoint that exists |
+| V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **partly implemented** -- `docs/api/openapi.json` is generated from the code and committed; it documents the two health endpoints and `POST /api/v1/auth/registrations`, which is every endpoint that exists |
 | V.5 | client is a remote control | §4.1, §9.1 | designed |
 | V.5 | configurable backend address | §9.1, [[musicroom-mobile]] | designed |
 | V.5 | social authentication on mobile | §10.2 | designed |
@@ -743,7 +753,7 @@ table to walk through at defence.
 | V.7 | measure and justify concurrent users | §14.4, [[ADR-0018-load-testing-tool]] | tool decided; measurement not started |
 | V.7 | declare server specification | §14.1, [[ADR-0015-hosting-and-deployment]], [[ADR-0016-supabase-plan-region]] | machine and region decided; measurement not started |
 | V.6 | OWASP conformance of all code | [[asvs-conformance]], §13 | target committed, evidence pending |
-| V.8 | per-layer tests | [[testing]], [[ADR-0012-test-stack]] | **partly implemented** -- API integration layer only, 4 tests over the health endpoints. Domain, application, validation, persistence and realtime layers arrive with the slices that create them |
+| V.8 | per-layer tests | [[testing]], [[ADR-0012-test-stack]] | **partly implemented** -- 17 tests across three projects: validation (`MusicRoom.Application.Tests`), infrastructure (`MusicRoom.Infrastructure.Tests`) and API integration (`MusicRoom.WebAPI.Tests`, Testcontainers-backed against a real PostgreSQL). Includes the concurrency test AGENTS.md requires: 20 parallel registrations of one address create exactly one row. Domain and realtime layers arrive with the slices that create them |
 | V.8 | continuous integration | [[ci-cd-containerization]] | **done** -- `.github/workflows/backend-dev.yml` and `backend-prod.yml`: restore, format, build -warnaserror, test, vulnerable-package scan, OpenAPI drift check; prod also builds the image. No deployment, by [[ADR-0015-hosting-and-deployment]] |
 | V.8 | credentials in a git-ignored `.env` | §14.3, `.env.example` | **done** |
 | V.8 | enforced code quality | [[dotnet-csharp]], `.editorconfig`, `MusicRoom/SonarLint.xml` | **done** -- proven live in S0: a 47-line method fails the build with `S138 ... greater than the 40 lines authorized`, and six parameters fail with `S107`. The thresholds moved to `SonarLint.xml`; in `.editorconfig` they were silently ignored |
@@ -753,8 +763,9 @@ table to walk through at defence.
 | VII | submitted in the git repository | [[ADR-0020-monorepo-layout]] | **designed** -- one clone holds backend, client and documentation |
 | III | the SDK must not do our work | §4.2, §9.3 | designed |
 
-"Designed" means the decision and the mechanism are recorded. No row in this table claims
-implemented code, because none exists.
+"Designed" means the decision and the mechanism are recorded, and nothing more. "Partly
+implemented" and "done" name code that exists on a branch and passes `make agent-check`; the row
+says which part, because a requirement is rarely finished in one slice.
 
 ---
 
@@ -773,6 +784,7 @@ defence, not more.
 | O11 | remote deployment target | a live demo URL | [[ADR-0015-hosting-and-deployment]]. Fly.io, Railway, Render, Azure Container Apps. **Not Vercel** |
 | O12 | fluent assertion library | test readability | add only if xUnit's built-ins prove insufficient |
 | O13 | silent-controller recovery | a stalled playback session | [[ADR-0017-playback-session]] accepted no watchdog; takeover is the manual path. Revisit only if it bites in testing |
+| O18 | self-hosted Infisical vault | API keys sitting readable in `.env` | [[ADR-0029-containerised-dev-and-secret-vault]]: the provider abstraction lands early, the vault at S1a with O17. Self-hosted Infisical needs its own PostgreSQL, Redis and encryption key — roughly five compose services instead of two. Beyond subject V.8, so it must not delay S1 to S9 |
 | O17 | real mail provider adapter | V.1 email verification actually reaching a mailbox | owner decision 2026-09-24: SPEC-003 ships a Development-only logging `IMailService`; the hosted-provider adapter is a separate spec at the end of S1. A logging implementation cannot satisfy V.1 at the defence |
 | O14 | music preferences have no consumer | nothing | V.1 requires storing and updating them, which is met. Note for defence: storage-only today |
 | O15 | MediatR licence terms | adding the package | [[ADR-0021-backend-dependency-set]]: verify the current free-tier terms before `dotnet add package` and record the result. Fallback is a hand-written dispatcher |
