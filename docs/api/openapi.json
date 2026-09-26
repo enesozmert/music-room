@@ -102,10 +102,54 @@
           }
         }
       }
+    },
+    "/api/v1/auth/email-verifications": {
+      "post": {
+        "tags": [
+          "AuthEndpoints"
+        ],
+        "summary": "Verify an email address",
+        "description": "Spends the token from the verification mail exactly once and marks the address verified. The description says nothing about what separates 400 from 410 for a given token, because that is the caller's business only when they hold it.",
+        "operationId": "PostAuthEmailVerification",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailVerificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "410": {
+            "description": "Gone"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "EmailVerificationRequest": {
+        "required": [
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The token from the verification mail."
+          }
+        },
+        "description": "The email verification payload — `docs/api/ENDPOINTS.md` §1."
+      },
       "HttpValidationProblemDetails": {
         "type": "object",
         "properties": {

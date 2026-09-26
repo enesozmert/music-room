@@ -58,6 +58,9 @@ jobs:
       - name: OpenAPI document is current
         env:
           DATABASE_URL: Host=localhost;Port=5432;Database=openapi;Username=openapi;Password=unused
+          # The OpenAPI generator boots the real host; the SPEC-003 start-up guard
+          # refuses an IMailService outside Development.
+          ASPNETCORE_ENVIRONMENT: Development
         run: |
           dotnet build MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj \
             --no-restore -p:GenerateOpenApiDocument=true
