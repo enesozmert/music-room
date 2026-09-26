@@ -627,7 +627,7 @@ engineering decision; an unwritten one is an oversight.
 | Client | user devices | React Native, built in parallel by the second team member |
 | CI | GitHub Actions, separate `dev` and `prod` configurations, plus an independent client job | builds and tests; **does not deploy** |
 | Observability | Serilog to stdout; OpenTelemetry exporter configuration-driven, **off by default** -- [[ADR-0022-observability-stack]] | switched on for a load run |
-| Secrets | `EnvSecretProvider` by default; `InfisicalSecretProvider` behind the same abstraction, vault self-hosted in the compose stack under a `vault` profile -- [[ADR-0029-containerised-dev-and-secret-vault]] | the vault lands at S1a; the abstraction lands earlier |
+| Secrets | `EnvSecretProvider` by default; `InfisicalSecretProvider` behind the same abstraction, vault self-hosted in the compose stack under a `vault` profile -- [[ADR-0029-containerised-dev-and-secret-vault]] | the vault lands at S1b; the abstraction lands earlier |
 
 The defence runs on the local stack. No remote deployment target is chosen yet; Vercel cannot host
 this API (serverless, no long-lived process, no persistent WebSocket).
@@ -637,15 +637,16 @@ part of the measured numbers, not an excuse for them.
 
 ### 14.2 Reproducibility
 
-Subject R1 IV.1 requires dependencies to install automatically from a fresh clone. Target path:
+Subject R1 IV.1 requires dependencies to install automatically from a fresh clone. The path:
 
 ```
 clone  ->  cp .env.example .env  ->  fill values  ->  make up
 ```
 
-The `Makefile` does not exist yet — there is no application to start.
-Issue O10, built in slice S0 of [[delivery-plan]]; rules in [[ci-cd-containerization]]. CI builds
-and tests but does not deploy -- [[ADR-0015-hosting-and-deployment]].
+`Makefile` and `docker-compose.yml` exist, and the path above is verified end to end: the API
+container serves `/health` and `/health/ready` against the compose PostgreSQL. Built in slice S0
+of [[delivery-plan]]; rules in [[ci-cd-containerization]]. Issue O10 is closed. CI builds and
+tests but does not deploy -- [[ADR-0015-hosting-and-deployment]].
 
 ### 14.3 Configuration
 
@@ -780,11 +781,10 @@ defence, not more.
 |---|---|---|---|
 | O8 | SignalR scale-out backplane (Redis) | multi-instance deployment | **deliberately open.** Not needed for a single-instance defence |
 | O9 | concrete table and column definitions | §8.5 | resolved by the first migration, not by a document |
-| O10 | `Makefile` and `docker compose` | §14.2, IV.1 | a task, not a decision. [[delivery-plan]] slice S0 |
 | O11 | remote deployment target | a live demo URL | [[ADR-0015-hosting-and-deployment]]. Fly.io, Railway, Render, Azure Container Apps. **Not Vercel** |
 | O12 | fluent assertion library | test readability | add only if xUnit's built-ins prove insufficient |
 | O13 | silent-controller recovery | a stalled playback session | [[ADR-0017-playback-session]] accepted no watchdog; takeover is the manual path. Revisit only if it bites in testing |
-| O18 | self-hosted Infisical vault | API keys sitting readable in `.env` | [[ADR-0029-containerised-dev-and-secret-vault]]: the provider abstraction lands early, the vault at S1a with O17. Self-hosted Infisical needs its own PostgreSQL, Redis and encryption key — roughly five compose services instead of two. Beyond subject V.8, so it must not delay S1 to S9 |
+| O18 | self-hosted Infisical vault | API keys sitting readable in `.env` | [[ADR-0029-containerised-dev-and-secret-vault]]: the provider abstraction lands early, the vault at S1b, after the mail adapter at S1a (O17). Self-hosted Infisical needs its own PostgreSQL, Redis and encryption key — roughly five compose services instead of two. Beyond subject V.8, so it must not delay S1 to S9 |
 | O17 | real mail provider adapter | V.1 email verification actually reaching a mailbox | owner decision 2026-09-24: SPEC-003 ships a Development-only logging `IMailService`; the hosted-provider adapter is a separate spec at the end of S1. A logging implementation cannot satisfy V.1 at the defence |
 | O14 | music preferences have no consumer | nothing | V.1 requires storing and updating them, which is met. Note for defence: storage-only today |
 | O15 | MediatR licence terms | adding the package | [[ADR-0021-backend-dependency-set]]: verify the current free-tier terms before `dotnet add package` and record the result. Fallback is a hand-written dispatcher |
@@ -795,6 +795,7 @@ defence, not more.
 | # | Issue | Closed by |
 |---|---|---|
 | O1 | which services ship | [[ADR-0010-service-scope]] — all three |
+| O10 | `Makefile` and `docker compose` | slice S0 — both exist, `make up` verified end to end against the compose PostgreSQL |
 | O2 | solution and folder layout | [[ADR-0011-solution-layout]] |
 | O3 | test framework | [[ADR-0012-test-stack]] |
 | O4 | API hosting target | [[ADR-0015-hosting-and-deployment]] |
