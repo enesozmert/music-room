@@ -38,7 +38,9 @@ public class Program
         builder.Services.AddApplicationServices();
         builder.Services.AddPersistenceServices(connectionString);
         builder.Services.AddInfrastructureServices(
-            EnvironmentConfiguration.ReadBCryptWorkFactor(builder.Configuration));
+            EnvironmentConfiguration.ReadBCryptWorkFactor(builder.Configuration),
+            builder.Environment.IsDevelopment(),
+            EnvironmentConfiguration.ReadVerificationLinkBaseUrl(builder.Configuration));
 
         ApiServices.Add(builder.Services);
         Observability.AddTracing(builder.Services, builder.Configuration);
@@ -85,6 +87,16 @@ internal static class EnvironmentConfiguration
     /// </summary>
     internal static int ReadBCryptWorkFactor(IConfiguration configuration) =>
         configuration.GetValue("Security:BCryptWorkFactor", BCryptPasswordHasher.MinimumWorkFactor);
+
+    /// <summary>
+    /// Reads where the client serves the verification screen. Read the way <c>DATABASE_URL</c> is —
+    /// straight from configuration, with no default — but unset is tolerated rather than fatal: the
+    /// Development sender then logs the bare token and says the variable is missing. A hard-coded
+    /// fallback would print a link to a machine nobody intended, which is the failure mode this
+    /// avoids. Absent while the hosted provider is still O17 / slice S1a.
+    /// </summary>
+    internal static string? ReadVerificationLinkBaseUrl(IConfiguration configuration) =>
+        configuration["VERIFICATION_LINK_BASE_URL"];
 }
 
 /// <summary>

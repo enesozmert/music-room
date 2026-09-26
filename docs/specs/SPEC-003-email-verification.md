@@ -1,7 +1,7 @@
 ---
 id: SPEC-003
 title: Verify an email address — IMailService, a Development-only logging sender, and POST /auth/email-verifications
-status: approved       # draft | approved | in-progress | done | blocked
+status: blocked        # draft | approved | in-progress | done | blocked
 tier: B                # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S1              # which DELIVERY-PLAN slice this belongs to
 requirements: [V.1, V.6, V.8]
@@ -65,6 +65,72 @@ escalation: |
      login, reset and resend, and building it per endpoint means building it four times. T-25
      stays unmitigated and must close before the defence — V.6 grades it, and this spec makes the
      surface it covers larger, which the row now says.
+
+  ---
+
+  BLOCKED, 2026-09-26, unattended cycle. The code is written and every check passes except one,
+  and the one that fails cannot be fixed inside this spec's Files table. A decision is owed.
+
+  **What passes.** `dotnet restore`, `dotnet format --verify-no-changes`,
+  `dotnet build -warnaserror` (0 warnings), `dotnet test` 29/29 including all six checks this
+  spec's Verification table names, and `dotnet list package --vulnerable --include-transitive`
+  (none). The parallel case is proven: 20 concurrent verifications of one token give exactly one
+  `204`, nineteen `400`, one `consumed_at_utc` and one verified account.
+
+  **What fails.** `make openapi`, which the same Verification section calls:
+
+      error : System.InvalidOperationException: No IMailService may be registered outside
+      Development: the only implementation writes the email verification link to the log.
+      The hosted provider is O17, slice S1a.
+         at MusicRoom.WebAPI.Program.Main ... Microsoft.Extensions.ApiDescription.Tool
+
+  The document generator boots the real host through `HostFactoryResolver` to read the OpenAPI
+  document. `make openapi` gives it a placeholder `DATABASE_URL` and nothing else, so
+  `ASPNETCORE_ENVIRONMENT` is unset and the host is Production. The start-up guard owner decision 1
+  asked for therefore fires during a build. Both CI workflows
+  (`.github/workflows/backend-dev.yml:64`, `backend-prod.yml:60`) set the same one variable, so CI
+  fails the same way. The guard is working exactly as specified; the spec did not notice that its
+  own verification gate boots a non-Development host.
+
+  **Why the cycle stopped instead of fixing it.** Each available fix crosses a stop condition in
+  `docs/prompt-library/PROMPTS.md` §2.7:
+
+  1. *Give the generator a Development environment.* One line in the `openapi` target of
+     `Makefile`, and one in each of the two workflows — exactly the reasoning that already puts a
+     placeholder `DATABASE_URL` there. Three files outside this spec's Files table: scope creep.
+     **This is the recommended fix**, and it needs the Files table amended to name those three
+     files. It weakens nothing: the guard still fires for every real host.
+  2. *Defer the throw to first resolution* (register a factory that throws) or *detect the
+     generator and skip the registration.* Both keep `make openapi` working and both rewrite the
+     guard the owner approved on a token surface — gate 5 territory, AGENTS.md §6. Not an agent's
+     call.
+  3. *Drop the guard.* Not considered. A silent fallback is the dangerous version of this, which is
+     what owner decision 1 rejected.
+
+  **Three judgements a reviewer should confirm**, all inside the Files table:
+
+  - *Unset `VERIFICATION_LINK_BASE_URL`.* Step 9 asks for "no silent default that points at a
+    machine nobody intended" and step 6 for a link built from configuration. Requiring the value
+    would break `make up` too — `docker-compose.yml:31` passes only `ASPNETCORE_ENVIRONMENT` and
+    `DATABASE_URL`, and it is not in the Files table either. So the sender composes no default: with
+    a base URL it logs the link, without one it logs the bare token and says
+    `VERIFICATION_LINK_BASE_URL is not set`. O17's value — read the token out of
+    `docker compose logs` — survives with no configuration at all, and no link ever points somewhere
+    unintended. Both behaviours are tested.
+  - *One hashing definition.* Issuing and spending must agree byte for byte, so
+    `VerificationTokenHash.Of` (hex SHA-256 of the token's UTF-8 bytes) lives beside the verify
+    handler and the register handler calls it. The token is now base64url text, 43 characters;
+    SPEC-002 hashed the raw bytes, whose plaintext never left the method, so nothing outstanding is
+    invalidated.
+  - *`VerifyEmailCommandValidator.TokenLength` is public.* The validator test asserts the bound and
+    the test project sees no internals; adding `InternalsVisibleTo` would have meant editing a
+    `.csproj` outside the Files table.
+
+  **State of the tree.** Everything in the Files table is written and committed on
+  `feat/spec-003-email-verification` as `wip(spec-003)`. Nothing is pushed. Three rows of the table
+  are deliberately untouched, because they belong to a close-out this run never reached:
+  `docs/api/openapi.json` (cannot be regenerated until the block clears),
+  `docs/owasp/THREAT-REGISTER.md` (T-26 and the T-25 amendment) and `docs/SDD.md` §16.
 
 ---
 
