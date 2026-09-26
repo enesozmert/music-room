@@ -1,8 +1,8 @@
 ---
 aliases: [prompt-library]
 kind: prompt-library
-version: 2.7.0
-updated: 2026-09-24
+version: 2.8.0
+updated: 2026-09-26
 ---
 
 # Prompt Library
@@ -273,6 +273,43 @@ Audit the knowledge layer without reading source code:
 - docs/SDD.md section 16 rows claiming more than the code supports
 
 Report only real mismatches. Invent no work.
+```
+
+## 16. Status query — is it built?
+
+Read-only. Run it before prompt 2, so the plan starts from what the code does rather than from
+what the documents claim.
+
+```
+Read brain/MEMORY.md and follow its router. Do not scan the workspace.
+
+Question: is <X> implemented?
+
+Answer from evidence only:
+- the types, endpoints, handlers or migrations that implement it, as path:line under
+  MusicRoom/ or MusicRoomApp/
+- the tests that cover it, as path:line
+- the deciding ADR from brain/decisions/decisions-index.md, by id, with its frontmatter status
+- what docs/SDD.md section 16, docs/DELIVERY-PLAN.md and docs/api/ENDPOINTS.md claim about it
+- one verdict, in the section 16 vocabulary: done / partly implemented / designed / absent /
+  claimed-but-absent
+
+"designed" means an Accepted ADR and no code. That is a normal state here, not a gap.
+"absent" means no ADR and no code.
+"claimed-but-absent" means section 16 says done or partly implemented and the code does not
+support it. Quote the row and the code side by side.
+Propose no work, write no code, change no file.
+```
+
+### Narrower — one rule or one gate
+
+```
+Does MusicRoom/ enforce <rule>?
+
+Give three things: the enforcing code as path:line, the test that proves it as path:line, and the
+docs/owasp/API-TOP10-CHECKLIST.md row it maps to.
+If any of the three is missing, the answer is "not enforced" — name which one is missing.
+Write no code.
 ```
 
 ---
@@ -673,6 +710,7 @@ AGENT_CMD="claude -p" $AGENT_CMD "$(sed -n '/## 15. Brain health check/,/^---/p'
 | Unbounded autonomous loop | unreviewable diff, exhausted budget | Part 2 stop conditions and the driver's cycle cap |
 | Agent self-approves a Tier B spec | the gate exists because these changes are expensive to undo | escalate; the seven questions are not advisory |
 | Loop that edits code from CI | a red build becomes a moving target | keep CI agents read-only |
+| "Is <X> done?" answered from the plan | docs/SDD.md section 16 drifts ahead of the code | prompt 16 — a verdict must cite path:line |
 
 ---
 

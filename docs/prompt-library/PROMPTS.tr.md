@@ -2,8 +2,8 @@
 aliases: [prompt-library-tr, prompt-kutuphanesi]
 kind: prompt-library
 lang: tr
-version: 2.7.0
-updated: 2026-09-24
+version: 2.8.0
+updated: 2026-09-26
 ---
 
 # Prompt Kütüphanesi (Türkçe)
@@ -267,6 +267,43 @@ Kaynak kodu okumadan bilgi katmanını denetle:
 - docs/SDD.md bölüm 16'da kodun desteklemediğini iddia eden satırlar
 
 Sadece gerçek uyuşmazlıkları raporla. İş uydurma.
+```
+
+## 16. Durum sorgusu — kurulu mu?
+
+Salt okunur. Prompt 2'den önce çalıştır; böylece plan, dokümanların iddiasından değil kodun
+yaptığından başlar.
+
+```
+brain/MEMORY.md dosyasını oku ve router'ını takip et. Workspace'i tarama.
+
+Soru: <X> uygulanmış mı?
+
+Sadece kanıta dayanarak cevapla:
+- onu uygulayan tipler, endpoint'ler, handler'lar veya migration'lar; MusicRoom/ veya
+  MusicRoomApp/ altında path:line olarak
+- onu kapsayan testler, path:line olarak
+- brain/decisions/decisions-index.md içinden kararı veren ADR; id'si ve frontmatter status'ü ile
+- docs/SDD.md bölüm 16, docs/DELIVERY-PLAN.md ve docs/api/ENDPOINTS.md bu konuda ne iddia ediyor
+- bölüm 16 sözlüğüyle tek bir hüküm: done / partly implemented / designed / absent /
+  claimed-but-absent
+
+"designed" = Accepted bir ADR var, kod yok. Burada normal bir durum, eksik değil.
+"absent" = ne ADR var ne kod.
+"claimed-but-absent" = bölüm 16 done veya partly implemented diyor, kod bunu desteklemiyor.
+Satırı ve kodu yan yana alıntıla.
+İş önerme, kod yazma, dosya değiştirme.
+```
+
+### Dar varyant — tek kural veya tek gate
+
+```
+MusicRoom/ <kural> kuralını zorluyor mu?
+
+Üç şey ver: zorlayan kod path:line olarak, bunu kanıtlayan test path:line olarak, ve eşlendiği
+docs/owasp/API-TOP10-CHECKLIST.md satırı.
+Üçünden biri eksikse cevap "not enforced" — hangisinin eksik olduğunu söyle.
+Kod yazma.
 ```
 
 ---
@@ -638,6 +675,7 @@ AGENT_CMD="claude -p" $AGENT_CMD "$(sed -n '/## 15. Brain health check/,/^---/p'
 | Sınırsız otonom döngü | incelenemez diff, tükenen bütçe | Bölüm 2.7 durma koşulları ve sürücünün döngü sınırı |
 | Ajanın Tier B spec'i kendi onaylaması | gate bu değişikliklerin geri alınması pahalı olduğu için var | escalate; yedi soru tavsiye değil |
 | CI'dan kod düzenleyen döngü | kırmızı build hareketli hedefe döner | CI ajanlarını salt okunur tut |
+| "<X> bitti mi?" sorusunu plandan cevaplamak | docs/SDD.md bölüm 16 koddan öne kaçar | prompt 16 — hüküm path:line göstermeli |
 
 ---
 
