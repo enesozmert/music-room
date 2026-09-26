@@ -1,7 +1,7 @@
 ---
 id: SPEC-003
 title: Verify an email address — IMailService, a Development-only logging sender, and POST /auth/email-verifications
-status: approved       # draft | approved | in-progress | done | blocked
+status: done           # draft | approved | in-progress | done | blocked
 tier: B                # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S1              # which DELIVERY-PLAN slice this belongs to
 requirements: [V.1, V.6, V.8]
@@ -161,6 +161,25 @@ escalation: |
     byte for byte, and SPEC-002's plaintext never left its method, so nothing outstanding breaks.
   - `TokenLength` public, so the validator test asserts the bound without an `InternalsVisibleTo`
     edit to a `.csproj` outside the table.
+
+  ---
+
+  CLOSED, 2026-09-26. `make agent-check` is green on `feat/spec-003-email-verification`:
+  `dotnet restore`, `dotnet format --verify-no-changes`, `dotnet build -warnaserror` with 0
+  warnings across twelve projects, `dotnet test` 29 passed / 0 failed / 0 skipped including all
+  six checks the Verification table names, `dotnet list package --vulnerable --include-transitive`
+  with no vulnerable package, `make openapi` with 0 warnings and 0 errors, and
+  `git diff --exit-code -- docs/api/openapi.json` clean — the committed document already matches
+  the code. Close-out wrote the three rows the earlier block left untouched: T-26 added and T-25
+  widened to name `POST /api/v1/auth/email-verifications` in
+  `docs/owasp/THREAT-REGISTER.md`, and `docs/SDD.md` §16 moved *V.1 email verification + forgot
+  password* to partly implemented (verification implemented, resend and forgot-password still
+  designed) with the V.8 test count corrected from 17 to 29. No migration, so
+  `brain/migrations/migrations-index.md` gains no row, as the Files table says. No
+  `brain/lessons/lessons-index.md` row: that file is not in the Files table, and writing to it
+  would be the scope creep §2.7 stops a run for. The durable lesson from this spec — a start-up
+  guard fires inside `make openapi`, because the document generator boots the real host — is
+  recorded in the BLOCK RESOLVED note above and belongs in a lessons entry a human can open.
 
 ---
 
@@ -410,8 +429,8 @@ Walked before implementation; findings and their disposition:
 
 ## Done when
 
-- [ ] every file in the Files table exists and compiles
-- [ ] every command under Verification passes
-- [ ] OWASP checklists walked for the surface touched; unfixed findings in the threat register
-- [ ] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
-- [ ] `status: done` in this file
+- [x] every file in the Files table exists and compiles
+- [x] every command under Verification passes
+- [x] OWASP checklists walked for the surface touched; unfixed findings in the threat register
+- [x] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
+- [x] `status: done` in this file
