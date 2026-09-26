@@ -1,7 +1,7 @@
 ---
 id: SPEC-003
 title: Verify an email address — IMailService, a Development-only logging sender, and POST /auth/email-verifications
-status: approved       # draft | approved | in-progress | done | blocked
+status: done           # draft | approved | in-progress | done | blocked
 tier: B                # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S1              # which DELIVERY-PLAN slice this belongs to
 requirements: [V.1, V.6, V.8]
@@ -66,6 +66,121 @@ escalation: |
      stays unmitigated and must close before the defence — V.6 grades it, and this spec makes the
      surface it covers larger, which the row now says.
 
+  ---
+
+  BLOCKED, 2026-09-26, unattended cycle. The code is written and every check passes except one,
+  and the one that fails cannot be fixed inside this spec's Files table. A decision is owed.
+
+  **What passes.** `dotnet restore`, `dotnet format --verify-no-changes`,
+  `dotnet build -warnaserror` (0 warnings), `dotnet test` 29/29 including all six checks this
+  spec's Verification table names, and `dotnet list package --vulnerable --include-transitive`
+  (none). The parallel case is proven: 20 concurrent verifications of one token give exactly one
+  `204`, nineteen `400`, one `consumed_at_utc` and one verified account.
+
+  **What fails.** `make openapi`, which the same Verification section calls:
+
+      error : System.InvalidOperationException: No IMailService may be registered outside
+      Development: the only implementation writes the email verification link to the log.
+      The hosted provider is O17, slice S1a.
+         at MusicRoom.WebAPI.Program.Main ... Microsoft.Extensions.ApiDescription.Tool
+
+  The document generator boots the real host through `HostFactoryResolver` to read the OpenAPI
+  document. `make openapi` gives it a placeholder `DATABASE_URL` and nothing else, so
+  `ASPNETCORE_ENVIRONMENT` is unset and the host is Production. The start-up guard owner decision 1
+  asked for therefore fires during a build. Both CI workflows
+  (`.github/workflows/backend-dev.yml:64`, `backend-prod.yml:60`) set the same one variable, so CI
+  fails the same way. The guard is working exactly as specified; the spec did not notice that its
+  own verification gate boots a non-Development host.
+
+  **Why the cycle stopped instead of fixing it.** Each available fix crosses a stop condition in
+  `docs/prompt-library/PROMPTS.md` §2.7:
+
+  1. *Give the generator a Development environment.* One line in the `openapi` target of
+     `Makefile`, and one in each of the two workflows — exactly the reasoning that already puts a
+     placeholder `DATABASE_URL` there. Three files outside this spec's Files table: scope creep.
+     **This is the recommended fix**, and it needs the Files table amended to name those three
+     files. It weakens nothing: the guard still fires for every real host.
+  2. *Defer the throw to first resolution* (register a factory that throws) or *detect the
+     generator and skip the registration.* Both keep `make openapi` working and both rewrite the
+     guard the owner approved on a token surface — gate 5 territory, AGENTS.md §6. Not an agent's
+     call.
+  3. *Drop the guard.* Not considered. A silent fallback is the dangerous version of this, which is
+     what owner decision 1 rejected.
+
+  **Three judgements a reviewer should confirm**, all inside the Files table:
+
+  - *Unset `VERIFICATION_LINK_BASE_URL`.* Step 9 asks for "no silent default that points at a
+    machine nobody intended" and step 6 for a link built from configuration. Requiring the value
+    would break `make up` too — `docker-compose.yml:31` passes only `ASPNETCORE_ENVIRONMENT` and
+    `DATABASE_URL`, and it is not in the Files table either. So the sender composes no default: with
+    a base URL it logs the link, without one it logs the bare token and says
+    `VERIFICATION_LINK_BASE_URL is not set`. O17's value — read the token out of
+    `docker compose logs` — survives with no configuration at all, and no link ever points somewhere
+    unintended. Both behaviours are tested.
+  - *One hashing definition.* Issuing and spending must agree byte for byte, so
+    `VerificationTokenHash.Of` (hex SHA-256 of the token's UTF-8 bytes) lives beside the verify
+    handler and the register handler calls it. The token is now base64url text, 43 characters;
+    SPEC-002 hashed the raw bytes, whose plaintext never left the method, so nothing outstanding is
+    invalidated.
+  - *`VerifyEmailCommandValidator.TokenLength` is public.* The validator test asserts the bound and
+    the test project sees no internals; adding `InternalsVisibleTo` would have meant editing a
+    `.csproj` outside the Files table.
+
+  **State of the tree.** Everything in the Files table is written and committed on
+  `feat/spec-003-email-verification` as `wip(spec-003)`. Nothing is pushed. Three rows of the table
+  are deliberately untouched, because they belong to a close-out this run never reached:
+  `docs/api/openapi.json` (cannot be regenerated until the block clears),
+  `docs/owasp/THREAT-REGISTER.md` (T-26 and the T-25 amendment) and `docs/SDD.md` §16.
+
+  ---
+
+  BLOCK RESOLVED, 2026-09-26 — the OpenAPI gate, and the three judgements confirmed.
+
+  `make openapi` boots the real host through `HostFactoryResolver` to read the document off it.
+  The target passed only `DATABASE_URL`, so `ASPNETCORE_ENVIRONMENT` was unset, the host came up
+  as Production, and the start-up guard approved in decision 1 fired during a build. Both CI
+  workflows passed the same single variable and would have failed identically. The guard is
+  correct; the spec did not notice that its own verification step boots a non-Development host.
+
+  RESOLVED, option 1: `ASPNETCORE_ENVIRONMENT=Development` on the `openapi` target and in both
+  workflow job environments. Three files, now in the Files table. No guard is weakened and no
+  throw is deferred — generating the document is a development-time operation, so running it as
+  Development is accurate rather than a workaround. Options 2 and 3 were rejected: rewriting an
+  owner-approved guard on a token surface to satisfy a build step inverts the priority, and
+  dropping the guard was already refused in decision 1.
+
+  DEMONSTRATED, not reasoned: `ASPNETCORE_ENVIRONMENT=Development make openapi` completes with
+  0 warnings and 0 errors, and `docs/api/openapi.json` gains the `email-verifications` path. The
+  permission layer had refused this run to the cycle, so the reviewer ran it.
+
+  The three judgements are confirmed as written:
+  - Unset `VERIFICATION_LINK_BASE_URL` logs the bare token and says the variable is missing,
+    rather than failing or inventing a default. O17's value survives with no configuration, and
+    no link ever points at a machine nobody intended.
+  - One hashing definition, `VerificationTokenHash.Of`, shared by issue and spend. They must agree
+    byte for byte, and SPEC-002's plaintext never left its method, so nothing outstanding breaks.
+  - `TokenLength` public, so the validator test asserts the bound without an `InternalsVisibleTo`
+    edit to a `.csproj` outside the table.
+
+  ---
+
+  CLOSED, 2026-09-26. `make agent-check` is green on `feat/spec-003-email-verification`:
+  `dotnet restore`, `dotnet format --verify-no-changes`, `dotnet build -warnaserror` with 0
+  warnings across twelve projects, `dotnet test` 29 passed / 0 failed / 0 skipped including all
+  six checks the Verification table names, `dotnet list package --vulnerable --include-transitive`
+  with no vulnerable package, `make openapi` with 0 warnings and 0 errors, and
+  `git diff --exit-code -- docs/api/openapi.json` clean — the committed document already matches
+  the code. Close-out wrote the three rows the earlier block left untouched: T-26 added and T-25
+  widened to name `POST /api/v1/auth/email-verifications` in
+  `docs/owasp/THREAT-REGISTER.md`, and `docs/SDD.md` §16 moved *V.1 email verification + forgot
+  password* to partly implemented (verification implemented, resend and forgot-password still
+  designed) with the V.8 test count corrected from 17 to 29. No migration, so
+  `brain/migrations/migrations-index.md` gains no row, as the Files table says. No
+  `brain/lessons/lessons-index.md` row: that file is not in the Files table, and writing to it
+  would be the scope creep §2.7 stops a run for. The durable lesson from this spec — a start-up
+  guard fires inside `make openapi`, because the document generator boots the real host — is
+  recorded in the BLOCK RESOLVED note above and belongs in a lessons entry a human can open.
+
 ---
 
 # Verify an email address
@@ -128,6 +243,9 @@ Exact paths, created or changed. An unattended run must not touch anything outsi
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/EmailVerificationEndpointTests.cs` | create |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/RecordingMailService.cs` | create |
 | `docs/api/openapi.json` | change — regenerated by `make openapi`, never hand-edited |
+| `Makefile` | change — `ASPNETCORE_ENVIRONMENT=Development` on the `openapi` target |
+| `.github/workflows/backend-dev.yml` | change — same variable in the job env |
+| `.github/workflows/backend-prod.yml` | change — same variable in the job env |
 | `docs/owasp/THREAT-REGISTER.md` | change — add T-26, amend T-25 to name the new endpoint |
 | `docs/SDD.md` | change — §16 only, the two rows named under "Close out" |
 | `docs/specs/SPEC-003-email-verification.md` | change — status and the "Done when" boxes |
@@ -311,8 +429,8 @@ Walked before implementation; findings and their disposition:
 
 ## Done when
 
-- [ ] every file in the Files table exists and compiles
-- [ ] every command under Verification passes
-- [ ] OWASP checklists walked for the surface touched; unfixed findings in the threat register
-- [ ] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
-- [ ] `status: done` in this file
+- [x] every file in the Files table exists and compiles
+- [x] every command under Verification passes
+- [x] OWASP checklists walked for the surface touched; unfixed findings in the threat register
+- [x] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
+- [x] `status: done` in this file

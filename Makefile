@@ -39,7 +39,10 @@ load: ## run the load scenario
 OPENAPI_DATABASE_URL := Host=localhost;Port=5432;Database=openapi;Username=openapi;Password=unused
 
 openapi: ## regenerate docs/api/openapi.json from the code
-	DATABASE_URL="$(OPENAPI_DATABASE_URL)" dotnet build \
+	# The generator boots the real host to read the document off it, so the environment must be
+	# Development: the SPEC-003 start-up guard refuses an IMailService anywhere else, and a
+	# document build is a development-time operation.
+	ASPNETCORE_ENVIRONMENT=Development DATABASE_URL="$(OPENAPI_DATABASE_URL)" dotnet build \
 		MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj \
 		-p:GenerateOpenApiDocument=true
 
