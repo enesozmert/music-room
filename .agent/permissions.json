@@ -43,9 +43,8 @@
       "Bash(git checkout -b:*)",
       "Bash(git switch -c:*)",
       "Bash(git branch:*)",
+      "Bash(git push:*)",
       "Bash(git rev-parse:*)",
-      "Bash(git push -u origin feat/spec-:*)",
-      "Bash(git push origin feat/spec-:*)",
       "Bash(gh pr create --draft:*)",
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",
@@ -66,9 +65,6 @@
       "Edit(docs/owasp/upstream/**)",
       "Edit(.agent/permissions.json)",
       "Edit(.github/**)",
-      "Bash(git push origin main:*)",
-      "Bash(git push --force:*)",
-      "Bash(git push -f:*)",
       "Bash(git reset --hard:*)",
       "Bash(git rebase:*)",
       "Bash(git tag:*)",
@@ -83,8 +79,17 @@
       "Bash(rm -rf:*)",
       "Bash(sudo:*)",
       "Bash(curl:* -d *)",
-      "Bash(claude:*)"
+      "Bash(claude:*)",
+      "Bash(git push origin main:*)",
+      "Bash(git push origin HEAD:main:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push --force-with-lease:*)",
+      "Bash(git push --delete:*)",
+      "Bash(git push --mirror:*)",
+      "Bash(git push --all:*)",
+      "Bash(git push --tags:*)"
     ]
   },
-  "_note": "Path-scoped rules use Edit(...) only. Claude Code matches file permissions through Edit rules, which cover every file-editing tool; a Write(path) rule is silently ignored. deny wins over allow."
+  "_note": "Path-scoped rules use Edit(...) only; a Write(path) rule is silently ignored. Bash rules match a whole-command prefix, so a partial word such as 'git push -u origin feat/spec-' never matches — push is allowed broadly and the dangerous forms are denied instead. deny wins over allow. Branch protection on main with enforce_admins:true is the mechanism that actually stops a push to main; these rules are the first layer, not the last."
 }

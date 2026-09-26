@@ -52,6 +52,13 @@ index files a spec legitimately updates. Denied outright: `reference/`, `.env`, 
 `brain/decisions/`, `docs/technical-guide/`, `.github/`, the permission file itself, pushes to
 `main`, force pushes, `gh pr merge`, `gh pr ready`, `gh api`.
 
+**Bash rules match a whole-command prefix.** `Bash(git push -u origin feat/spec-:*)` matches
+nothing, because `feat/spec-` is half a word — the agent simply loses the capability and says
+so at the end of a cycle. Allow the command broadly and deny the dangerous forms: push is
+allowed, while `main`, `--force`, `--force-with-lease`, `--delete`, `--mirror`, `--all` and
+`--tags` are denied. Branch protection with `enforce_admins: true` is what actually stops a
+push to `main`; these rules are the first layer, not the last.
+
 **Path rules must be written as `Edit(...)`, never `Write(...)`.** Claude Code matches file
 permissions through `Edit` rules, which cover every file-editing tool; a `Write(path)` rule is
 silently ignored and the protection you think you have does not exist. Both directions are
