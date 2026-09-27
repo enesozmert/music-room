@@ -1,11 +1,8 @@
-using System.Buffers.Text;
-using System.Security.Cryptography;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Application.Abstractions.Persistence;
 using MusicRoom.Application.Abstractions.Security;
-using MusicRoom.Application.Features.Auth.Commands.VerifyEmail;
 using MusicRoom.Domain.Entities;
 
 namespace MusicRoom.Application.Features.Auth.Commands.Register;
@@ -56,7 +53,7 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand>
             UpdatedAtUtc = nowUtc,
         };
 
-        IssuedVerificationToken issued = IssueVerificationToken(user.Id, nowUtc);
+        IssuedVerificationToken issued = VerificationTokenIssuer.Issue(user.Id, nowUtc);
 
         bool registered = await _users
             .TryRegisterAsync(user, issued.Token, cancellationToken)
@@ -72,33 +69,6 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand>
 
         // After the insert committed, never inside it — ADR-0013.
         await SendVerificationLinkAsync(user.Email, issued.Plaintext, cancellationToken).ConfigureAwait(false);
-    }
-
-    private static IssuedVerificationToken IssueVerificationToken(Guid userId, DateTime nowUtc)
-    {
-        // 256 bits of entropy, which is what the token needs to be unguessable.
-        const int tokenByteLength = 32;
-
-        // The verification window — authentication-authorization.
-        const int tokenLifetimeHours = 24;
-
-        // base64url, so the value survives a URL untouched: no padding, no characters to escape.
-        string plaintext = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(tokenByteLength));
-
-        EmailVerificationToken token = new()
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            // The row holds the digest. The plaintext leaves this method only to reach the mail
-            // sender, and a leaked database therefore hands nobody a working link.
-            TokenHash = VerificationTokenHash.Of(plaintext),
-            ExpiresAtUtc = nowUtc.AddHours(tokenLifetimeHours),
-            ConsumedAtUtc = null,
-            CreatedAtUtc = nowUtc,
-            UpdatedAtUtc = nowUtc,
-        };
-
-        return new IssuedVerificationToken(token, plaintext);
     }
 
     private async Task SendVerificationLinkAsync(
@@ -123,12 +93,4 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand>
                 "Verification mail for a new registration could not be sent. The account was created.");
         }
     }
-
-    /// <summary>
-    /// The stored token and the plaintext that must reach the mail sender, kept together for the one
-    /// call that needs both.
-    /// </summary>
-    /// <param name="Token">The row to insert, holding only the digest.</param>
-    /// <param name="Plaintext">The value the recipient clicks. Never stored and never logged.</param>
-    private sealed record IssuedVerificationToken(EmailVerificationToken Token, string Plaintext);
 }

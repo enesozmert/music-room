@@ -85,6 +85,63 @@ internal sealed class UserRepository : IUserRepository
         return VerifyEmailOutcome.Verified;
     }
 
+    /// <inheritdoc />
+    public async Task<bool> TryIssueEmailVerificationTokenAsync(
+        string email,
+        EmailVerificationToken token,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+
+        // The supersede and the insert must not be separable. A crash between them would leave an
+        // account with every link consumed and no replacement, which no later request could repair
+        // except by asking for yet another resend.
+        await using IDbContextTransaction transaction = await _context.Database
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        Guid userId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.Email == email && !user.IsEmailVerified)
+            .Select(user => user.Id)
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (userId == Guid.Empty)
+        {
+            return false;
+        }
+
+        await SupersedeOutstandingTokensAsync(userId, nowUtc, cancellationToken).ConfigureAwait(false);
+
+        token.UserId = userId;
+        _context.EmailVerificationTokens.Add(token);
+
+        await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+        return true;
+    }
+
+    /// <summary>
+    /// Stamps every unspent token of an account as consumed, so exactly one link is live once the
+    /// caller inserts the new one — SPEC-004, owner decision 1.
+    /// </summary>
+    private Task<int> SupersedeOutstandingTokensAsync(
+        Guid userId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken) =>
+        _context.EmailVerificationTokens
+            .Where(token => token.UserId == userId && token.ConsumedAtUtc == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(token => token.ConsumedAtUtc, nowUtc)
+                    // ExecuteUpdateAsync does not run through SaveChangesAsync, so the column the
+                    // context would have stamped is stamped here — SDD §8.3.
+                    .SetProperty(token => token.UpdatedAtUtc, nowUtc),
+                cancellationToken);
+
     /// <summary>
     /// Tells the three losing cases apart. Only reached when the UPDATE affected nothing, so the
     /// happy path stays a single statement.
