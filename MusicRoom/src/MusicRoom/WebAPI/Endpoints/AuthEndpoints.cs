@@ -2,6 +2,7 @@ using FluentValidation;
 using FluentValidation.Results;
 using MediatR;
 using MusicRoom.Application.Features.Auth.Commands.Register;
+using MusicRoom.Application.Features.Auth.Commands.RequestEmailVerification;
 using MusicRoom.Application.Features.Auth.Commands.VerifyEmail;
 
 namespace MusicRoom.WebAPI.Endpoints;
@@ -20,6 +21,7 @@ internal static class AuthEndpoints
 
         MapRegistrations(group);
         MapEmailVerifications(group);
+        MapVerificationRequests(group);
 
         return endpoints;
     }
@@ -49,6 +51,19 @@ internal static class AuthEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status410Gone);
 
+    private static void MapVerificationRequests(RouteGroupBuilder group) =>
+        group.MapPost("/verification-requests", RequestEmailVerificationAsync)
+            .AllowAnonymous()
+            .WithName("PostAuthVerificationRequest")
+            .WithSummary("Ask for another email verification link")
+            .WithDescription(
+                "Answers 202 for any address that is a valid address. Whether a mail follows is "
+                + "not stated and cannot be inferred from the response: a distinct answer here "
+                + "would tell an anonymous caller which addresses hold a registered or confirmed "
+                + "account.")
+            .Produces(StatusCodes.Status202Accepted)
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
     private static async Task<IResult> RegisterAsync(
         RegistrationRequest request,
         ISender sender,
@@ -62,6 +77,29 @@ internal static class AuthEndpoints
         }
         catch (ValidationException exception)
         {
+            return Results.ValidationProblem(
+                ToErrors(exception),
+                statusCode: StatusCodes.Status422UnprocessableEntity);
+        }
+
+        return Results.Accepted();
+    }
+
+    private static async Task<IResult> RequestEmailVerificationAsync(
+        VerificationRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        RequestEmailVerificationCommand command = new(request.Email);
+
+        try
+        {
+            await sender.Send(command, cancellationToken);
+        }
+        catch (ValidationException exception)
+        {
+            // 422 with the rule messages, as registration answers: the rules describe the shape of
+            // an address, which is public knowledge, and say nothing about which addresses exist.
             return Results.ValidationProblem(
                 ToErrors(exception),
                 statusCode: StatusCodes.Status422UnprocessableEntity);
@@ -130,3 +168,9 @@ internal sealed record RegistrationRequest(string Email, string Password, string
 /// </summary>
 /// <param name="Token">The token from the verification mail.</param>
 internal sealed record EmailVerificationRequest(string Token);
+
+/// <summary>
+/// The verification resend payload — <c>docs/api/ENDPOINTS.md</c> §1.
+/// </summary>
+/// <param name="Email">The address to send another verification link to.</param>
+internal sealed record VerificationRequest(string Email);

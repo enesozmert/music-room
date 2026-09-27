@@ -133,6 +133,41 @@
           }
         }
       }
+    },
+    "/api/v1/auth/verification-requests": {
+      "post": {
+        "tags": [
+          "AuthEndpoints"
+        ],
+        "summary": "Ask for another email verification link",
+        "description": "Answers 202 for any address that is a valid address. Whether a mail follows is not stated and cannot be inferred from the response: a distinct answer here would tell an anonymous caller which addresses hold a registered or confirmed account.",
+        "operationId": "PostAuthVerificationRequest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -219,6 +254,19 @@
           }
         },
         "description": "The registration payload — `docs/api/ENDPOINTS.md` §1."
+      },
+      "VerificationRequest": {
+        "required": [
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The address to send another verification link to."
+          }
+        },
+        "description": "The verification resend payload — `docs/api/ENDPOINTS.md` §1."
       }
     }
   },

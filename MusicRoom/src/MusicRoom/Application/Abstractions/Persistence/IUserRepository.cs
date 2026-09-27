@@ -43,4 +43,32 @@ public interface IUserRepository
         string tokenHash,
         DateTime nowUtc,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Issues a replacement verification token for an unverified account, superseding any link
+    /// already outstanding for it, in one transaction.
+    /// </summary>
+    /// <param name="email">The address to match, already trimmed and lower-cased by the caller —
+    /// the column stores it that way and this method does not normalise it again.</param>
+    /// <param name="token">The token to write. Its <see cref="EmailVerificationToken.UserId"/> is
+    /// assigned by the implementation, because the account an address belongs to is resolved inside
+    /// the same transaction that inserts the row rather than by an earlier read.</param>
+    /// <param name="nowUtc">The instant the superseded rows are stamped with.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// True when the token was written. False means there is no unverified account for the address
+    /// — deliberately without saying whether the address is unknown or its account is already
+    /// verified, because the caller answers <c>202</c> to both and must not be able to tell them
+    /// apart (SPEC-004, owner decision 3).
+    /// </returns>
+    /// <remarks>
+    /// Superseding is the owner's decision of 2026-09-27: exactly one link is live at a time, so the
+    /// guess surface does not grow with the number of resends. The cost is that a link from an
+    /// earlier mail stops working.
+    /// </remarks>
+    Task<bool> TryIssueEmailVerificationTokenAsync(
+        string email,
+        EmailVerificationToken token,
+        DateTime nowUtc,
+        CancellationToken cancellationToken);
 }
