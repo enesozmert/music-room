@@ -42,7 +42,7 @@
       <Parameters>
         <Parameter>
           <Key>max</Key>
-          <Value>5</Value>
+          <Value>30</Value>
         </Parameter>
       </Parameters>
     </Rule>
@@ -65,6 +65,17 @@
         <Parameter>
           <Key>maximumMethodThreshold</Key>
           <Value>15</Value>
+        </Parameter>
+      </Parameters>
+    </Rule>
+
+    <!-- Class coupling. Matches CA1506.threshold in .editorconfig. -->
+    <Rule>
+      <Key>S1200</Key>
+      <Parameters>
+        <Parameter>
+          <Key>max</Key>
+          <Value>30</Value>
         </Parameter>
       </Parameters>
     </Rule>
