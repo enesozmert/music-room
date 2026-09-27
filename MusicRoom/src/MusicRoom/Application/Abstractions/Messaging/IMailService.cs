@@ -24,4 +24,19 @@ public interface IMailService
         string emailAddress,
         string token,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Delivers the password reset link — SDD §13.1.
+    /// </summary>
+    /// <param name="emailAddress">The address that asked for a reset.</param>
+    /// <param name="token">The <em>plaintext</em> reset token. It is a stronger credential than the
+    /// verification token: whoever holds it can replace the account's password. The sender is the only
+    /// component that may ever see it, the database holds its SHA-256 digest, and no other layer keeps a
+    /// copy.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task that completes when the message has been handed to the transport.</returns>
+    Task SendPasswordResetAsync(
+        string emailAddress,
+        string token,
+        CancellationToken cancellationToken);
 }

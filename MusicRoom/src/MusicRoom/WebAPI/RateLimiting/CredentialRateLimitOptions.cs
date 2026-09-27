@@ -31,6 +31,15 @@ internal sealed class CredentialRateLimitOptions
     internal CredentialRateLimitWindow EmailVerifications { get; init; } = new(30, TimeSpan.FromMinutes(5));
 
     /// <summary>
+    /// Reset requests: 10 per hour, the verification-resend numbers. Same work, same cost — SPEC-007
+    /// escalation 2.
+    /// </summary>
+    internal CredentialRateLimitWindow PasswordResetRequests { get; init; } = new(10, TimeSpan.FromHours(1));
+
+    /// <summary>Reset: 30 per 5 minutes, which bounds token guessing without breaking a retry.</summary>
+    internal CredentialRateLimitWindow PasswordResets { get; init; } = new(30, TimeSpan.FromMinutes(5));
+
+    /// <summary>
     /// Reads the options from configuration, falling back to the approved numbers value by value.
     /// </summary>
     /// <param name="configuration">The host's configuration.</param>
@@ -54,6 +63,14 @@ internal sealed class CredentialRateLimitOptions
                 configuration,
                 "RATE_LIMIT_EMAIL_VERIFICATIONS",
                 defaults.EmailVerifications),
+            PasswordResetRequests = ReadWindow(
+                configuration,
+                "RATE_LIMIT_PASSWORD_RESET_REQUESTS",
+                defaults.PasswordResetRequests),
+            PasswordResets = ReadWindow(
+                configuration,
+                "RATE_LIMIT_PASSWORD_RESETS",
+                defaults.PasswordResets),
         };
     }
 

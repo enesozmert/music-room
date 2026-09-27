@@ -59,4 +59,29 @@ internal sealed class LoggingMailService : IMailService
 
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The reset token is written to the log, which the repository owner accepted on 2026-09-27
+    /// (SPEC-006 escalation 3 — recorded as the widening of T-26). It is strictly worse than the
+    /// verification token this class already logs: a reader of a Development log can take the account
+    /// over, not merely confirm its address. The start-up guard in
+    /// <see cref="InfrastructureServiceRegistration"/> is what keeps that to Development hosts, and the
+    /// row closes when slice S1a lands the real sender.
+    /// </remarks>
+    public Task SendPasswordResetAsync(
+        string emailAddress,
+        string token,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _logger.LogWarning(
+            "Password reset token issued for {EmailAddress}: {PasswordResetToken}. This token replaces "
+            + "a password; it is logged only because this sender is Development-only (T-26).",
+            emailAddress,
+            token);
+
+        return Task.CompletedTask;
+    }
 }

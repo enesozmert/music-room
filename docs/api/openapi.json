@@ -253,6 +253,88 @@
           }
         }
       }
+    },
+    "/api/v1/auth/password-reset-requests": {
+      "post": {
+        "tags": [
+          "PasswordResetEndpoints"
+        ],
+        "summary": "Ask for a password reset link",
+        "description": "Answers 202 for any address that is a valid address. Whether a mail follows is not stated and cannot be inferred from the response: a distinct answer here would tell an anonymous caller which addresses hold an account.",
+        "operationId": "PostAuthPasswordResetRequest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/password-resets": {
+      "post": {
+        "tags": [
+          "PasswordResetEndpoints"
+        ],
+        "summary": "Replace a forgotten password",
+        "description": "Spends the token from the reset mail exactly once, replaces the password and revokes every refresh token the account holds, so a password change ends every session opened with the old one. An access token issued moments earlier stays valid until it expires; that window is the 15 minutes the session design fixes. A 422 describes the new password only, never the token.",
+        "operationId": "PostAuthPasswordReset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetSubmission"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "410": {
+            "description": "Gone"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -316,6 +398,37 @@
             }
           }
         }
+      },
+      "PasswordResetRequest": {
+        "required": [
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The address to send a reset link to."
+          }
+        },
+        "description": "The reset request payload — `docs/api/ENDPOINTS.md` §1."
+      },
+      "PasswordResetSubmission": {
+        "required": [
+          "token",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The token from the reset mail."
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "The replacement password. Never logged or echoed back."
+          }
+        },
+        "description": "The reset payload — `docs/api/ENDPOINTS.md` §1."
       },
       "RegistrationRequest": {
         "required": [
@@ -423,6 +536,9 @@
     },
     {
       "name": "AuthEndpoints"
+    },
+    {
+      "name": "PasswordResetEndpoints"
     }
   ]
 }

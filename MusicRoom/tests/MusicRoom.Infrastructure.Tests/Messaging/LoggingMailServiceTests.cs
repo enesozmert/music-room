@@ -61,6 +61,46 @@ public sealed class LoggingMailServiceTests
     }
 
     /// <summary>
+    /// The reset token is logged, and the event says why — the widening of T-26 the owner accepted on
+    /// 2026-09-27 (SPEC-007 escalation 3). This token replaces a password, so what the sender writes is
+    /// asserted rather than assumed.
+    /// </summary>
+    [Fact]
+    public async Task SendPasswordResetAsync_WritesTheTokenAndNamesTheRiskAsync()
+    {
+        // Arrange
+        MessageLog log = new();
+        IMailService mail = ResolveMailService(log, BaseUrl);
+
+        // Act
+        await mail.SendPasswordResetAsync(EmailAddress, Token, TestContext.Current.CancellationToken);
+
+        // Assert
+        string message = Assert.Single(log.Messages);
+        Assert.Contains(Token, message, StringComparison.Ordinal);
+        Assert.Contains(EmailAddress, message, StringComparison.Ordinal);
+        Assert.Contains("T-26", message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The reset event is a warning, not information: a credential in a log is worth more attention than
+    /// a verification link.
+    /// </summary>
+    [Fact]
+    public async Task SendPasswordResetAsync_LogsAtWarningAsync()
+    {
+        // Arrange
+        MessageLog log = new();
+        IMailService mail = ResolveMailService(log, BaseUrl);
+
+        // Act
+        await mail.SendPasswordResetAsync(EmailAddress, Token, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(LogLevel.Warning, Assert.Single(log.Levels));
+    }
+
+    /// <summary>
     /// Outside Development the registration refuses to run. The guard is mechanical, not a promise:
     /// no code path writes a verification token into a non-Development log.
     /// </summary>
@@ -118,10 +158,23 @@ public sealed class LoggingMailServiceTests
     internal sealed class MessageLog
     {
         private readonly List<string> _messages = [];
+        private readonly List<LogLevel> _levels = [];
 
         internal IReadOnlyList<string> Messages => _messages;
 
+        /// <summary>The level of each captured event, in the same order as the messages.</summary>
+        internal IReadOnlyList<LogLevel> Levels => _levels;
+
         internal void Add(string message) => _messages.Add(message);
+
+        /// <summary>Captures one event's message and level together.</summary>
+        /// <param name="level">The level it was logged at.</param>
+        /// <param name="message">The formatted message.</param>
+        internal void Add(LogLevel level, string message)
+        {
+            _levels.Add(level);
+            _messages.Add(message);
+        }
     }
 
     /// <summary>
@@ -175,7 +228,7 @@ public sealed class LoggingMailServiceTests
         {
             ArgumentNullException.ThrowIfNull(formatter);
 
-            _log.Add(formatter(state, exception));
+            _log.Add(logLevel, formatter(state, exception));
         }
     }
 }
