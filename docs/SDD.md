@@ -613,6 +613,20 @@ cannot switch a limit off.
 Audit record: `userId`, `action`, `targetType`, `targetId`, `platform`, `device`, `appVersion`,
 `occurredAtUtc`, `correlationId`, outcome. See §10.7.
 
+The `outcome` vocabulary, implemented values (SPEC-009):
+
+| Value | Means |
+|---|---|
+| `completed` | the action ran to completion. Also what a handler that says nothing produces |
+| `refused` | wrong credential, or an unknown or already-spent token |
+| `throttled` | the account is out of attempts — §13.3 |
+| `expired` | the credential existed and its window had passed |
+| `reusedetected` | an already-rotated refresh token was presented, so the family was revoked — §13.1. The loudest row in the table: a refresh token leaked |
+
+`userId` is set where the handler knows the account — a successful sign-in, a rotation, a completed
+reset — and left null where naming it would say more than the caller proved: a failed login must not
+record which address exists, and a duplicate registration stays `completed` for the same reason.
+
 **Both transports are covered.** REST commands go through the pipeline behaviour; SignalR
 `JoinEvent`, `LeaveEvent`, `JoinPlaylist` and `LeavePlaylist` go through a hub filter writing the
 same record -- [[ADR-0019-hub-action-auditing]]. Client context is captured at the handshake,
@@ -773,7 +787,7 @@ table to walk through at defence.
 | V.6 | own data only, never another user's | §13.2 | designed |
 | V.6 | brute force and session theft protections | §13.1, §13.3 | **implemented** -- **brute force:** every credential endpoint carries a per-IP policy (one per endpoint, so a registration loop cannot spend the sign-in allowance) and a per-account counter with progressive backoff, answering `429` with `Retry-After` and an empty body; the numbers are in §13.3 and the trip is logged without naming the account. **Session theft:** refresh tokens are stored only as SHA-256 digests, rotate on every use through a `consumed_at_utc IS NULL AND revoked_at_utc IS NULL AND expires_at_utc > @now` conditional update, and presenting an already-rotated token revokes the whole family in the same transaction. Parallel tests prove both concurrency claims: 20 concurrent rotations of one token produce exactly one `200`, one spent row and one replacement. Remaining gap, recorded and not silent: limiter state is per process, so several instances would each hold their own -- O8 |
 | V.6 | document remaining threats | §13.6, [[threat-register]] | **designed** — register written, verification pending |
-| V.6 | log platform, device, app version per action | §10.7, §13.4, [[ADR-0019-hub-action-auditing]] | **partly implemented** -- **REST is done:** middleware refuses any mutating request that omits `X-Client-Platform`, `X-Client-Device` or `X-Client-App-Version` with a bodiless `400`, and an `AuditBehaviour` writes exactly one `audit_records` row per handled command, carrying those three values plus the action, the target type, the trace id and the instant. The record is written **inside the command's transaction**, so an effect without a record cannot exist and a record without an effect cannot either; if the audit write fails the whole command fails (owner decision, 2026-09-27, fail closed). A command refused by validation leaves no record. `user_id` is null on every row until an endpoint authenticates its caller, because every mutating endpoint that exists is anonymous -- stated, not hidden. **The hub filter is still designed only:** no hub exists yet, so ADR-0019's filter arrives with the first one rather than being registered against nothing |
+| V.6 | log platform, device, app version per action | §10.7, §13.4, [[ADR-0019-hub-action-auditing]] | **partly implemented** -- **REST is done:** middleware refuses any mutating request that omits `X-Client-Platform`, `X-Client-Device` or `X-Client-App-Version` with a bodiless `400`, and an `AuditBehaviour` writes exactly one `audit_records` row per handled command, carrying those three values plus the action, the target type, the trace id and the instant. The record is written **inside the command's transaction**, so an effect without a record cannot exist and a record without an effect cannot either; if the audit write fails the whole command fails (owner decision, 2026-09-27, fail closed). A command refused by validation leaves no record. `user_id` is null on every row until an endpoint authenticates its caller, because every mutating endpoint that exists is anonymous -- stated, not hidden, and it is now populated wherever the handler knows the account. Since SPEC-009 the row also says **what became of** the action — `completed`, `refused`, `throttled`, `expired` or `reusedetected` (§13.4) — so a failed login, a rejected token and a detected refresh-token family revocation are each visible as themselves. A throttled credential attempt is recorded too, which needed the limiter's refusal to stop being an exception. **The hub filter is still designed only:** no hub exists yet, so ADR-0019's filter arrives with the first one rather than being registered against nothing |
 | V.7 | measure and justify concurrent users | §14.4, [[ADR-0018-load-testing-tool]] | tool decided; measurement not started |
 | V.7 | declare server specification | §14.1, [[ADR-0015-hosting-and-deployment]], [[ADR-0016-supabase-plan-region]] | machine and region decided; measurement not started |
 | V.6 | OWASP conformance of all code | [[asvs-conformance]], §13 | target committed, evidence pending |

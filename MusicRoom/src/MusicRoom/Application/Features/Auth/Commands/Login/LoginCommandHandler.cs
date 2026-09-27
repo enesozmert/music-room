@@ -1,7 +1,7 @@
 using MediatR;
+using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Persistence;
 using MusicRoom.Application.Abstractions.Security;
-using MusicRoom.Domain.Entities;
 
 namespace MusicRoom.Application.Features.Auth.Commands.Login;
 
@@ -9,54 +9,51 @@ namespace MusicRoom.Application.Features.Auth.Commands.Login;
 /// Verifies a password and opens a session — SDD §13.1.
 /// </summary>
 /// <remarks>
-/// Every failure — unknown address, wrong password, unverified account — returns null, and the
-/// endpoint turns that into one bodiless <c>401</c>. Distinguishing them would tell an anonymous
-/// caller which addresses hold an account.
+/// Every failure — unknown address, wrong password, unverified account — answers
+/// <see cref="LoginResult.Refused"/>, which the endpoint turns into one bodiless <c>401</c>.
+/// Distinguishing them would tell an anonymous caller which addresses hold an account. Being out of
+/// attempts is the one refusal the endpoint answers differently, because the contract lists `429`.
 /// </remarks>
-internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTokenPair?>
+internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResult>
 {
-    /// <summary>
-    /// The absolute lifetime of a refresh-token family — owner decision, 2026-09-27. Absolute, not
-    /// sliding: every replacement inherits this expiry from the family's first token, so a stolen
-    /// family cannot be kept alive by rotating it.
-    /// </summary>
-    internal const int RefreshTokenLifetimeDays = 30;
-
     private readonly IUserRepository _users;
-    private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IPasswordHasher _passwordHasher;
-    private readonly IAccessTokenIssuer _accessTokens;
+    private readonly SessionIssuer _sessions;
     private readonly ICredentialAttemptLimiter _attempts;
+    private readonly IAuditContext _audit;
 
-    /// <summary>Takes the two write paths, the hasher, the token issuer and the attempt limiter.</summary>
+    /// <summary>Takes the account read path, the hasher, the session issuer, the limiter and the audit context.</summary>
     /// <param name="users">The account read path.</param>
-    /// <param name="refreshTokens">The refresh-token write path.</param>
     /// <param name="passwordHasher">The password verifier — ADR-0007.</param>
-    /// <param name="accessTokens">The access-token issuer.</param>
+    /// <param name="sessions">Opens the refresh-token family and mints the pair.</param>
     /// <param name="attempts">The per-account half of the credential rate limit — SPEC-006.</param>
+    /// <param name="audit">Where this handler states what became of the attempt — SPEC-009.</param>
     /// <remarks>
     /// Public on an internal type: MediatR activates the handler through a public constructor only.
     /// </remarks>
     public LoginCommandHandler(
         IUserRepository users,
-        IRefreshTokenRepository refreshTokens,
         IPasswordHasher passwordHasher,
-        IAccessTokenIssuer accessTokens,
-        ICredentialAttemptLimiter attempts)
+        SessionIssuer sessions,
+        ICredentialAttemptLimiter attempts,
+        IAuditContext audit)
     {
         _users = users;
-        _refreshTokens = refreshTokens;
         _passwordHasher = passwordHasher;
-        _accessTokens = accessTokens;
+        _sessions = sessions;
         _attempts = attempts;
+        _audit = audit;
     }
 
-    /// <summary>Issues a token pair, or null for every failure.</summary>
+    /// <summary>Issues a token pair, or reports the refusal.</summary>
     /// <param name="request">The validated command.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
-    /// <returns>The pair on success, null otherwise.</returns>
-    /// <remarks>Neither the password nor either issued token is ever logged here.</remarks>
-    public async Task<AuthTokenPair?> Handle(LoginCommand request, CancellationToken cancellationToken)
+    /// <returns>The pair on success, a refusal otherwise — out of attempts or not.</returns>
+    /// <remarks>
+    /// Neither the password nor either issued token is ever logged here. What became of the attempt goes to
+    /// the audit context, so the row says <c>refused</c>, <c>throttled</c> or <c>completed</c> — SPEC-009.
+    /// </remarks>
+    public async Task<LoginResult> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -71,7 +68,10 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTo
 
         if (!decision.Allowed)
         {
-            throw new CredentialAttemptThrottledException(decision.RetryAfter);
+            // The loudest row the table holds: somebody is working through passwords for this address.
+            _audit.SetOutcome(AuditOutcome.Throttled);
+
+            return LoginResult.OutOfAttempts(new CredentialThrottle(decision.RetryAfter));
         }
 
         UserCredential? credential = await _users
@@ -86,14 +86,22 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTo
             // that keeps trying is: the mail it needs is a different endpoint, with its own limit.
             _attempts.RecordChargeableAttempt(email);
 
-            return null;
+            // Refused, and deliberately without naming an account: a user_id on a failed login would make
+            // the table an account-existence oracle for anyone who can read it.
+            _audit.SetOutcome(AuditOutcome.Refused);
+
+            return LoginResult.Refused;
         }
 
         // A successful sign-in clears the history, so a user who mistyped twice and then got it right
         // does not carry a penalty into tomorrow.
         _attempts.Reset(email);
 
-        return await IssueSessionAsync(credential.UserId, cancellationToken).ConfigureAwait(false);
+        _audit.SetUserId(credential.UserId);
+        _audit.SetTargetId(credential.UserId);
+
+        return LoginResult.Issued(
+            await _sessions.IssueAsync(credential.UserId, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
@@ -114,31 +122,5 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTo
         }
 
         return _passwordHasher.Verify(password, credential.PasswordHash);
-    }
-
-    /// <summary>
-    /// Opens a new refresh-token family and mints the first pair of the session.
-    /// </summary>
-    private async Task<AuthTokenPair> IssueSessionAsync(Guid userId, CancellationToken cancellationToken)
-    {
-        DateTime nowUtc = DateTime.UtcNow;
-        string plaintext = RefreshTokenSecret.Create();
-
-        RefreshToken token = new()
-        {
-            Id = Guid.NewGuid(),
-            UserId = userId,
-            // A login starts its own family. Everything rotated from it carries this id, so one
-            // indexed UPDATE can revoke the whole lineage if a spent token is ever replayed.
-            FamilyId = Guid.NewGuid(),
-            TokenHash = OpaqueTokenHash.Of(plaintext),
-            ExpiresAtUtc = nowUtc.AddDays(RefreshTokenLifetimeDays),
-        };
-
-        await _refreshTokens.IssueAsync(token, cancellationToken).ConfigureAwait(false);
-
-        IssuedAccessToken accessToken = _accessTokens.Issue(userId, nowUtc);
-
-        return new AuthTokenPair(accessToken.Token, plaintext, accessToken.ExpiresInSeconds);
     }
 }

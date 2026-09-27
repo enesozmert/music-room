@@ -66,13 +66,11 @@ internal static class PasswordResetEndpoints
     {
         RequestPasswordResetCommand command = new(request.Email);
 
+        CredentialThrottle? throttled;
+
         try
         {
-            await sender.Send(command, cancellationToken);
-        }
-        catch (CredentialAttemptThrottledException exception)
-        {
-            return CredentialEndpointResults.Throttled(httpContext, exception);
+            throttled = await sender.Send(command, cancellationToken);
         }
         catch (ValidationException exception)
         {
@@ -83,7 +81,9 @@ internal static class PasswordResetEndpoints
                 statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
-        return Results.Accepted();
+        return throttled is null
+            ? Results.Accepted()
+            : CredentialEndpointResults.Throttled(httpContext, throttled);
     }
 
     private static async Task<IResult> ResetPasswordAsync(

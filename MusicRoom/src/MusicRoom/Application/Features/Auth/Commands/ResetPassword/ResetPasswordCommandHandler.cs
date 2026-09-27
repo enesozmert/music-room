@@ -1,4 +1,5 @@
 using MediatR;
+using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Persistence;
 using MusicRoom.Application.Abstractions.Security;
 
@@ -17,17 +18,23 @@ internal sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswor
 {
     private readonly IUserRepository _users;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IAuditContext _audit;
 
-    /// <summary>Takes the write path and the hasher.</summary>
+    /// <summary>Takes the write path, the hasher and the audit context.</summary>
     /// <param name="users">The account write path.</param>
     /// <param name="passwordHasher">The password hasher — ADR-0007.</param>
+    /// <param name="audit">Where this handler states what became of the attempt — SPEC-009.</param>
     /// <remarks>
     /// Public on an internal type: MediatR activates the handler through a public constructor only.
     /// </remarks>
-    public ResetPasswordCommandHandler(IUserRepository users, IPasswordHasher passwordHasher)
+    public ResetPasswordCommandHandler(
+        IUserRepository users,
+        IPasswordHasher passwordHasher,
+        IAuditContext audit)
     {
         _users = users;
         _passwordHasher = passwordHasher;
+        _audit = audit;
     }
 
     /// <summary>Replaces the password, or reports why the token could not be spent.</summary>
@@ -47,12 +54,27 @@ internal sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswor
         // BCrypt runs for a quarter of a second.
         string newPasswordHash = _passwordHasher.Hash(request.NewPassword);
 
-        return await _users
+        PasswordResetResult result = await _users
             .TryResetPasswordAsync(
                 OpaqueTokenHash.Of(request.Token),
                 newPasswordHash,
                 DateTime.UtcNow,
                 cancellationToken)
             .ConfigureAwait(false);
+
+        _audit.SetOutcome(result.Outcome switch
+        {
+            ResetPasswordOutcome.Reset => AuditOutcome.Completed,
+            ResetPasswordOutcome.Expired => AuditOutcome.Expired,
+            _ => AuditOutcome.Refused,
+        });
+
+        if (result.UserId is Guid userId)
+        {
+            _audit.SetUserId(userId);
+            _audit.SetTargetId(userId);
+        }
+
+        return result.Outcome;
     }
 }

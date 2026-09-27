@@ -1,4 +1,6 @@
 using Core.Application.Pipelines.Validation;
+using MusicRoom.Application.Abstractions.Auditing;
+using MusicRoom.Application.Features.Auth;
 using MusicRoom.Application.Pipelines.Auditing;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +34,15 @@ public static class ApplicationServiceRegistration
         });
 
         services.AddValidatorsFromAssembly(typeof(ApplicationServiceRegistration).Assembly);
+
+        // Request-scoped: one handler writes what became of the action, the audit behaviour reads it —
+        // SPEC-009.
+        services.AddScoped<IAuditContext, AuditContext>();
+
+        // Extracted from the handlers when the audit context pushed two constructors past the
+        // five-parameter limit S107 enforces — SPEC-009.
+        services.AddScoped<SessionIssuer>();
+        services.AddScoped<CredentialMailDispatcher>();
 
         return services;
     }

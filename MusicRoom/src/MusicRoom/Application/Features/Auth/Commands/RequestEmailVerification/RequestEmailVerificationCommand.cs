@@ -1,5 +1,6 @@
 using MediatR;
 using MusicRoom.Application.Abstractions.Auditing;
+using MusicRoom.Application.Abstractions.Security;
 
 namespace MusicRoom.Application.Features.Auth.Commands.RequestEmailVerification;
 
@@ -12,7 +13,7 @@ namespace MusicRoom.Application.Features.Auth.Commands.RequestEmailVerification;
 /// unverified or already verified, so a result carrying which of those it was would be an
 /// account-enumeration oracle waiting to be serialised — SPEC-004, owner decision 2026-09-27.
 /// </remarks>
-public sealed record RequestEmailVerificationCommand(string Email) : IRequest, IAuditableCommand
+public sealed record RequestEmailVerificationCommand(string Email) : IRequest<CredentialThrottle?>, IAuditableCommand
 {
     /// <inheritdoc />
     /// <remarks>A stable string, not a type name: renaming this record must not rewrite history.</remarks>

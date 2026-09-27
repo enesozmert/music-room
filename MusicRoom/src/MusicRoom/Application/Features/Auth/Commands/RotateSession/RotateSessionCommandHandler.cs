@@ -1,4 +1,5 @@
 using MediatR;
+using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Persistence;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Domain.Entities;
@@ -18,19 +19,23 @@ internal sealed class RotateSessionCommandHandler : IRequestHandler<RotateSessio
 {
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IAccessTokenIssuer _accessTokens;
+    private readonly IAuditContext _audit;
 
-    /// <summary>Takes the refresh-token write path and the access-token issuer.</summary>
+    /// <summary>Takes the refresh-token write path, the access-token issuer and the audit context.</summary>
     /// <param name="refreshTokens">The refresh-token write path.</param>
     /// <param name="accessTokens">The access-token issuer.</param>
+    /// <param name="audit">Where this handler states what became of the exchange — SPEC-009.</param>
     /// <remarks>
     /// Public on an internal type: MediatR activates the handler through a public constructor only.
     /// </remarks>
     public RotateSessionCommandHandler(
         IRefreshTokenRepository refreshTokens,
-        IAccessTokenIssuer accessTokens)
+        IAccessTokenIssuer accessTokens,
+        IAuditContext audit)
     {
         _refreshTokens = refreshTokens;
         _accessTokens = accessTokens;
+        _audit = audit;
     }
 
     /// <summary>Rotates the pair, or returns null for every failure.</summary>
@@ -69,10 +74,25 @@ internal sealed class RotateSessionCommandHandler : IRequestHandler<RotateSessio
 
         if (rotation.Status != RefreshTokenRotationStatus.Rotated)
         {
-            // Reused revoked the family inside the repository; rejected had nothing to revoke. Both
-            // answer the caller identically.
+            // Reused revoked the family inside the repository; rejected had nothing to revoke. Both answer
+            // the caller identically — and the audit row is where they stop being identical, because a
+            // reuse means a refresh token leaked and an operator needs to see that.
+            if (rotation.Status == RefreshTokenRotationStatus.Reused)
+            {
+                _audit.SetOutcome(AuditOutcome.ReuseDetected);
+                _audit.SetUserId(rotation.UserId);
+                _audit.SetTargetId(rotation.UserId);
+            }
+            else
+            {
+                _audit.SetOutcome(AuditOutcome.Refused);
+            }
+
             return null;
         }
+
+        _audit.SetUserId(rotation.UserId);
+        _audit.SetTargetId(rotation.UserId);
 
         IssuedAccessToken accessToken = _accessTokens.Issue(rotation.UserId, nowUtc);
 

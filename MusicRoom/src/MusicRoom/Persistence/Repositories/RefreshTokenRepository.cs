@@ -136,7 +136,9 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
         await RevokeFamilyAsync(token.FamilyId, nowUtc, cancellationToken).ConfigureAwait(false);
         await CommitIfOwnedAsync(transaction, cancellationToken).ConfigureAwait(false);
 
-        return new RefreshTokenRotation(RefreshTokenRotationStatus.Reused, Guid.Empty);
+        // The account is named on this path, unlike the rejected one: a reuse proves the presented value was
+        // once issued to that account, so the audit row may say whose family was revoked — SPEC-009.
+        return new RefreshTokenRotation(RefreshTokenRotationStatus.Reused, token.UserId);
     }
 
     /// <summary>

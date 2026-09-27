@@ -42,8 +42,11 @@ public interface IRefreshTokenRepository
 /// What an attempted exchange did.
 /// </summary>
 /// <param name="Status">Rotated, reused or rejected.</param>
-/// <param name="UserId">The account the rotated session belongs to, or
-/// <see cref="Guid.Empty"/> when nothing was rotated.</param>
+/// <param name="UserId">The account the session belongs to. Set on
+/// <see cref="RefreshTokenRotationStatus.Rotated"/> and on
+/// <see cref="RefreshTokenRotationStatus.Reused"/> — a reuse proves the presented value was once issued to
+/// that account, so the audit row may name it. <see cref="Guid.Empty"/> on
+/// <see cref="RefreshTokenRotationStatus.Rejected"/>, where nothing was proved.</param>
 /// <remarks>
 /// Declared beside the interface rather than in its own file: it exists only as this method's return
 /// value, and SPEC-005's Files table is the contract for what this change may create.

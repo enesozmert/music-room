@@ -19,6 +19,11 @@ namespace MusicRoom.Application.Pipelines.Auditing;
 /// was no action to record.
 /// </para>
 /// <para>
+/// What the record *says* comes from <see cref="IAuditContext"/>, which the handler writes — SPEC-009. A
+/// handler that says nothing yields <see cref="AuditOutcome.Completed"/> and no account, which is still
+/// true of a command that ran to completion.
+/// </para>
+/// <para>
 /// A command that is not <see cref="IAuditableCommand"/> passes straight through, with no transaction of
 /// this behaviour's making. That is how a read, or a command whose own repository method already arbitrates
 /// its writes, stays untouched.
@@ -29,25 +34,26 @@ namespace MusicRoom.Application.Pipelines.Auditing;
 public sealed class AuditBehaviour<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : notnull
 {
-    /// <summary>What the outcome column says while refusals are still handler-level events.</summary>
-    public const string CompletedOutcome = "completed";
-
     private readonly IUnitOfWork _unitOfWork;
     private readonly IAuditSink _audit;
     private readonly IClientContextAccessor _clientContext;
+    private readonly IAuditContext _auditContext;
 
-    /// <summary>Takes the transaction boundary, the sink and the client context.</summary>
+    /// <summary>Takes the transaction boundary, the sink, the client context and the audit context.</summary>
     /// <param name="unitOfWork">The transaction boundary — SPEC-008 escalation 2.</param>
     /// <param name="audit">Where the record is written.</param>
     /// <param name="clientContext">The three client values subject V.6 names.</param>
+    /// <param name="auditContext">What the handler said became of the action — SPEC-009.</param>
     public AuditBehaviour(
         IUnitOfWork unitOfWork,
         IAuditSink audit,
-        IClientContextAccessor clientContext)
+        IClientContextAccessor clientContext,
+        IAuditContext auditContext)
     {
         _unitOfWork = unitOfWork;
         _audit = audit;
         _clientContext = clientContext;
+        _auditContext = auditContext;
     }
 
     /// <summary>Wraps the handler, then records what it did.</summary>
@@ -83,8 +89,9 @@ public sealed class AuditBehaviour<TRequest, TResponse> : IPipelineBehavior<TReq
         {
             TResponse response = await next(cancellationToken).ConfigureAwait(false);
 
+            // Read after the handler ran: the outcome and the account are what it just learned.
             await _audit
-                .WriteAsync(Record(auditable, context), cancellationToken)
+                .WriteAsync(Record(auditable, context, _auditContext), cancellationToken)
                 .ConfigureAwait(false);
 
             if (owned)
@@ -105,7 +112,10 @@ public sealed class AuditBehaviour<TRequest, TResponse> : IPipelineBehavior<TReq
         }
     }
 
-    private static AuditRecord Record(IAuditableCommand command, ClientContext context)
+    private static AuditRecord Record(
+        IAuditableCommand command,
+        ClientContext context,
+        IAuditContext auditContext)
     {
         DateTime nowUtc = DateTime.UtcNow;
 
@@ -113,21 +123,19 @@ public sealed class AuditBehaviour<TRequest, TResponse> : IPipelineBehavior<TReq
         {
             Id = Guid.NewGuid(),
 
-            // Null until an endpoint authenticates its caller — SPEC-008 escalation 3, option A. The
-            // record still names the action, and the client context identifies the caller's device.
-            UserId = null,
+            // Named by the handler where it knows the account, null where it does not — an anonymous
+            // refusal must not claim an account, and naming one on a failed login would make the table an
+            // account-existence oracle.
+            UserId = auditContext.UserId,
             Action = command.AuditAction,
             TargetType = command.AuditTargetType,
-
-            // Null while no command can name its target: for these seven, the account id is resolved
-            // inside the handler and never reaches the command.
-            TargetId = null,
+            TargetId = auditContext.TargetId,
             Platform = context.Platform,
             Device = context.Device,
             AppVersion = context.AppVersion,
             OccurredAtUtc = nowUtc,
             CorrelationId = context.CorrelationId,
-            Outcome = CompletedOutcome,
+            Outcome = auditContext.Outcome.ToString().ToLowerInvariant(),
             CreatedAtUtc = nowUtc,
             UpdatedAtUtc = nowUtc,
         };

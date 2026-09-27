@@ -48,37 +48,17 @@ public interface ICredentialAttemptLimiter
 public sealed record CredentialAttemptDecision(bool Allowed, TimeSpan RetryAfter);
 
 /// <summary>
-/// Thrown by a handler whose account key is out of attempts, and turned into `429` by the endpoint.
+/// A refusal to spend another attempt, and how long the caller must wait.
 /// </summary>
+/// <param name="RetryAfter">What the endpoint puts in <c>Retry-After</c>.</param>
 /// <remarks>
-/// An exception rather than an outcome on three different return types: registration and resend answer
-/// <c>Task</c>, login answers a token pair, and all three must produce the same `429` with the same
-/// header. The message carries no address and no count.
+/// A value rather than an exception — SPEC-009 escalation 2, owner decision of 2026-09-28. The exception it
+/// replaces was thrown on a path the system expects, and SPEC-008's fail-closed behaviour rolled the audit
+/// record back with it, so the loudest event in the system left no row. A handler now returns this and the
+/// endpoint maps it, which keeps the record on the ordinary success path of the pipeline.
+/// <para>
+/// Declared beside the limiter rather than in its own file: it exists only as the shape of a refusal, and
+/// SPEC-009's Files table is the contract for what this change may create.
+/// </para>
 /// </remarks>
-public sealed class CredentialAttemptThrottledException : Exception
-{
-    /// <summary>Builds the exception with the wait the limiter reported.</summary>
-    /// <param name="retryAfter">What the endpoint puts in <c>Retry-After</c>.</param>
-    public CredentialAttemptThrottledException(TimeSpan retryAfter)
-        : base("Too many attempts for this account. Retry later.") => RetryAfter = retryAfter;
-
-    /// <summary>Required by CA1032; prefer the constructor that carries the wait.</summary>
-    public CredentialAttemptThrottledException()
-        : this(TimeSpan.Zero)
-    {
-    }
-
-    /// <summary>Required by CA1032.</summary>
-    /// <param name="message">The message.</param>
-    public CredentialAttemptThrottledException(string message)
-        : base(message) => RetryAfter = TimeSpan.Zero;
-
-    /// <summary>Required by CA1032.</summary>
-    /// <param name="message">The message.</param>
-    /// <param name="innerException">The cause.</param>
-    public CredentialAttemptThrottledException(string message, Exception innerException)
-        : base(message, innerException) => RetryAfter = TimeSpan.Zero;
-
-    /// <summary>How long the caller must wait before the next attempt is accepted.</summary>
-    public TimeSpan RetryAfter { get; }
-}
+public sealed record CredentialThrottle(TimeSpan RetryAfter);

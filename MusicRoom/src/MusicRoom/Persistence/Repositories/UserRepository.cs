@@ -176,7 +176,7 @@ internal sealed class UserRepository : IUserRepository
     }
 
     /// <inheritdoc />
-    public async Task<ResetPasswordOutcome> TryResetPasswordAsync(
+    public async Task<PasswordResetResult> TryResetPasswordAsync(
         string tokenHash,
         string newPasswordHash,
         DateTime nowUtc,
@@ -205,7 +205,9 @@ internal sealed class UserRepository : IUserRepository
 
         if (consumedRows == 0)
         {
-            return await ClassifyLostResetRaceAsync(tokenHash, nowUtc, cancellationToken).ConfigureAwait(false);
+            return new PasswordResetResult(
+                await ClassifyLostResetRaceAsync(tokenHash, nowUtc, cancellationToken).ConfigureAwait(false),
+                UserId: null);
         }
 
         Guid userId = await _context.PasswordResetTokens
@@ -219,7 +221,8 @@ internal sealed class UserRepository : IUserRepository
         await RevokeEveryRefreshTokenAsync(userId, nowUtc, cancellationToken).ConfigureAwait(false);
         await CommitIfOwnedAsync(transaction, cancellationToken).ConfigureAwait(false);
 
-        return ResetPasswordOutcome.Reset;
+        // The id goes back so the audit record can name the account this reset acted on — SPEC-009.
+        return new PasswordResetResult(ResetPasswordOutcome.Reset, userId);
     }
 
     /// <summary>
