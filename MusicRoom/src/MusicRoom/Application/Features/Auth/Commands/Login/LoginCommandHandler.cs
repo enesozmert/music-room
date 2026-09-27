@@ -26,12 +26,14 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTo
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IAccessTokenIssuer _accessTokens;
+    private readonly ICredentialAttemptLimiter _attempts;
 
-    /// <summary>Takes the two write paths, the hasher and the token issuer.</summary>
+    /// <summary>Takes the two write paths, the hasher, the token issuer and the attempt limiter.</summary>
     /// <param name="users">The account read path.</param>
     /// <param name="refreshTokens">The refresh-token write path.</param>
     /// <param name="passwordHasher">The password verifier — ADR-0007.</param>
     /// <param name="accessTokens">The access-token issuer.</param>
+    /// <param name="attempts">The per-account half of the credential rate limit — SPEC-006.</param>
     /// <remarks>
     /// Public on an internal type: MediatR activates the handler through a public constructor only.
     /// </remarks>
@@ -39,12 +41,14 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTo
         IUserRepository users,
         IRefreshTokenRepository refreshTokens,
         IPasswordHasher passwordHasher,
-        IAccessTokenIssuer accessTokens)
+        IAccessTokenIssuer accessTokens,
+        ICredentialAttemptLimiter attempts)
     {
         _users = users;
         _refreshTokens = refreshTokens;
         _passwordHasher = passwordHasher;
         _accessTokens = accessTokens;
+        _attempts = attempts;
     }
 
     /// <summary>Issues a token pair, or null for every failure.</summary>
@@ -57,8 +61,18 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTo
         ArgumentNullException.ThrowIfNull(request);
 
         // Lower-cased on the way in, the way registration stores it — the column and ux_users_email
-        // both hold the normalised form.
+        // both hold the normalised form. It is also the rate-limit partition key.
         string email = request.Email.Trim().ToLowerInvariant();
+
+        // Asked before any hashing and before the read: the point of the limit is that a refused
+        // attempt is cheap. A refusal costs the same whether or not the address exists, so this check
+        // is not an enumeration oracle either.
+        CredentialAttemptDecision decision = _attempts.Check(email);
+
+        if (!decision.Allowed)
+        {
+            throw new CredentialAttemptThrottledException(decision.RetryAfter);
+        }
 
         UserCredential? credential = await _users
             .FindCredentialByEmailAsync(email, cancellationToken)
@@ -66,9 +80,20 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, AuthTo
 
         bool passwordMatches = VerifyInConstantWork(request.Password, credential);
 
-        return passwordMatches && credential is { IsEmailVerified: true }
-            ? await IssueSessionAsync(credential.UserId, cancellationToken).ConfigureAwait(false)
-            : null;
+        if (!passwordMatches || credential is not { IsEmailVerified: true })
+        {
+            // Only a failure is charged. A correct password is not abuse, and an unverified account
+            // that keeps trying is: the mail it needs is a different endpoint, with its own limit.
+            _attempts.RecordChargeableAttempt(email);
+
+            return null;
+        }
+
+        // A successful sign-in clears the history, so a user who mistyped twice and then got it right
+        // does not carry a penalty into tomorrow.
+        _attempts.Reset(email);
+
+        return await IssueSessionAsync(credential.UserId, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

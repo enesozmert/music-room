@@ -37,6 +37,7 @@ public sealed class LoginEndpointTests : IAsyncLifetime
         {
             webHost.UseSetting("DATABASE_URL", _database.GetConnectionString());
             TestJwtSettings.Apply(webHost);
+            TestRateLimitSettings.Relax(webHost);
             webHost.ConfigureTestServices(services =>
                 services.AddSingleton<IMailService>(_mail));
         });
@@ -235,6 +236,40 @@ internal static class TestJwtSettings
         webHost.UseSetting("JWT_ISSUER", "musicroom-tests");
         webHost.UseSetting("JWT_AUDIENCE", "musicroom-tests-client");
         webHost.UseSetting("JWT_ACCESS_TOKEN_MINUTES", "15");
+    }
+}
+
+/// <summary>
+/// The rate limits a test host uses when limiting is not what the suite is proving.
+/// </summary>
+/// <remarks>
+/// SPEC-006 attached a per-IP policy to every credential endpoint and a per-account limit inside the
+/// handlers. A suite that signs in six times, or fires twenty parallel requests to prove a race, trips
+/// both — so these suites raise the permits instead of skipping a test or weakening an assertion. The
+/// limits themselves are proven by `CredentialRateLimitingTests` and `CredentialAttemptLimiterTests`.
+/// </remarks>
+internal static class TestRateLimitSettings
+{
+    /// <summary>High enough that no suite reaches it, low enough to stay a number.</summary>
+    internal const string Permits = "100000";
+
+    /// <summary>Raises every credential limit on a test host.</summary>
+    /// <param name="webHost">The builder being configured.</param>
+    internal static void Relax(IWebHostBuilder webHost)
+    {
+        foreach (string prefix in new[]
+        {
+            "RATE_LIMIT_SESSIONS",
+            "RATE_LIMIT_TOKENS",
+            "RATE_LIMIT_REGISTRATIONS",
+            "RATE_LIMIT_VERIFICATION_REQUESTS",
+            "RATE_LIMIT_EMAIL_VERIFICATIONS",
+        })
+        {
+            webHost.UseSetting($"{prefix}_PERMITS", Permits);
+        }
+
+        webHost.UseSetting("RATE_LIMIT_ACCOUNT_PERMITS", Permits);
     }
 }
 

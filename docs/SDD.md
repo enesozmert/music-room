@@ -581,6 +581,25 @@ Rate limits keyed on account **and** IP for login, registration, reset, verifica
 vote casting. Progressive backoff on repeated login failure. Generic error text to prevent
 account enumeration. `429` with `Retry-After`.
 
+The numbers, approved by the repository owner on 2026-09-27 (SPEC-006). Implemented values, not
+intent: the per-IP half is the built-in middleware, one policy per endpoint; the per-account half is
+`ICredentialAttemptLimiter`, enforced inside the handler because the address a request names is known
+only after model binding. Both halves hold state **in process**, which is correct for the single
+instance [[ADR-0015-hosting-and-deployment]] deploys and would not be shared across several -- O8.
+
+| Endpoint | Per IP | Per named account |
+|---|---|---|
+| `POST /auth/sessions` | 20 / 5 min | 5 failures / 5 min, then a penalty of 1 window doubling to a ceiling of 8 |
+| `POST /auth/tokens` | 60 / 5 min | -- the request names no account, only a token |
+| `POST /auth/registrations` | 10 / hour | the same per-account counter, charged on **every** attempt |
+| `POST /auth/verification-requests` | 10 / hour | the same, charged on every attempt -- each one writes a row and spends mail quota (T-19) |
+| `POST /auth/email-verifications` | 30 / 5 min | -- the request names no account |
+
+Login charges only a *failed* attempt and clears the counter on success. Registration and resend
+charge every attempt, because the cost is in the attempt rather than in its outcome. The defaults are
+compiled in and overridable from configuration; a non-positive override is ignored, so configuration
+cannot switch a limit off.
+
 ### 13.4 Audit log — mandatory, and distinct from application logging
 
 | | Audit log | Application log |
@@ -750,7 +769,7 @@ table to walk through at defence.
 | V.5 | configurable backend address | §9.1, [[musicroom-mobile]] | designed |
 | V.5 | social authentication on mobile | §10.2 | designed |
 | V.6 | own data only, never another user's | §13.2 | designed |
-| V.6 | brute force and session theft protections | §13.1, §13.3 | **partly implemented** -- session theft is detected: refresh tokens are stored only as SHA-256 digests, rotate on every use through a `consumed_at_utc IS NULL AND revoked_at_utc IS NULL AND expires_at_utc > @now` conditional update, and presenting an already-rotated token revokes the whole family in the same transaction. A parallel test proves 20 concurrent rotations of one token produce exactly one `200`, one spent row and one replacement. Brute-force protection is **not** implemented: no credential endpoint is attached to a rate limiter, which is T-25 and the next S1 spec |
+| V.6 | brute force and session theft protections | §13.1, §13.3 | **implemented** -- **brute force:** every credential endpoint carries a per-IP policy (one per endpoint, so a registration loop cannot spend the sign-in allowance) and a per-account counter with progressive backoff, answering `429` with `Retry-After` and an empty body; the numbers are in §13.3 and the trip is logged without naming the account. **Session theft:** refresh tokens are stored only as SHA-256 digests, rotate on every use through a `consumed_at_utc IS NULL AND revoked_at_utc IS NULL AND expires_at_utc > @now` conditional update, and presenting an already-rotated token revokes the whole family in the same transaction. Parallel tests prove both concurrency claims: 20 concurrent rotations of one token produce exactly one `200`, one spent row and one replacement. Remaining gap, recorded and not silent: limiter state is per process, so several instances would each hold their own -- O8 |
 | V.6 | document remaining threats | §13.6, [[threat-register]] | **designed** — register written, verification pending |
 | V.6 | log platform, device, app version per action | §10.7, §13.4, [[ADR-0019-hub-action-auditing]] | **designed** -- REST and hub both covered |
 | V.7 | measure and justify concurrent users | §14.4, [[ADR-0018-load-testing-tool]] | tool decided; measurement not started |

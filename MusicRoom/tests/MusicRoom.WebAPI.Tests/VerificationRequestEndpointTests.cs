@@ -46,6 +46,7 @@ public sealed class VerificationRequestEndpointTests : IAsyncLifetime
         {
             webHost.UseSetting("DATABASE_URL", _database.GetConnectionString());
             TestJwtSettings.Apply(webHost);
+            TestRateLimitSettings.Relax(webHost);
             webHost.ConfigureTestServices(services =>
                 services.AddSingleton<IMailService>(_mail));
         });
