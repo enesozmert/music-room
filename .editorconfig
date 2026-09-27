@@ -92,7 +92,12 @@ dotnet_diagnostic.S107.severity = error                # too many parameters (5)
 dotnet_diagnostic.S134.severity = error                # nesting too deep (3)
 dotnet_diagnostic.S1448.severity = error               # too many methods in a type (15)
 dotnet_diagnostic.S104.severity = error                # file has too many lines (300)
-dotnet_diagnostic.S1200.severity = warning             # class coupling
+dotnet_diagnostic.S1200.severity = warning             # class coupling (30)
+
+# `TreatWarningsAsErrors` is on for every project, so a `warning` severity here fails the build
+# exactly like `error`. The distinction above is documentary: it records which rules the project
+# would drop to a warning if that property were ever relaxed. To make a rule genuinely
+# non-blocking, use `suggestion` or `none` — not `warning`.
 
 # ---- correctness rules escalated ----
 dotnet_diagnostic.CA2007.severity = none               # ConfigureAwait: not needed in ASP.NET Core
@@ -104,7 +109,15 @@ dotnet_diagnostic.CA3075.severity = error              # insecure DTD processing
 dotnet_diagnostic.CA5359.severity = error              # do not disable certificate validation
 
 # ---- tests: length limits relaxed, security rules are not ----
+# A long arrange block in a fixture is not the defect S138 and S104 exist to catch.
+#
+# Measured 2026-09-27: SonarAnalyzer already skips these rules in any project it recognises as a
+# test project, and `IsTestProject` is true for all three. A 47-line method in
+# MusicRoom.Application.Tests produced no S138 at `error`, `warning` or `suggestion`. This block
+# is therefore a declaration of intent, and the safety net for a test project that is ever not
+# recognised as one. `suggestion` is what makes it a real relaxation: `TreatWarningsAsErrors` is
+# on, so `warning` would fail the build exactly like `error`.
 [**/*Tests/**/*.cs]
-dotnet_diagnostic.S138.severity = warning
+dotnet_diagnostic.S138.severity = suggestion
 dotnet_diagnostic.S1448.severity = none
-dotnet_diagnostic.S104.severity = warning
+dotnet_diagnostic.S104.severity = suggestion

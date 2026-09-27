@@ -71,18 +71,26 @@ File name matches the single public type it contains. One public type per file.
 
 ### Size and complexity limits
 
-Enforced by analyzers, configured once in the root `.editorconfig`. A limit that lives only in a
-document is a suggestion, and suggestions lose to deadlines.
+Enforced by analyzers. The configuration is split, and the split is not optional: **severities**
+live in the repository-root `.editorconfig`, **numeric thresholds** live in
+`MusicRoom/SonarLint.xml`, which reaches the compiler through the `AdditionalFiles` item in
+`MusicRoom/Directory.Build.props`. SonarAnalyzer reads rule parameters from nowhere else; a
+`sonar.csharp.*` key in `.editorconfig` is silently ignored. A limit that lives only in a document
+is a suggestion, and suggestions lose to deadlines.
 
 | Limit | Value | Applies to | Rule |
 |---|---|---|---|
 | Method body length | **40 lines** hard, 20 target | every method | `S138` |
 | Cyclomatic complexity | **10** | every method | `S1541`, `CA1502` |
-| Parameters | **5** | every method, excluding `CancellationToken` | `S107` |
+| Parameters | **5** | every method | `S107` |
 | Nesting depth | **3** | every method | `S134` |
 | Methods per type | **15** | every type | `S1448` |
 | File length | **300 lines** | every `.cs` file | `S104` |
 | Class coupling | **30** | every type | `S1200`, `CA1506` |
+
+`S107` counts every parameter, `CancellationToken` included; it has no exclusion parameter. Six
+parameters fail the build even when one of them is the token. Split the method or pass a request
+object.
 
 Additional shape rules that follow from the architecture:
 
@@ -96,9 +104,16 @@ Additional shape rules that follow from the architecture:
 - `Microsoft.CodeAnalysis.NetAnalyzers` covers complexity (`CA1502`), maintainability (`CA1505`)
   and class coupling (`CA1506`).
 - **Line-count and method-count limits are not expressible in the Microsoft analyzers.**
-  `SonarAnalyzer.CSharp` supplies `S138`, `S1541`, `S107`, `S134`, `S1448`, `S104` and `S1200`.
+  `SonarAnalyzer.CSharp` supplies `S138`, `S1541`, `S107`, `S134`, `S1448`, `S104` and `S1200`,
+  with their thresholds in `MusicRoom/SonarLint.xml`.
   It is a build-time analyzer package: no runtime code ships, and restore downloads it, which is
   consistent with subject IV.1 (no third-party **source** committed).
+- **SonarAnalyzer does not apply the size rules to test projects.** Verified 2026-09-27: a 47-line
+  method in `MusicRoom.Application.Tests` produces no `S138` at any severity, because
+  `IsTestProject` is true. The relaxation in `.editorconfig` for `**/*Tests/**/*.cs` records the
+  intent and covers a project that is ever not recognised as a test project.
+- **Every `warning` severity in `.editorconfig` fails the build.** `TreatWarningsAsErrors` is on
+  for every project, so `warning` and `error` differ only as documentation.
 - The escape hatch is an explicit `#pragma warning disable <rule>` with a comment naming the
   reason, re-enabled immediately after. It is visible in review and countable in the codebase.
 - Lowering a severity globally in `.editorconfig` to make a build pass is not an option. Change the
@@ -119,6 +134,7 @@ Additional shape rules that follow from the architecture:
 - [ ] No method over 40 lines, complexity over 10, or type over 15 methods
 - [ ] Every `#pragma warning disable` carries a reason and is re-enabled
 - [ ] `IDE1006` escalated to error; no naming deviation in the diff
+- [ ] A changed threshold went into `MusicRoom/SonarLint.xml`, not into `.editorconfig`
 
 ## References
 
