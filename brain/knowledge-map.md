@@ -88,7 +88,7 @@ Each arrow is a deliberate narrowing. Never skip a step by searching the whole v
 
 ### Operational history
 
-- [[migrations-index]] — schema transitions, empty until the first migration
+- [[migrations-index]] — schema transitions; four migrations so far, identity through the audit log
 - [[lessons-index]] — durable gotchas only
 
 ## Which layer owns what

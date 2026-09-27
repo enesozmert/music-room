@@ -1,6 +1,6 @@
 ---
 kind: architecture
-updated: 2026-09-23
+updated: 2026-09-28
 ---
 
 # Auth, Identity & Audit
@@ -51,8 +51,11 @@ Design: clients send `X-Client-Platform`, `X-Client-Device`, `X-Client-App-Versi
 middleware validates and attaches them to the request scope; every handled command writes an
 audit record. Missing headers are a 400 for mutating endpoints, not a silent default.
 
-SignalR hub joins and leaves are audited by a hub filter writing the same record; client context
-is captured at the handshake ([[ADR-0019-hub-action-auditing]]).
+SignalR hub joins and leaves **will be** audited by a hub filter writing the same record, with client
+context captured at the handshake ([[ADR-0019-hub-action-auditing]]). That filter is designed and not
+built: no hub exists yet, and SPEC-008 decided it arrives with the first one rather than being
+registered against nothing. The REST half — middleware plus `AuditBehaviour` writing one
+`audit_records` row per handled command, inside the command's own transaction — is built.
 
 Never log credentials, tokens, full request bodies, or voter coordinates. See standard
 `application-security`.

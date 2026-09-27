@@ -1,11 +1,11 @@
 ---
 kind: architecture
-updated: 2026-09-23
+updated: 2026-09-28
 ---
 
 # Domain Model (target)
 
-Sketch, not a schema. Field-level detail is `UNKNOWN - requires decision` until the first migration exists.
+Sketch, not a schema. For the aggregates that have shipped — `User`, `EmailVerificationToken`, `RefreshToken`, `PasswordResetToken`, `AuditRecord` — the migrations and their `IEntityTypeConfiguration` files are authoritative on field-level detail, not this note ([[migrations-index]]). For the rest it is still `UNKNOWN - requires decision` until the migration that creates them.
 
 ## Aggregates
 
