@@ -56,7 +56,11 @@ tracking, `AsNoTracking`, concurrency tokens and split queries. Provider:
 
 - Concurrency tokens use the Postgres system column `xmin`, mapped with
   `.UseXminAsConcurrencyToken()`. No hand-maintained version column.
-- Snake-case naming is applied through a naming convention, not by writing every column name by hand.
+- Snake-case table and column names are written out in the `IEntityTypeConfiguration<T>`, as the
+  Mapping section above requires. The project pins no naming-convention package: a convention
+  renames silently when a property is renamed, and a silent rename is a migration nobody read.
+  `MusicRoom.Persistence.Tests` walks the built model and fails the build on any name that
+  breaks the `database-design-migrations` conventions.
 - `timestamp with time zone` for every instant, always written as UTC.
 - The API uses the pooled connection string; `dotnet ef` uses the **direct** one. Enable
   `No Reset On Close` / disable prepared statements on the pooled connection as Supavisor requires.
