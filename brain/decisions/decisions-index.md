@@ -17,7 +17,7 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0005-api-style-rest-json]] | REST + JSON + OpenAPI | Accepted |
 | [[ADR-0006-datastore]] | Supabase (managed PostgreSQL) as the datastore | Accepted |
 | [[ADR-0007-password-hashing-bcrypt]] | BCrypt for password hashing | Accepted |
-| [[ADR-0008-oidc-social-login]] | OpenID Connect for Google and Facebook sign-in | Accepted |
+| [[ADR-0008-oidc-social-login]] | OpenID Connect for Google and Facebook sign-in | Accepted, amended 2026-09-27: one shared validation core |
 | [[ADR-0009-code-quality-gates]] | OWASP conformance and enforced code-size limits | Accepted |
 | [[ADR-0010-service-scope]] | Ship all three services | Accepted |
 | [[ADR-0011-solution-layout]] | Solution layout mirrors nArchitecture | Accepted |
@@ -40,5 +40,6 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0028-domain-owns-its-base-types]] | Domain owns its base types; Application owns its service abstractions | Accepted |
 | [[ADR-0029-containerised-dev-and-secret-vault]] | Fully containerised development, and a secret vault for API keys | Accepted |
 | [[ADR-0030-hub-rate-limits-and-origin]] | Hub call limits and handshake origin | Accepted |
+| [[ADR-0031-musicroom-as-openid-provider]] | The MusicRoom API becomes an OpenID Provider at S8 | Accepted |
 
 Related: [[MEMORY]] · [[system-overview]] · [[standards-router]]

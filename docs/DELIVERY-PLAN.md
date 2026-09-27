@@ -183,7 +183,7 @@ Each slice below cuts through all five projects and ends with something demonstr
 | S5 | Playlist Editor | REST + `PlaylistHub` + sparse ordering + concurrency token + parallel reorder tests | V.2.3 |
 | S6 | Track Vote | REST + `EventHub` + unique-index vote arbitration + licence policy incl. geofence and event code + parallel vote tests | V.2.1 |
 | S7 | Control Delegation + Playback | `PlaybackSession`, queue advance, device state machine, `ControlHub`, per-device licence | V.2.1, V.2.2 |
-| S8 | Social login | Google and Facebook via **OIDC**, PKCE, server-side ID token validation, account linking | V.1, V.5 |
+| S8 | OpenID Connect, both roles | **Relying party:** Google and Facebook through one discovery-driven validation core, acquisition branching only — Google authorization code + PKCE `S256`, Facebook Limited Login ([[ADR-0008-oidc-social-login]]). **Provider:** the API's own discovery document, JWKS, authorization and token endpoints, ID token and UserInfo, replacing the sign-in surface S1 shipped ([[ADR-0031-musicroom-as-openid-provider]]). Account linking | V.1, V.5 |
 | S9 | Capacity + conformance evidence | Gatling simulations under `tests/load/`, `docs/load/REPORT.md`; fill the Verified column in [[threat-register]] and the evidence in [[asvs-conformance]] | V.7, V.6 |
 
 ### Why this order
@@ -335,6 +335,7 @@ Consequences of a two-person split run sequentially:
 | Load report left to the last day | V.7 unmet — an unmeasured number is worth nothing | S8, and the machine decided in Phase 2 |
 | Credential committed | **automatic project failure** (V.8) | `.env` git-ignored from commit 1; rotate-first leak procedure in [[secrets-management]] |
 | Bonus started before mandatory is flawless | bonus not evaluated, mandatory weakened | Phase 6 |
+| S8 carries both OIDC roles and sits last | S8 grew from "add two providers" to "become a provider", it rewrites the endpoints SPEC-005 to SPEC-007 shipped, and nothing follows it but S9 | the migration is written into S8's spec before any code, old endpoints are removed only once their replacements pass, and the RS256 key work (O19) is pulled forward to S1b with the vault rather than discovered in S8 |
 | The secret vault competes with graded work | S1b is required scope by owner decision but is not a subject requirement, so a slip there and a slip in S5 to S7 cost very differently | S1b keeps its slot right after S1a and is not deferred to the end. If it slips, it slips against S1b's own schedule — never by taking days from the concurrency slices, which are what V.2 grades |
 | **Client work starts only after S9** | V.5 and IV.2 are mandatory and graded, and a sequential start concentrates the whole client into the last stretch, next to the S9 load report | owner decision, accepted with eyes open: hold S0-S9 to their definition of done so no backend rework eats the client's window, and keep `docs/api/openapi.json` current so the client starts against a contract that already matches the code |
 | Three services half-finished instead of two complete | subject VI: mandatory must be flawless | drop S7 Control Delegation first; [[ADR-0010-service-scope]] |

@@ -59,7 +59,15 @@ Algorithm: **BCrypt** via `BCrypt.Net-Next` — `brain/decisions/ADR-0007-passwo
 
 ### Tokens and sessions
 
-- Short-lived JWT access token (15 minutes) signed with a strong asymmetric or HMAC key from `.env`.
+- Short-lived JWT access token (15 minutes), **RS256**, signed with an asymmetric key. HMAC is not
+  an option: a shared secret cannot be published in a JWKS, and the JWKS is what lets anything
+  other than the API verify a token — [[ADR-0031-musicroom-as-openid-provider]]. Until S8 the key
+  comes from `.env`; from S1b it comes from the vault.
+- **From S8 the API is an OpenID Provider**, so the access token is joined by an **ID token** and
+  the pair is served through a discovery document, a JWKS endpoint, an authorization endpoint with
+  PKCE `S256`, a token endpoint and UserInfo. The ID token says who authenticated; the access
+  token authorises a call. Neither is accepted in the other's place. No resource-owner
+  password-credentials grant: OAuth 2.1 removes it and RFC 9700 deprecates it.
 - Refresh tokens are opaque, stored hashed server-side, rotated on every use, and revocable.
 - Reuse of an already-rotated refresh token means theft: revoke the whole family and force re-login.
 - Access tokens carry `sub`, `iat`, `exp`, `jti` and nothing sensitive. A JWT is signed, not secret.

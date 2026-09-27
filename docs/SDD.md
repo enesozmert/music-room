@@ -554,10 +554,11 @@ V10 OAuth and OIDC, and V16 Security Logging and Error Handling.
 |---|---|
 | Password hashing | **BCrypt** (`BCrypt.Net-Next`), work factor >= 12, rehash on login when the stored cost is lower -- [[ADR-0007-password-hashing-bcrypt]] |
 | Password policy | 12 to 64 characters, **<= 72 bytes UTF-8** (BCrypt truncates beyond that), no composition rules, no forced rotation (NIST SP 800-63B) |
-| Session | 15-minute JWT access token + opaque, hashed, rotating refresh token |
+| Session | 15-minute **RS256** JWT access token + opaque, hashed, rotating refresh token. From S8 an **ID token** joins it and both are issued by the API's own OpenID Provider surface -- [[ADR-0031-musicroom-as-openid-provider]] |
 | Theft detection | reuse of a rotated refresh token revokes the whole family |
 | Verification / reset | single-use, hashed, short-TTL tokens; identical responses whether or not the account exists |
-| Social | **OpenID Connect** + PKCE; the ID token is validated server-side including `aud` and `nonce`; one provider identity maps to at most one user -- [[ADR-0008-oidc-social-login]] |
+| Social | **OpenID Connect**; one validation core driven by each provider's discovery document, acquisition branching only: Google authorization code + PKCE `S256`, Facebook Limited Login. The ID token is validated server-side including `aud` and `nonce`; one provider identity maps to at most one user -- [[ADR-0008-oidc-social-login]] |
+| Provider role | from S8 the API is itself an **OpenID Provider**: discovery document, JWKS, authorization endpoint with PKCE `S256`, token endpoint, ID token, UserInfo. No resource-owner password-credentials grant -- [[ADR-0031-musicroom-as-openid-provider]] |
 
 ### 13.2 Authorisation — two independent gates
 
@@ -789,6 +790,7 @@ defence, not more.
 | O17 | real mail provider adapter | V.1 email verification actually reaching a mailbox | owner decision 2026-09-24: SPEC-003 ships a Development-only logging `IMailService`; the hosted-provider adapter is a separate spec at the end of S1. A logging implementation cannot satisfy V.1 at the defence |
 | O14 | music preferences have no consumer | nothing | V.1 requires storing and updating them, which is met. Note for defence: storage-only today |
 | O15 | MediatR licence terms | adding the package | [[ADR-0021-backend-dependency-set]]: verify the current free-tier terms before `dotnet add package` and record the result. Fallback is a hand-written dispatcher |
+| O19 | RS256 key pair: generation, storage, JWKS exposure and rotation with an overlap window | the OpenID Provider surface at S8 | [[ADR-0031-musicroom-as-openid-provider]]. `EnvSecretProvider` holds the private key until the vault lands at S1b, after which it belongs there. Rotation needs an overlap so tokens signed by the outgoing key keep verifying |
 | O16 | OpenTelemetry must earn its place | credibility of the V.7 bottleneck claim | [[ADR-0022-observability-stack]]: capture one trace during the Gatling run showing EF Core, HttpClient and total request time together |
 
 ### Closed

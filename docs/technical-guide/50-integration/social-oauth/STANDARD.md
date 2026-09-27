@@ -57,12 +57,35 @@ A profile object sent by the client is never trusted, at any step.
 
 ### Provider differences — do not assume symmetry
 
-| Provider | Reality |
-|---|---|
-| Google | full OpenID Connect. Discovery at `https://accounts.google.com/.well-known/openid-configuration`; ID token validation is the documented path. |
-| Facebook | **not uniformly OIDC.** Classic Facebook Login is OAuth 2.0 plus the Graph API; Facebook *Limited Login* issues an OIDC ID token. The integration branches: OIDC validation where an ID token exists, server-side token inspection against Facebook's own endpoint where it does not. |
+Both providers publish a discovery document. They are not equally capable. Read 2026-09-27:
+
+| | Google | Facebook |
+|---|---|---|
+| Discovery | `https://accounts.google.com/.well-known/openid-configuration` | `https://www.facebook.com/.well-known/openid-configuration` |
+| `issuer` | `https://accounts.google.com` | `https://www.facebook.com` |
+| `token_endpoint` | present | **absent** |
+| `response_types_supported` | includes `code` | `id_token`, `token id_token` only |
+| `code_challenge_methods_supported` | `plain`, `S256` | **absent** |
+| `userinfo_endpoint` | present | **absent** |
+| `id_token_signing_alg_values_supported` | `RS256` | `RS256` |
+
+Authorization code plus PKCE is therefore available at Google and **not** at Facebook.
+
+**One core, two acquisitions** — [[ADR-0008-oidc-social-login]], amended 2026-09-27:
+
+- **Validation is written once** and driven by the discovery document: fetch it, cache the JWKS
+  against key rotation, run the six checks above. Nothing in that path names a provider. A new
+  provider is a configuration row: discovery URL, client id, and how its ID token arrives.
+- **Acquisition is where the branch lives, and the only place.** Google: authorization code plus
+  PKCE `S256` through the token endpoint. Facebook: Limited Login, which yields an ID token with
+  no code exchange. Both hand the same signed ID token to the same validator.
+- **`aud` and `nonce` carry the weight on the Facebook path**, because no code exchange binds the
+  response to this client.
+- Facebook's classic OAuth 2.0 plus Graph API path is **not used**. It is the one route that would
+  put a non-OIDC integration in the codebase.
 
 Treating the two providers as identical produces either a broken integration or an insecure one.
+Writing them as two separate integrations produces two places for a validation bug to hide.
 
 ### Account model
 
