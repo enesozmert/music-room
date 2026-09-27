@@ -42,9 +42,8 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
         // The spend and the insert must not be separable. A crash between them would leave a session
         // whose token is spent and whose replacement does not exist, and the client would hold a
         // value no request can ever exchange.
-        await using IDbContextTransaction transaction = await _context.Database
-            .BeginTransactionAsync(cancellationToken)
-            .ConfigureAwait(false);
+        await using IDbContextTransaction? transaction =
+            await BeginIfNoneAsync(cancellationToken).ConfigureAwait(false);
 
         // One conditional UPDATE. Whoever affects the row won the exchange; everybody else is told so
         // by the database, under its own row lock, rather than by a read this code performed earlier.
@@ -74,7 +73,7 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
                 cancellationToken)
             .ConfigureAwait(false);
 
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        await CommitIfOwnedAsync(transaction, cancellationToken).ConfigureAwait(false);
 
         return rotated;
     }
@@ -121,7 +120,7 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
     private async Task<RefreshTokenRotation> ClassifyLostRaceAsync(
         string tokenHash,
         DateTime nowUtc,
-        IDbContextTransaction transaction,
+        IDbContextTransaction? transaction,
         CancellationToken cancellationToken)
     {
         RefreshToken? token = await _context.RefreshTokens
@@ -135,7 +134,7 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
         }
 
         await RevokeFamilyAsync(token.FamilyId, nowUtc, cancellationToken).ConfigureAwait(false);
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        await CommitIfOwnedAsync(transaction, cancellationToken).ConfigureAwait(false);
 
         return new RefreshTokenRotation(RefreshTokenRotationStatus.Reused, Guid.Empty);
     }
@@ -153,4 +152,28 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
                     // context would have stamped is stamped here — SDD §8.3.
                     .SetProperty(token => token.UpdatedAtUtc, nowUtc),
                 cancellationToken);
+
+    /// <summary>
+    /// Opens a transaction only when the request does not already have one.
+    /// </summary>
+    /// <remarks>
+    /// SPEC-008 put the audit record inside the command's transaction, so a behaviour now opens one before
+    /// the handler runs. EF Core refuses a second <c>BeginTransactionAsync</c> on the same context, so this
+    /// method enlists instead of beginning, and returns null to say "not yours to commit".
+    /// </remarks>
+    private async Task<IDbContextTransaction?> BeginIfNoneAsync(CancellationToken cancellationToken) =>
+        _context.Database.CurrentTransaction is null
+            ? await _context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)
+            : null;
+
+    /// <summary>
+    /// Commits only a transaction this repository opened. A null one belongs to the caller — today, the
+    /// audit behaviour, which commits after the record is written.
+    /// </summary>
+    private static Task CommitIfOwnedAsync(
+        IDbContextTransaction? transaction,
+        CancellationToken cancellationToken) =>
+        transaction is null
+            ? Task.CompletedTask
+            : transaction.CommitAsync(cancellationToken);
 }

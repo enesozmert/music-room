@@ -1,4 +1,5 @@
 using MediatR;
+using MusicRoom.Application.Abstractions.Auditing;
 
 namespace MusicRoom.Application.Features.Auth.Commands.Register;
 
@@ -14,4 +15,12 @@ namespace MusicRoom.Application.Features.Auth.Commands.Register;
 /// free, so a result carrying that fact would be an account-enumeration oracle waiting to be
 /// serialised — SDD §10.1 step 5.
 /// </remarks>
-public sealed record RegisterCommand(string Email, string Password, string DisplayName) : IRequest;
+public sealed record RegisterCommand(string Email, string Password, string DisplayName) : IRequest, IAuditableCommand
+{
+    /// <inheritdoc />
+    /// <remarks>A stable string, not a type name: renaming this record must not rewrite history.</remarks>
+    public string AuditAction => "auth.register";
+
+    /// <inheritdoc />
+    public string AuditTargetType => "account";
+}

@@ -34,6 +34,8 @@ internal static class PasswordResetEndpoints
                 "Answers 202 for any address that is a valid address. Whether a mail follows is not "
                 + "stated and cannot be inferred from the response: a distinct answer here would tell "
                 + "an anonymous caller which addresses hold an account.")
+            // 400 from the client-context middleware, not from this handler — SPEC-008, SDD §10.7.
+            .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status202Accepted)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .Produces(StatusCodes.Status429TooManyRequests);

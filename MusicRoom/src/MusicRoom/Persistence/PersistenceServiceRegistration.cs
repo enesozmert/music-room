@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Persistence;
+using MusicRoom.Persistence.Auditing;
 using MusicRoom.Persistence.Contexts;
 using MusicRoom.Persistence.Repositories;
 
@@ -26,6 +28,8 @@ public static class PersistenceServiceRegistration
         services.AddDbContext<MusicRoomDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IAuditSink, AuditSink>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         return services;
     }

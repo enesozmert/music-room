@@ -291,7 +291,7 @@ public sealed class CredentialRateLimitingTests : IAsyncLifetime
         object body,
         string? clientIp = null)
     {
-        using HttpClient client = factory.CreateClient();
+        using HttpClient client = factory.CreateAuditedClient();
 
         if (clientIp is not null)
         {

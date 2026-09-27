@@ -352,7 +352,7 @@ public sealed class PasswordResetEndpointTests : IAsyncLifetime
 
     private async Task<HttpResponseMessage> PostAsync(string path, object body)
     {
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
 
         return await client.PostAsJsonAsync(path, body, TestContext.Current.CancellationToken);
     }

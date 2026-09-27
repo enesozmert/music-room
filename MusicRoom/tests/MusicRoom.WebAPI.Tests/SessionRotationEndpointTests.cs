@@ -180,7 +180,7 @@ public sealed class SessionRotationEndpointTests : IAsyncLifetime
     {
         int before = _mail.Tokens.Count;
 
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
         using HttpResponseMessage registered = await client.PostAsJsonAsync(
             LoginEndpointTests.RegistrationPath,
             new { email, password = LoginEndpointTests.AccountPassword, displayName = "Player One" },
@@ -209,7 +209,7 @@ public sealed class SessionRotationEndpointTests : IAsyncLifetime
 
     private async Task<HttpResponseMessage> PostRotationAsync(string refreshToken)
     {
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
 
         return await client.PostAsJsonAsync(
             TokensPath,
