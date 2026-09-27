@@ -38,11 +38,24 @@ load: ## run the load scenario
 # never opens a socket: only a request to /health/ready connects.
 OPENAPI_DATABASE_URL := Host=localhost;Port=5432;Database=openapi;Username=openapi;Password=unused
 
+# The host also requires the JWT settings from SPEC-005, and refuses a signing key under 32 bytes.
+# These are placeholders on the same footing as the connection string above: generating the document
+# signs no token and reaches no network. Never reuse them anywhere a real token is issued.
+OPENAPI_JWT_SIGNING_KEY := openapi-document-build-placeholder-key-not-a-secret
+OPENAPI_JWT_ISSUER := musicroom-openapi
+OPENAPI_JWT_AUDIENCE := musicroom-openapi
+OPENAPI_JWT_ACCESS_TOKEN_MINUTES := 15
+
 openapi: ## regenerate docs/api/openapi.json from the code
 	# The generator boots the real host to read the document off it, so the environment must be
 	# Development: the SPEC-003 start-up guard refuses an IMailService anywhere else, and a
 	# document build is a development-time operation.
-	ASPNETCORE_ENVIRONMENT=Development DATABASE_URL="$(OPENAPI_DATABASE_URL)" dotnet build \
+	ASPNETCORE_ENVIRONMENT=Development DATABASE_URL="$(OPENAPI_DATABASE_URL)" \
+	JWT_SIGNING_KEY="$(OPENAPI_JWT_SIGNING_KEY)" \
+	JWT_ISSUER="$(OPENAPI_JWT_ISSUER)" \
+	JWT_AUDIENCE="$(OPENAPI_JWT_AUDIENCE)" \
+	JWT_ACCESS_TOKEN_MINUTES="$(OPENAPI_JWT_ACCESS_TOKEN_MINUTES)" \
+	dotnet build \
 		MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj \
 		-p:GenerateOpenApiDocument=true
 
