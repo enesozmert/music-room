@@ -1,3 +1,4 @@
+using System.Globalization;
 using FluentValidation;
 using FluentValidation.Results;
 using MediatR;
@@ -6,7 +7,9 @@ using MusicRoom.Application.Features.Auth.Commands.Login;
 using MusicRoom.Application.Features.Auth.Commands.Register;
 using MusicRoom.Application.Features.Auth.Commands.RequestEmailVerification;
 using MusicRoom.Application.Features.Auth.Commands.RotateSession;
+using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Application.Features.Auth.Commands.VerifyEmail;
+using MusicRoom.WebAPI.RateLimiting;
 
 namespace MusicRoom.WebAPI.Endpoints;
 
@@ -34,6 +37,7 @@ internal static class AuthEndpoints
     private static void MapRegistrations(RouteGroupBuilder group) =>
         group.MapPost("/registrations", RegisterAsync)
             .AllowAnonymous()
+            .RequireRateLimiting(CredentialRateLimiterPolicies.Registrations)
             .WithName("PostAuthRegistration")
             .WithSummary("Register an account")
             .WithDescription(
@@ -41,11 +45,13 @@ internal static class AuthEndpoints
                 + "registered. A 409 here would tell an anonymous caller who holds an account; the "
                 + "mailbox tells the real user what happened.")
             .Produces(StatusCodes.Status202Accepted)
-            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .Produces(StatusCodes.Status429TooManyRequests);
 
     private static void MapEmailVerifications(RouteGroupBuilder group) =>
         group.MapPost("/email-verifications", VerifyEmailAsync)
             .AllowAnonymous()
+            .RequireRateLimiting(CredentialRateLimiterPolicies.EmailVerifications)
             .WithName("PostAuthEmailVerification")
             .WithSummary("Verify an email address")
             .WithDescription(
@@ -54,11 +60,13 @@ internal static class AuthEndpoints
                 + "given token, because that is the caller's business only when they hold it.")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status410Gone);
+            .Produces(StatusCodes.Status410Gone)
+            .Produces(StatusCodes.Status429TooManyRequests);
 
     private static void MapVerificationRequests(RouteGroupBuilder group) =>
         group.MapPost("/verification-requests", RequestEmailVerificationAsync)
             .AllowAnonymous()
+            .RequireRateLimiting(CredentialRateLimiterPolicies.VerificationRequests)
             .WithName("PostAuthVerificationRequest")
             .WithSummary("Ask for another email verification link")
             .WithDescription(
@@ -67,11 +75,13 @@ internal static class AuthEndpoints
                 + "would tell an anonymous caller which addresses hold a registered or confirmed "
                 + "account.")
             .Produces(StatusCodes.Status202Accepted)
-            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+            .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
+            .Produces(StatusCodes.Status429TooManyRequests);
 
     private static void MapSessions(RouteGroupBuilder group) =>
         group.MapPost("/sessions", LoginAsync)
             .AllowAnonymous()
+            .RequireRateLimiting(CredentialRateLimiterPolicies.Sessions)
             .WithName("PostAuthSession")
             .WithSummary("Sign in")
             .WithDescription(
@@ -80,11 +90,13 @@ internal static class AuthEndpoints
                 + "the unknown-address path spends the same hashing work as the others, so the "
                 + "response cannot be timed either.")
             .Produces<TokenPairResponse>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status401Unauthorized);
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status429TooManyRequests);
 
     private static void MapTokens(RouteGroupBuilder group) =>
         group.MapPost("/tokens", RotateSessionAsync)
             .AllowAnonymous()
+            .RequireRateLimiting(CredentialRateLimiterPolicies.Tokens)
             .WithName("PostAuthToken")
             .WithSummary("Rotate a session")
             .WithDescription(
@@ -93,16 +105,25 @@ internal static class AuthEndpoints
                 + "session-theft detector, and it answers exactly as an unknown or expired token "
                 + "does.")
             .Produces<TokenPairResponse>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status401Unauthorized);
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status429TooManyRequests);
 
     private static async Task<IResult> LoginAsync(
         SessionRequest request,
         ISender sender,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         LoginCommand command = new(request.Email, request.Password);
 
-        return await SendForTokenPairAsync(sender, command, cancellationToken);
+        try
+        {
+            return await SendForTokenPairAsync(sender, command, cancellationToken);
+        }
+        catch (CredentialAttemptThrottledException exception)
+        {
+            return Throttled(httpContext, exception);
+        }
     }
 
     private static async Task<IResult> RotateSessionAsync(
@@ -112,6 +133,8 @@ internal static class AuthEndpoints
     {
         RotateSessionCommand command = new(request.RefreshToken);
 
+        // No per-account limit here: the request names no account, only a token. The per-IP policy is
+        // the whole control on this route, and 256 bits of token entropy is the rest of the answer.
         return await SendForTokenPairAsync(sender, command, cancellationToken);
     }
 
@@ -147,6 +170,7 @@ internal static class AuthEndpoints
     private static async Task<IResult> RegisterAsync(
         RegistrationRequest request,
         ISender sender,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         RegisterCommand command = new(request.Email, request.Password, request.DisplayName);
@@ -154,6 +178,10 @@ internal static class AuthEndpoints
         try
         {
             await sender.Send(command, cancellationToken);
+        }
+        catch (CredentialAttemptThrottledException exception)
+        {
+            return Throttled(httpContext, exception);
         }
         catch (ValidationException exception)
         {
@@ -168,6 +196,7 @@ internal static class AuthEndpoints
     private static async Task<IResult> RequestEmailVerificationAsync(
         VerificationRequest request,
         ISender sender,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         RequestEmailVerificationCommand command = new(request.Email);
@@ -175,6 +204,10 @@ internal static class AuthEndpoints
         try
         {
             await sender.Send(command, cancellationToken);
+        }
+        catch (CredentialAttemptThrottledException exception)
+        {
+            return Throttled(httpContext, exception);
         }
         catch (ValidationException exception)
         {
@@ -218,6 +251,22 @@ internal static class AuthEndpoints
             // decision 2026-09-26.
             _ => Results.BadRequest(),
         };
+    }
+
+    /// <summary>
+    /// Answers `429` with <c>Retry-After</c> when the per-account limiter refused the attempt.
+    /// </summary>
+    /// <remarks>
+    /// The per-IP half of the limit is middleware and never reaches a handler; this is the half that
+    /// knows which account was named (SPEC-006 escalation 2, option B). The body is empty for the same
+    /// reason the middleware's is: a message saying which key tripped tells a caller which key to vary.
+    /// </remarks>
+    private static IResult Throttled(HttpContext httpContext, CredentialAttemptThrottledException exception)
+    {
+        httpContext.Response.Headers.RetryAfter =
+            ((int)Math.Ceiling(exception.RetryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+
+        return Results.StatusCode(StatusCodes.Status429TooManyRequests);
     }
 
     /// <summary>

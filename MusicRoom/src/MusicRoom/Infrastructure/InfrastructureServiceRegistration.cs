@@ -13,46 +13,41 @@ namespace MusicRoom.Infrastructure;
 public static class InfrastructureServiceRegistration
 {
     /// <summary>
-    /// Registers the password hasher, the access-token issuer and the mail sender.
+    /// Registers the password hasher, the access-token issuer, the credential attempt limiter and the
+    /// mail sender.
     /// </summary>
     /// <param name="services">The container being built.</param>
-    /// <param name="bcryptWorkFactor">The cost from configuration. The hasher clamps it up to the
-    /// ADR-0007 floor, so a configuration mistake cannot weaken storage.</param>
-    /// <param name="isDevelopment">True when the host environment is Development. The only sender
-    /// that exists writes the verification link to the log, so this flag decides whether the
-    /// application may start at all.</param>
-    /// <param name="verificationLinkBaseUrl">Where the client serves the verification screen, from
-    /// configuration. Nothing here substitutes a default for it.</param>
-    /// <param name="jwtOptions">The signing key, issuer, audience and access-token lifetime, already
-    /// validated by <see cref="JwtOptions"/>. They arrive as one record so this method stays inside
-    /// the five-parameter limit the .editorconfig enforces.</param>
+    /// <param name="options">Everything this layer needs from configuration, already validated.</param>
     /// <returns>The same collection, so calls chain.</returns>
     /// <exception cref="InvalidOperationException">The host is not Development. There is no sender
     /// that may run outside Development yet.</exception>
     /// <remarks>
-    /// The cost and the URL arrive as values rather than as <c>IConfiguration</c>: reading them here
-    /// would make this project depend on the configuration stack to learn two settings, and the
-    /// composition root already holds both.
+    /// One options record rather than a parameter per setting: SPEC-005 left this method at five
+    /// arguments, which is the .editorconfig limit (S107, proven live in S0 at six), and SPEC-006 needs
+    /// a sixth. The values still arrive as values rather than as <c>IConfiguration</c>, so this project
+    /// does not depend on the configuration stack to learn a number.
     /// </remarks>
     public static IServiceCollection AddInfrastructureServices(
         this IServiceCollection services,
-        int bcryptWorkFactor,
-        bool isDevelopment,
-        string? verificationLinkBaseUrl,
-        JwtOptions jwtOptions)
+        InfrastructureOptions options)
     {
         ArgumentNullException.ThrowIfNull(services);
-        ArgumentNullException.ThrowIfNull(jwtOptions);
+        ArgumentNullException.ThrowIfNull(options);
 
-        services.AddSingleton<IPasswordHasher>(_ => new BCryptPasswordHasher(bcryptWorkFactor));
+        services.AddSingleton<IPasswordHasher>(_ => new BCryptPasswordHasher(options.BCryptWorkFactor));
 
         // Singleton: the signing credentials are built once and the issuer holds no request state.
-        services.AddSingleton<IAccessTokenIssuer>(_ => new JwtAccessTokenIssuer(jwtOptions));
+        services.AddSingleton<IAccessTokenIssuer>(_ => new JwtAccessTokenIssuer(options.Jwt));
+
+        // Singleton on purpose: the attempt history is the whole point, and a scoped limiter would
+        // forget every failure at the end of the request that recorded it.
+        services.AddSingleton<ICredentialAttemptLimiter>(_ =>
+            new InMemoryCredentialAttemptLimiter(options.CredentialAttempts, TimeProvider.System));
 
         // No silent fallback. Outside Development the only available sender would write a live
         // credential into a production log, so the host fails loudly instead — the guard the
         // repository owner accepted for T-26 on 2026-09-26.
-        if (!isDevelopment)
+        if (!options.IsDevelopment)
         {
             throw new InvalidOperationException(
                 "No IMailService may be registered outside Development: the only implementation "
@@ -62,8 +57,32 @@ public static class InfrastructureServiceRegistration
 
         services.AddSingleton<IMailService>(provider => new LoggingMailService(
             provider.GetRequiredService<ILogger<LoggingMailService>>(),
-            verificationLinkBaseUrl));
+            options.VerificationLinkBaseUrl));
 
         return services;
     }
 }
+
+/// <summary>
+/// Everything <see cref="InfrastructureServiceRegistration.AddInfrastructureServices"/> needs from the
+/// composition root.
+/// </summary>
+/// <param name="BCryptWorkFactor">The cost from configuration. The hasher clamps it up to the ADR-0007
+/// floor, so a configuration mistake cannot weaken storage.</param>
+/// <param name="IsDevelopment">True when the host environment is Development. The only sender that
+/// exists writes the verification link to the log, so this flag decides whether the application may
+/// start at all.</param>
+/// <param name="VerificationLinkBaseUrl">Where the client serves the verification screen, from
+/// configuration. Nothing here substitutes a default for it.</param>
+/// <param name="Jwt">The signing key, issuer, audience and access-token lifetime.</param>
+/// <param name="CredentialAttempts">The per-account credential limits — SPEC-006 escalation 1.</param>
+/// <remarks>
+/// Declared beside the registration rather than in its own file: it exists only as that method's
+/// parameter list, and SPEC-006's Files table is the contract for what this change may create.
+/// </remarks>
+public sealed record InfrastructureOptions(
+    int BCryptWorkFactor,
+    bool IsDevelopment,
+    string? VerificationLinkBaseUrl,
+    JwtOptions Jwt,
+    CredentialAttemptLimits CredentialAttempts);

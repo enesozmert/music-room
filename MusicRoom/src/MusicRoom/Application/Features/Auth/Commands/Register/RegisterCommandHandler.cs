@@ -16,18 +16,27 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand>
     private readonly IUserRepository _users;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IMailService _mail;
+    private readonly ICredentialAttemptLimiter _attempts;
     private readonly ILogger<RegisterCommandHandler> _logger;
 
-    /// <summary>Takes the write path, the hasher and the mail sender; all abstractions this layer declares.</summary>
+    /// <summary>Takes the write path, the hasher, the mail sender and the attempt limiter; all
+    /// abstractions this layer declares.</summary>
+    /// <param name="users">The account write path.</param>
+    /// <param name="passwordHasher">The password hasher — ADR-0007.</param>
+    /// <param name="mail">The mail sender.</param>
+    /// <param name="attempts">The per-account half of the credential rate limit — SPEC-006.</param>
+    /// <param name="logger">The handler's logger.</param>
     public RegisterCommandHandler(
         IUserRepository users,
         IPasswordHasher passwordHasher,
         IMailService mail,
+        ICredentialAttemptLimiter attempts,
         ILogger<RegisterCommandHandler> logger)
     {
         _users = users;
         _passwordHasher = passwordHasher;
         _mail = mail;
+        _attempts = attempts;
         _logger = logger;
     }
 
@@ -39,6 +48,19 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand>
         ArgumentNullException.ThrowIfNull(request);
 
         DateTime nowUtc = DateTime.UtcNow;
+        string partitionKey = request.Email.Trim().ToLowerInvariant();
+
+        // Charged before the BCrypt hash, which is the expensive part of this handler, and charged on
+        // every attempt: a duplicate address answers 202 and writes nothing, but it still made the
+        // service hash a password.
+        CredentialAttemptDecision decision = _attempts.Check(partitionKey);
+
+        if (!decision.Allowed)
+        {
+            throw new CredentialAttemptThrottledException(decision.RetryAfter);
+        }
+
+        _attempts.RecordChargeableAttempt(partitionKey);
 
         User user = new()
         {

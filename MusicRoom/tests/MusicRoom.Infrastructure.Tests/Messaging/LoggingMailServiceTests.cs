@@ -72,31 +72,39 @@ public sealed class LoggingMailServiceTests
 
         // Act
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
-            () => services.AddInfrastructureServices(
-                WorkFactor,
-                isDevelopment: false,
-                BaseUrl,
-                JwtSettings()));
+            () => services.AddInfrastructureServices(Options(isDevelopment: false)));
 
         // Assert — the message names the decision, not a way to make start-up succeed.
         Assert.Contains("S1a", exception.Message, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// Valid JWT settings, so the registration under test fails for the reason each test is about and
-    /// not because <see cref="JwtOptions"/> refused a short key. SPEC-005 added the parameter.
+    /// Valid options, so the registration under test fails for the reason each test is about and not
+    /// because <see cref="JwtOptions"/> refused a short key. SPEC-005 added the JWT settings and
+    /// SPEC-006 collapsed the whole parameter list into this record.
     /// </summary>
-    private static JwtOptions JwtSettings() =>
-        new(new string('k', JwtOptions.MinimumSigningKeyBytes), "musicroom-tests", "musicroom-tests", 15);
+    private static InfrastructureOptions Options(bool isDevelopment) =>
+        new(
+            WorkFactor,
+            isDevelopment,
+            BaseUrl,
+            new JwtOptions(
+                new string('k', JwtOptions.MinimumSigningKeyBytes),
+                "musicroom-tests",
+                "musicroom-tests",
+                15),
+            new CredentialAttemptLimits(
+                CredentialAttemptLimits.DefaultPermitsPerWindow,
+                TimeSpan.FromMinutes(CredentialAttemptLimits.DefaultWindowMinutes),
+                CredentialAttemptLimits.DefaultMaximumPenaltyWindows));
 
     private static IMailService ResolveMailService(MessageLog log, string? verificationLinkBaseUrl)
     {
         ServiceCollection services = new();
-        services.AddInfrastructureServices(
-            WorkFactor,
-            isDevelopment: true,
-            verificationLinkBaseUrl,
-            JwtSettings());
+        services.AddInfrastructureServices(Options(isDevelopment: true) with
+        {
+            VerificationLinkBaseUrl = verificationLinkBaseUrl,
+        });
 
         ServiceDescriptor descriptor = services.Single(
             candidate => candidate.ServiceType == typeof(IMailService));
