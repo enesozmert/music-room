@@ -31,3 +31,6 @@ reference/
 .agent/STOP
 .agent/.lock
 .agent/*.local
+
+# Claude Code: personal settings stay out of the shared configuration.
+.claude/settings.local.json

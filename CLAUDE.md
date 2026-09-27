@@ -16,6 +16,17 @@ This file holds only what is specific to Claude Code.
 | Security conformance | `docs/owasp/README.md` |
 | Prompts | `docs/prompt-library/PROMPTS.md` |
 
+## Slash commands
+
+`.claude/commands/` wraps the prompts in `docs/prompt-library/PROMPTS.md`. The library stays
+canonical; a command is a shortcut, never a second copy of the rules.
+
+`/bootstrap` · `/plan <task>` · `/adr <decision>` · `/sdd-sync <change>` · `/review-diff` ·
+`/brain-check` · `/status <thing>` · `/spec-status`
+
+`.claude/hooks/write-boundary.sh` blocks the three writes that have no legitimate exception:
+anything under `reference/`, `.env`, and any `.pdf`. See `.claude/README.md`.
+
 ## Claude Code specifics
 
 - **Plan mode** for anything touching more than two files. Present the file list before writing.

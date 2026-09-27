@@ -528,7 +528,8 @@ Başka araçta karşılığı olmayan özellikler. Kullan; Bölüm 1'e taşıma.
 | **`/loop <aralık> <prompt>`** | Bölüm 2 aşamalarını zamanlı sürmek. Aralığı boş bırakırsan model kendi hızını ayarlar |
 | **Subagent** | sadece salt okunur fan-out: kod bulma, dizin haritalama. Uygulama ana thread'de kalsın ki diff tek yerde incelensin |
 | **`CLAUDE.md`** | zaten `AGENTS.md`'ye işaret ediyor. İnce tut; ortak kurallar `AGENTS.md`'de |
-| **Hook** (`.claude/settings.json`) | mekanik zorlama: `MusicRoom/` dışına yazmayı, `reference/` düzenlemeyi reddet |
+| **Slash komutlar** (`.claude/commands/`) | aşağıdaki promptlar, her biri bir dosya: `/bootstrap`, `/plan`, `/adr`, `/sdd-sync`, `/review-diff`, `/brain-check`, `/status`, `/spec-status`. Kanonik olan kütüphane |
+| **Hook** (`.claude/settings.json`) | mekanik zorlama. Bağlı olan: `reference/`, `.env` ve her `.pdf` yazılamaz — `.claude/hooks/write-boundary.sh` |
 | **`/code-review`** | yerleşik inceleme; yine de prompt 12 ile standartları besle |
 
 ### Otonom koşu, Claude Code

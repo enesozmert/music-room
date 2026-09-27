@@ -536,7 +536,8 @@ Features with no equivalent in other tools. Use them; do not port them into Part
 | **`/loop <interval> <prompt>`** | driving Part 2 stages on a schedule. Omit the interval to let the model self-pace |
 | **Subagents** | read-only fan-out only: locating code, mapping a directory, surveying naming. Implementation stays in the main thread so one diff is reviewable |
 | **`CLAUDE.md`** | already points to `AGENTS.md`. Keep it thin; shared rules live in `AGENTS.md` |
-| **Hooks** (`.claude/settings.json`) | mechanical enforcement: block writes outside `MusicRoom/`, refuse edits under `reference/` |
+| **Slash commands** (`.claude/commands/`) | the prompts below, one file each: `/bootstrap`, `/plan`, `/adr`, `/sdd-sync`, `/review-diff`, `/brain-check`, `/status`, `/spec-status`. The library stays canonical |
+| **Hooks** (`.claude/settings.json`) | mechanical enforcement. Wired: `reference/`, `.env` and every `.pdf` are unwritable — `.claude/hooks/write-boundary.sh` |
 | **`/code-review`** | the built-in review; still feed it the standards with prompt 12 |
 
 ### Autonomous run, Claude Code
