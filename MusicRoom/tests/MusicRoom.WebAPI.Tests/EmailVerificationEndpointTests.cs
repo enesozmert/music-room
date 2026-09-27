@@ -40,6 +40,7 @@ public sealed class EmailVerificationEndpointTests : IAsyncLifetime
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(webHost =>
         {
             webHost.UseSetting("DATABASE_URL", _database.GetConnectionString());
+            TestJwtSettings.Apply(webHost);
             webHost.ConfigureTestServices(services =>
                 services.AddSingleton<IMailService>(_mail));
         });

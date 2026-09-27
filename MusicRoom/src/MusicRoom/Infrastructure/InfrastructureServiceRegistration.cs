@@ -13,7 +13,7 @@ namespace MusicRoom.Infrastructure;
 public static class InfrastructureServiceRegistration
 {
     /// <summary>
-    /// Registers the password hasher and the mail sender.
+    /// Registers the password hasher, the access-token issuer and the mail sender.
     /// </summary>
     /// <param name="services">The container being built.</param>
     /// <param name="bcryptWorkFactor">The cost from configuration. The hasher clamps it up to the
@@ -23,6 +23,9 @@ public static class InfrastructureServiceRegistration
     /// application may start at all.</param>
     /// <param name="verificationLinkBaseUrl">Where the client serves the verification screen, from
     /// configuration. Nothing here substitutes a default for it.</param>
+    /// <param name="jwtOptions">The signing key, issuer, audience and access-token lifetime, already
+    /// validated by <see cref="JwtOptions"/>. They arrive as one record so this method stays inside
+    /// the five-parameter limit the .editorconfig enforces.</param>
     /// <returns>The same collection, so calls chain.</returns>
     /// <exception cref="InvalidOperationException">The host is not Development. There is no sender
     /// that may run outside Development yet.</exception>
@@ -35,11 +38,16 @@ public static class InfrastructureServiceRegistration
         this IServiceCollection services,
         int bcryptWorkFactor,
         bool isDevelopment,
-        string? verificationLinkBaseUrl)
+        string? verificationLinkBaseUrl,
+        JwtOptions jwtOptions)
     {
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(jwtOptions);
 
         services.AddSingleton<IPasswordHasher>(_ => new BCryptPasswordHasher(bcryptWorkFactor));
+
+        // Singleton: the signing credentials are built once and the issuer holds no request state.
+        services.AddSingleton<IAccessTokenIssuer>(_ => new JwtAccessTokenIssuer(jwtOptions));
 
         // No silent fallback. Outside Development the only available sender would write a live
         // credential into a production log, so the host fails loudly instead — the guard the

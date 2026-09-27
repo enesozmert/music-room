@@ -168,6 +168,76 @@
           }
         }
       }
+    },
+    "/api/v1/auth/sessions": {
+      "post": {
+        "tags": [
+          "AuthEndpoints"
+        ],
+        "summary": "Sign in",
+        "description": "Exchanges an address and a password for a token pair. Every failure — unknown address, wrong password, unverified account — answers the same bodiless 401, and the unknown-address path spends the same hashing work as the others, so the response cannot be timed either.",
+        "operationId": "PostAuthSession",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/tokens": {
+      "post": {
+        "tags": [
+          "AuthEndpoints"
+        ],
+        "summary": "Rotate a session",
+        "description": "Spends a refresh token exactly once and returns a rotated pair. Presenting an already-rotated token revokes the whole family and answers 401: that is the session-theft detector, and it answers exactly as an unknown or expired token does.",
+        "operationId": "PostAuthToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRotationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -254,6 +324,65 @@
           }
         },
         "description": "The registration payload — `docs/api/ENDPOINTS.md` §1."
+      },
+      "SessionRequest": {
+        "required": [
+          "email",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "The address the account is known by."
+          },
+          "password": {
+            "type": "string",
+            "description": "The plaintext password. Never logged or echoed back."
+          }
+        },
+        "description": "The sign-in payload — `docs/api/ENDPOINTS.md` §1."
+      },
+      "TokenPairResponse": {
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "expiresIn"
+        ],
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string",
+            "description": "The signed, short-lived JWT."
+          },
+          "refreshToken": {
+            "type": "string",
+            "description": "The opaque refresh token, to be presented to\n    `POST /auth/tokens`. The server keeps only its digest."
+          },
+          "expiresIn": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The access token's lifetime in seconds, for the client's own planning.",
+            "format": "int32"
+          }
+        },
+        "description": "The token pair both session endpoints answer with — `docs/api/ENDPOINTS.md` §1."
+      },
+      "TokenRotationRequest": {
+        "required": [
+          "refreshToken"
+        ],
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "The refresh token issued by the previous exchange."
+          }
+        },
+        "description": "The rotation payload — `docs/api/ENDPOINTS.md` §1."
       },
       "VerificationRequest": {
         "required": [

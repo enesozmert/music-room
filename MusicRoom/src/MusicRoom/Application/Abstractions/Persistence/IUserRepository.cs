@@ -71,4 +71,31 @@ public interface IUserRepository
         EmailVerificationToken token,
         DateTime nowUtc,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads what signing in needs to judge a password, and nothing else.
+    /// </summary>
+    /// <param name="email">The address to match, already trimmed and lower-cased by the caller —
+    /// the column stores it that way and this method does not normalise it again.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The credential, or null when no account holds the address.</returns>
+    /// <remarks>
+    /// A narrow projection rather than the <see cref="User"/> aggregate: the login path has no
+    /// reason to hold a tracked entity, and a record of three fields cannot accidentally be logged
+    /// whole with a display name and an address attached to the hash.
+    /// </remarks>
+    Task<UserCredential?> FindCredentialByEmailAsync(string email, CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// The three facts a login decision is made from.
+/// </summary>
+/// <param name="UserId">The account, which becomes the <c>sub</c> claim on success.</param>
+/// <param name="PasswordHash">The stored BCrypt string the candidate is checked against.</param>
+/// <param name="IsEmailVerified">False until the address is proven. An unverified account cannot use
+/// the services — SDD §11.1.</param>
+/// <remarks>
+/// Declared beside the interface rather than in its own file: it exists only as that method's return
+/// value, and SPEC-005's Files table is the contract for what this change may create.
+/// </remarks>
+public sealed record UserCredential(Guid UserId, string PasswordHash, bool IsEmailVerified);

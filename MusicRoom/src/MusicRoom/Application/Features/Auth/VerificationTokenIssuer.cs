@@ -1,6 +1,6 @@
 using System.Buffers.Text;
 using System.Security.Cryptography;
-using MusicRoom.Application.Features.Auth.Commands.VerifyEmail;
+using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Domain.Entities;
 
 namespace MusicRoom.Application.Features.Auth;
@@ -11,7 +11,7 @@ namespace MusicRoom.Application.Features.Auth;
 /// <remarks>
 /// Registration and resend must issue the same shape of token, because one endpoint spends what
 /// either of them produced. A copy in each feature folder is a bug waiting for one of them to be
-/// changed — the same reasoning as <see cref="VerificationTokenHash"/>, which this method calls.
+/// changed — the same reasoning as <see cref="OpaqueTokenHash"/>, which this method calls.
 /// </remarks>
 internal static class VerificationTokenIssuer
 {
@@ -36,7 +36,7 @@ internal static class VerificationTokenIssuer
             UserId = userId,
             // The row holds the digest. The plaintext leaves this method only to reach the mail
             // sender, and a leaked database therefore hands nobody a working link.
-            TokenHash = VerificationTokenHash.Of(plaintext),
+            TokenHash = OpaqueTokenHash.Of(plaintext),
             ExpiresAtUtc = nowUtc.AddHours(tokenLifetimeHours),
             ConsumedAtUtc = null,
             CreatedAtUtc = nowUtc,

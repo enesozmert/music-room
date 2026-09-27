@@ -124,6 +124,18 @@ internal sealed class UserRepository : IUserRepository
         return true;
     }
 
+    /// <inheritdoc />
+    public Task<UserCredential?> FindCredentialByEmailAsync(
+        string email,
+        CancellationToken cancellationToken) =>
+        _context.Users
+            .AsNoTracking()
+            .Where(user => user.Email == email)
+            // Projected in the database, so the hash arrives without the display name and the
+            // address that would make an accidental log entry a profile.
+            .Select(user => new UserCredential(user.Id, user.PasswordHash, user.IsEmailVerified))
+            .SingleOrDefaultAsync(cancellationToken);
+
     /// <summary>
     /// Stamps every unspent token of an account as consumed, so exactly one link is live once the
     /// caller inserts the new one — SPEC-004, owner decision 1.

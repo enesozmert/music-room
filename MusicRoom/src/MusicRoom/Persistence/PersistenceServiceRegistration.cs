@@ -25,6 +25,7 @@ public static class PersistenceServiceRegistration
 
         services.AddDbContext<MusicRoomDbContext>(options => options.UseNpgsql(connectionString));
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         return services;
     }

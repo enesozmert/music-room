@@ -103,6 +103,9 @@ public sealed class HealthEndpointTests
             // DATABASE_URL is required at start-up and has no fallback, by design — ADR-0026.
             webHost.UseSetting("DATABASE_URL", TestConnectionString);
 
+            // The JWT settings are start-up requirements too, since SPEC-005.
+            TestJwtSettings.Apply(webHost);
+
             webHost.ConfigureTestServices(services =>
                 services.Configure<HealthCheckServiceOptions>(options =>
                 {
