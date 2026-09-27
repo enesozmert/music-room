@@ -7,6 +7,13 @@ date: 2026-09-24
 
 # ADR-0029 — Fully containerised development, and a secret vault for API keys
 
+> **Amended 2026-09-27.** The vault is **required scope**, not an optional extra. The original
+> text left it sounding droppable — "beyond subject V.8", "opt-in", "must not delay S1 to S9".
+> Owner requirement: the delivered system reads its API keys from a self-hosted Infisical vault.
+> Subject V.8 sets the floor (`.env` git-ignored, no committed credential); this project goes
+> past that floor deliberately, and the vault ships. It stays at slice S1b in
+> [[delivery-plan]] — the sequencing is unchanged, the commitment is not.
+
 ## Context
 
 Owner requirement, 2026-09-24:
@@ -85,8 +92,10 @@ The abstraction lands earlier, because writing it later means touching every con
 
 - Infisical's own bootstrap secrets are the only values in `.env` once the vault is in place, and
   they are documented in `.env.example` like everything else.
-- The compose file gains a `vault` profile, so `docker compose up` without it stays two services
-  for everyday work and the full stack is opt-in.
+- The compose file gains a `vault` profile. `docker compose up` without it stays two services, so
+  an everyday loop and a Testcontainers run do not pay for five. The profile is a performance
+  choice for local work, **not** a statement that the vault is optional: the delivered system runs
+  with it, and the defence walkthrough brings it up.
 - CI does not use the vault. It uses repository secrets, because a pipeline that needs a running
   vault to build is a pipeline that breaks for the wrong reasons.
 
@@ -97,9 +106,11 @@ The abstraction lands earlier, because writing it later means touching every con
 - **Docker secrets or .NET user-secrets** — much lighter, and adequate for a school project. They
   do not give rotation or shared access, which is the point of the request.
 - **HashiCorp Vault** — more capable and considerably heavier to operate than this project warrants.
-- **Do nothing; keep `.env`** — satisfies subject V.8 exactly. Rejected by the owner.
+- **Do nothing; keep `.env`** — satisfies subject V.8 exactly. Rejected by the owner, and the
+  rejection is a requirement rather than a preference: an API key readable in a plain file is the
+  thing this decision exists to remove.
 
 ## Affected
 
 Standards: `ci-cd-containerization`, `secrets-management`.
-Design: [[sdd]] §14. Plan: [[delivery-plan]] S1a. Related: [[ADR-0026-environment-bring-up]].
+Design: [[sdd]] §14. Plan: [[delivery-plan]] S1b. Related: [[ADR-0026-environment-bring-up]].

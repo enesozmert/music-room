@@ -30,8 +30,10 @@ How the project builds, how it runs locally, and what a pull request must pass.
   A contributor needs Docker and nothing else on the host. No documented step may require a locally
   installed SDK, database client or CLI — anything tool-shaped is pinned in
   `.config/dotnet-tools.json` and restored.
-- Optional compose profiles keep the everyday stack small: `vault` adds self-hosted Infisical and
-  its dependencies, and is off by default.
+- Compose profiles keep the everyday stack small: `vault` adds self-hosted Infisical and its
+  dependencies and is off by default, so a normal loop and a Testcontainers run stay at two
+  services. Off by default is a speed choice, not an optional feature — the vault is required
+  scope (ADR-0029, amended 2026-09-27) and the delivered stack runs with the profile on.
 - `docker compose` brings up the API and a local PostgreSQL container for development and tests.
   No host installation of a database engine is required — `psql` is not installed on the team's
   machine, and it does not need to be.
