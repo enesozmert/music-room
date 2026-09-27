@@ -20,7 +20,7 @@ This plan sequences work. It does not decide anything — decisions go in ADRs, 
 
 | Input | Value |
 |---|---|
-| Team size | **2** — one backend developer, one UI developer |
+| Team size | **2** — one backend developer, one UI developer, working in sequence |
 | Backend owner | one person; this plan is that person's plan |
 | Deadline | `UNKNOWN - requires decision` |
 | Services in scope | **all three** — [[ADR-0010-service-scope]] |
@@ -295,18 +295,24 @@ Subject III explicitly asks for tasks to be divided among team members.
 **The team is two people: one backend, one UI.** The split is therefore across the client/server
 boundary, not across backend layers.
 
-| Owner | Scope |
-|---|---|
-| Backend developer | everything in this plan: S0 through S9, all under `MusicRoom/` |
-| UI developer | the React Native client under `MusicRoomApp/` — same repository, separate root ([[ADR-0020-monorepo-layout]]) |
-| Shared | the API contract (the endpoint inventory from Phase 3), and the realtime event contracts in [[sdd]] §9.2 |
+| Owner | Scope | When |
+|---|---|---|
+| Backend developer | everything in this plan: S0 through S9, all under `MusicRoom/` | now |
+| UI developer | the React Native client under `MusicRoomApp/` — same repository, separate root ([[ADR-0020-monorepo-layout]]) | after S9 |
+| Shared | the API contract (the endpoint inventory from Phase 3), and the realtime event contracts in [[sdd]] §9.2 | written in Phase 3, kept current throughout |
 
-Consequences of a two-person split with a single backend owner:
+**The two workstreams run in sequence, not in parallel.** Owner decision, 2026-09-27: the backend
+is finished first, and the client starts once S9 lands. `MusicRoomApp/` stays empty until then.
 
-- **The contract is the interface between the two people.** Phase 3's endpoint inventory is not
-  paperwork; it is what unblocks the UI developer. Write it before S1.
-- **Publish the OpenAPI document early and keep it current.** The UI developer consumes
-  `docs/api/openapi.json`; a stale contract blocks them silently.
+Consequences of a two-person split run sequentially:
+
+- **The contract is still the interface between the two people**, and it is still written before
+  the code. What changes is when it is consumed: the client reads it after S9, not alongside S1.
+  Phase 3's endpoint inventory stays a precondition of S1, because it is what the backend builds
+  against.
+- **Publish the OpenAPI document early and keep it current.** `docs/api/openapi.json` is generated
+  from the code and drift-checked in CI. A sequential start does not make a stale contract safe —
+  it makes it worse, because nobody is reading it early enough to notice.
 - **There is no second pair of backend eyes.** The concurrency slices (S5, S6, S7) are the
   highest-risk graded area and normally want pairing. Compensate with the parallel tests in the
   definition of done and a deliberate pass of prompt §4 on each one — a test that runs the
@@ -329,6 +335,7 @@ Consequences of a two-person split with a single backend owner:
 | Load report left to the last day | V.7 unmet — an unmeasured number is worth nothing | S8, and the machine decided in Phase 2 |
 | Credential committed | **automatic project failure** (V.8) | `.env` git-ignored from commit 1; rotate-first leak procedure in [[secrets-management]] |
 | Bonus started before mandatory is flawless | bonus not evaluated, mandatory weakened | Phase 6 |
+| **Client work starts only after S9** | V.5 and IV.2 are mandatory and graded, and a sequential start concentrates the whole client into the last stretch, next to the S9 load report | owner decision, accepted with eyes open: hold S0-S9 to their definition of done so no backend rework eats the client's window, and keep `docs/api/openapi.json` current so the client starts against a contract that already matches the code |
 | Three services half-finished instead of two complete | subject VI: mandatory must be flawless | drop S7 Control Delegation first; [[ADR-0010-service-scope]] |
 | Supabase free project pauses before the defence | dead demo | touch the project in the days before; local PostgreSQL container as the fallback path |
 | GPS spoofing defeats the location licence | V.2.1 partially circumvented | event code as the stronger proof; residual risk stated as T-17 in [[threat-register]] |

@@ -1,14 +1,15 @@
 ---
 kind: project-card
 id: musicroom-mobile
-status: parallel-workstream
+status: deferred-workstream
 updated: 2026-09-23
 ---
 
 # Project Card — MusicRoom.Mobile
 
-React Native client at `MusicRoomApp/`. **Built in parallel by the second team member**, in this
-same repository so that one clone is the whole submission (subject VII).
+React Native client at `MusicRoomApp/`. **Built by the second team member after the backend
+slices land** — owner decision, 2026-09-27, recorded in [[delivery-plan]] "Work split". Same
+repository, so that one clone is the whole submission (subject VII).
 
 This card exists so the API contract is designed against a real consumer, and so the two
 workstreams agree on the contract rather than discovering it late.

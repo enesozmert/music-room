@@ -8,8 +8,9 @@ updated: 2026-09-24
 
 # Endpoint Inventory
 
-The API contract, written before the code. This is [[delivery-plan]] Phase 3, and it is what
-unblocks the UI developer — the two workstreams meet here and nowhere else.
+The API contract, written before the code. This is [[delivery-plan]] Phase 3, and it is where the
+two workstreams meet and nowhere else. The client is built after the backend, so this file is read
+by the backend first and by the UI developer later; it must be correct for both.
 
 **Status: design, nothing implemented.** Once code exists, `docs/api/openapi.json` generated from
 that code becomes the machine-readable contract and this file becomes the human overview. They
