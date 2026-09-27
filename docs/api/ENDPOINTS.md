@@ -79,6 +79,28 @@ Subject V.1, V.5. Rules: [[authentication-authorization]], [[social-oauth]].
 | POST | `/auth/social-links` | `provider`, `idToken` | `201` | `409` already linked, `422` | `auth` |
 | DELETE | `/auth/social-links/{provider}` | — | `204` | `409` last sign-in method | `self` |
 
+#### OpenID Provider surface — S8
+
+The API becomes an OpenID Provider at S8 -- [[ADR-0031-musicroom-as-openid-provider]]. Paths and
+parameter names below follow OpenID Connect Core 1.0 and are **not** ours to rename.
+
+| Method | Path | Request | Success | Errors | Auth |
+|---|---|---|---|---|---|
+| GET | `/.well-known/openid-configuration` | — | `200` discovery document | — | `anon` |
+| GET | `/.well-known/jwks.json` | — | `200` public key set | — | `anon` |
+| GET | `/oauth2/authorize` | `response_type=code`, `client_id`, `redirect_uri`, `scope`, `state`, `nonce`, `code_challenge`, `code_challenge_method=S256` | `302` to `redirect_uri` with `code` | `302` with `error` | `anon` |
+| POST | `/oauth2/token` | `grant_type=authorization_code` + `code` + `code_verifier`, or `grant_type=refresh_token` + `refresh_token` | `200` access token + ID token + rotated refresh token | `400` `invalid_grant`, `401`, `429` | `anon` |
+| GET | `/oauth2/userinfo` | — | `200` claims the granted scopes allow | `401` | `auth` |
+| POST | `/oauth2/revoke` | `token` | `200` | `401` | `anon` |
+
+`code_challenge_method=S256` is required; `plain` is refused. There is no
+`grant_type=password`: OAuth 2.1 removes the resource-owner password-credentials grant and RFC
+9700 deprecates it.
+
+**These replace rather than join** `POST /auth/sessions`, `POST /auth/sessions/social` and
+`POST /auth/tokens`. The removal is part of S8's spec, and no old endpoint is deleted before its
+replacement passes.
+
 ### Design notes
 
 - **`202` on registration, verification resend and password reset is deliberate.** A `409 email

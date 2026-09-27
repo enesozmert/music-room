@@ -7,6 +7,16 @@ date: 2026-09-23
 
 # ADR-0008 — OpenID Connect for Google and Facebook sign-in
 
+> **Amended 2026-09-27.** Owner requirement: **one relying-party implementation, driven by
+> configuration, not one integration per provider.** A provider is a row of configuration — its
+> discovery URL, client id, and how its ID token arrives — and the validation core is written
+> once. The branch this ADR already predicted is now bounded: it lives in **acquisition only**,
+> never in validation. See "One core, two acquisitions" below, where the two providers' published
+> discovery documents are recorded as read on 2026-09-27.
+>
+> What the API issues after validation is no longer a plain JWT:
+> [[ADR-0031-musicroom-as-openid-provider]] makes the API an OpenID Provider at S8.
+
 ## Context
 
 Subject V.1 requires registering with a social account and linking one to an existing account.
@@ -37,6 +47,42 @@ Server-side validation of every ID token, in this order:
 
 `state` and `nonce` are generated server-side, single-use, and verified. Redirect URIs are
 registered exactly and allow-listed.
+
+## One core, two acquisitions
+
+Both providers publish an OpenID Connect discovery document. They are not equally capable, and the
+difference is in the record because it decides the shape of the code. Read 2026-09-27:
+
+| | Google | Facebook |
+|---|---|---|
+| Discovery | `https://accounts.google.com/.well-known/openid-configuration` | `https://www.facebook.com/.well-known/openid-configuration` |
+| `issuer` | `https://accounts.google.com` | `https://www.facebook.com` |
+| `jwks_uri` | `https://www.googleapis.com/oauth2/v3/certs` | `https://www.facebook.com/.well-known/oauth/openid/jwks/` |
+| `token_endpoint` | `https://oauth2.googleapis.com/token` | **absent** |
+| `response_types_supported` | includes `code` | `id_token`, `token id_token` only |
+| `code_challenge_methods_supported` | `plain`, `S256` | **absent** |
+| `userinfo_endpoint` | present | **absent** |
+| `id_token_signing_alg_values_supported` | `RS256` | `RS256` |
+
+So the authorization code flow with PKCE, which this ADR chose, is available at Google and **not
+available at Facebook**: Facebook publishes no token endpoint and no `code` response type. Its
+Limited Login hands the ID token to the app directly instead.
+
+The decision that follows:
+
+- **Validation is one implementation, shared, and driven by the discovery document.** Fetch the
+  document, cache the JWKS with respect to key rotation, then run the six checks above. Nothing in
+  that path names a provider. Adding a third provider is a configuration row.
+- **Acquisition branches, and only there.** Google: authorization code plus PKCE `S256` through
+  the token endpoint. Facebook: Limited Login, which yields an ID token without a code exchange.
+  Both hand the same thing — a signed ID token — to the same validator.
+- **`aud` and `nonce` carry the weight on the Facebook path**, because there is no code exchange
+  binding the response to this client. `nonce` is generated server-side, single-use, and verified,
+  exactly as on the Google path.
+- Facebook's classic OAuth 2.0 plus Graph API path is **not** used. It is the one route that would
+  put a non-OIDC integration in the codebase.
+- Subject V.1 asks for "Facebook **or** Google", so shipping only Google was available and was not
+  chosen. Both ship, and the non-uniformity above is the price.
 
 ## Consequences
 
