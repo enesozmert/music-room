@@ -42,7 +42,7 @@
       <Parameters>
         <Parameter>
           <Key>max</Key>
-          <Value>30</Value>
+          <Value>5</Value>
         </Parameter>
       </Parameters>
     </Rule>
