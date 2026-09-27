@@ -624,7 +624,7 @@ engineering decision; an unwritten one is an oversight.
 |---|---|---|
 | API | local Docker on a declared machine -- [[ADR-0015-hosting-and-deployment]] | multi-stage image, pinned base, non-root user |
 | Database | S0-S3 a **local PostgreSQL container**; S4 onward Supabase Free tier, Frankfurt -- [[ADR-0026-environment-bring-up]] | same engine, same migrations, different connection string |
-| Client | user devices | React Native, built in parallel by the second team member |
+| Client | user devices | React Native, built by the second team member after the backend slices land |
 | CI | GitHub Actions, separate `dev` and `prod` configurations, plus an independent client job | builds and tests; **does not deploy** |
 | Observability | Serilog to stdout; OpenTelemetry exporter configuration-driven, **off by default** -- [[ADR-0022-observability-stack]] | switched on for a load run |
 | Secrets | `EnvSecretProvider` by default; `InfisicalSecretProvider` behind the same abstraction, vault self-hosted in the compose stack under a `vault` profile -- [[ADR-0029-containerised-dev-and-secret-vault]] | the vault lands at S1b; the abstraction lands earlier |
@@ -760,7 +760,7 @@ table to walk through at defence.
 | V.8 | enforced code quality | [[dotnet-csharp]], `.editorconfig`, `MusicRoom/SonarLint.xml` | **done** -- proven live in S0: a 47-line method fails the build with `S138 ... greater than the 40 lines authorized`, and six parameters fail with `S107`. The thresholds moved to `SonarLint.xml`; in `.editorconfig` they were silently ignored |
 | IV.1 | no third-party source in the repo | §5.1, `.gitignore` excludes `reference/` | **done** |
 | IV.1 | dependencies install from a fresh clone | §14.2, `Makefile`, `docker-compose.yml` | **done** -- clone, `cp .env.example .env`, fill, `make up`. Verified end to end: the API container serves `/health` and `/health/ready` against the compose PostgreSQL |
-| IV.2 | mobile app covers all operations | `MusicRoomApp/`, [[musicroom-mobile]] | parallel workstream, owned by the UI developer |
+| IV.2 | mobile app covers all operations | `MusicRoomApp/`, [[musicroom-mobile]] | sequential workstream, owned by the UI developer; starts after S9 — [[delivery-plan]] "Work split" |
 | VII | submitted in the git repository | [[ADR-0020-monorepo-layout]] | **designed** -- one clone holds backend, client and documentation |
 | III | the SDK must not do our work | §4.2, §9.3 | designed |
 
