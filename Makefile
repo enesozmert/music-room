@@ -65,3 +65,8 @@ agent-check: ## the full local gate; every spec's Verification section calls thi
 	dotnet list $(SOLUTION) package --vulnerable --include-transitive
 	$(MAKE) openapi
 	git diff --exit-code -- docs/api/openapi.json
+	# Same guard for the distribution PDFs: Markdown is the source of truth, so a PDF that does
+	# not match its source is a stale artifact shipped to a reader. SOURCE_DATE_EPOCH keeps the
+	# output byte-stable, so any diff here is a real content difference.
+	./docs/build-pdf.sh >/dev/null
+	git diff --exit-code -- '*.pdf'
