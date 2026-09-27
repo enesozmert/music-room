@@ -176,7 +176,7 @@ Each slice below cuts through all five projects and ends with something demonstr
 | S1 | Identity | register (BCrypt cost >= 12), email verification, login, JWT + refresh rotation, password reset | V.1, V.6 |
 | S1a | Mail provider adapter | **precondition: the T-25 rate limiter must exist first.** Owner decision 2026-09-27: an unauthenticated loop against `/auth/verification-requests` costs a log line today and burns the provider quota (T-19) the moment a real sender lands |
 | S1a | Mail provider adapter | the real hosted-provider implementation of `IMailService`, once the account and API key exist — issue O17 | V.1 |
-| S1b | Secret vault | self-hosted Infisical under a `vault` compose profile, plus `InfisicalSecretProvider` behind the abstraction — issue O18, [[ADR-0029-containerised-dev-and-secret-vault]] | beyond V.8 |
+| S1b | Secret vault | self-hosted Infisical under a `vault` compose profile, plus `InfisicalSecretProvider` behind the abstraction — issue O18, [[ADR-0029-containerised-dev-and-secret-vault]] | owner requirement |
 | S2 | Audit + client context | required headers, middleware, audit behaviour, **SignalR hub filter**, audit table | V.6 |
 | S3 | Profile | three visibility tiers, per-field server-side filtering, music preferences | V.1 |
 | S4 | Catalog | YouTube adapter, `TrackRef`, caching, quota discipline | III |
@@ -335,6 +335,7 @@ Consequences of a two-person split run sequentially:
 | Load report left to the last day | V.7 unmet — an unmeasured number is worth nothing | S8, and the machine decided in Phase 2 |
 | Credential committed | **automatic project failure** (V.8) | `.env` git-ignored from commit 1; rotate-first leak procedure in [[secrets-management]] |
 | Bonus started before mandatory is flawless | bonus not evaluated, mandatory weakened | Phase 6 |
+| The secret vault competes with graded work | S1b is required scope by owner decision but is not a subject requirement, so a slip there and a slip in S5 to S7 cost very differently | S1b keeps its slot right after S1a and is not deferred to the end. If it slips, it slips against S1b's own schedule — never by taking days from the concurrency slices, which are what V.2 grades |
 | **Client work starts only after S9** | V.5 and IV.2 are mandatory and graded, and a sequential start concentrates the whole client into the last stretch, next to the S9 load report | owner decision, accepted with eyes open: hold S0-S9 to their definition of done so no backend rework eats the client's window, and keep `docs/api/openapi.json` current so the client starts against a contract that already matches the code |
 | Three services half-finished instead of two complete | subject VI: mandatory must be flawless | drop S7 Control Delegation first; [[ADR-0010-service-scope]] |
 | Supabase free project pauses before the defence | dead demo | touch the project in the days before; local PostgreSQL container as the fallback path |
