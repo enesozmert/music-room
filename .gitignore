@@ -29,4 +29,5 @@ reference/
 # refuses to start on a dirty tree, so pulling the cord would jam the next run.
 .agent/runs/
 .agent/STOP
+.agent/.lock
 .agent/*.local

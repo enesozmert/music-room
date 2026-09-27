@@ -21,6 +21,17 @@ MAX_CYCLES="${1:-5}"
 AGENT_FILTER="${AGENT_FILTER:-cat}"
 mkdir -p .agent/runs
 
+# One cycle at a time. Two concurrent drivers switch branches under each other, and uncommitted
+# work from one lands in the other's commit — observed 2026-09-27, when an analyzer change rode
+# into an unrelated pull request that way.
+LOCK=".agent/.lock"
+if [ -e "$LOCK" ] && kill -0 "$(cat "$LOCK" 2>/dev/null)" 2>/dev/null; then
+  echo "another cycle is running (pid $(cat "$LOCK")); refusing to start" >&2
+  exit 1
+fi
+echo $$ > "$LOCK"
+trap 'rm -f "$LOCK"' EXIT INT TERM
+
 # ADR-0025: a run must start from a clean tree, or the spec commit captures unrelated work.
 if [ -n "$(git status --porcelain)" ]; then
   echo "working tree is dirty; commit or stash before an unattended run" >&2

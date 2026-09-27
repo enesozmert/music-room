@@ -13,6 +13,7 @@ Unattended agent operation. Recipes: `docs/prompt-library/PROMPTS.md` Part 2.
 | `run.sh` | tool-agnostic driver. Runs Part 2 cycles until done, blocked, or the cycle budget runs out |
 | `permissions.json` | scoped Claude Code permissions. Without it a non-interactive run cannot ask, so every ungranted write is refused and the cycle ends with nothing on disk |
 | `STOP` | create this file to halt after the current cycle. Delete it to resume |
+| `.lock` | pid of the running cycle. The driver refuses to start a second one — two drivers switch branches under each other and commit each other's work. **Git-ignored** |
 | `runs/` | per-cycle logs. **Git-ignored** — transient, never committed, never copied into `brain/` |
 
 ## Use
