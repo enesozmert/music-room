@@ -549,6 +549,18 @@ make agent-run            # scoped permissions + live output
 make agent-run CYCLES=5
 ```
 
+Cycles stack up: one branch and one draft pull request per spec, each based on the last. Landing
+them is its own job, and doing it by hand loses a pull request to GitHub's base-branch behaviour —
+so it is scripted:
+
+```bash
+make land                 # plan only
+make land READY=1         # land the stack, bottom first
+```
+
+`.agent/README.md` has the traps it exists to avoid. A human runs it: `--ready` is the review
+signal, and an agent merging its own work is what [[ADR-0027-agent-push-and-pr]] forbids.
+
 A bare `claude -p` **cannot ask for permission**, so every ungranted write is refused and the cycle
 ends with nothing on disk. `.agent/permissions.json` and `--permission-prompts none` are what make
 an unattended run actually produce work. Path rules in that file must use `Edit(...)`;

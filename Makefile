@@ -70,6 +70,9 @@ agent-run: ## drive unattended agent cycles — permissions scoped, output live 
 	  else empty end'" \
 	./.agent/run.sh $(CYCLES)
 
+land: ## land the stack of open pull requests onto main, bottom first (READY=1 to act)
+	@./.agent/land-stack.sh $(if $(READY),--ready,--dry-run) $(if $(LIMIT),--limit $(LIMIT),)
+
 agent-check: ## the full local gate; every spec's Verification section calls this
 	dotnet restore $(SOLUTION)
 	dotnet format $(SOLUTION) --verify-no-changes
