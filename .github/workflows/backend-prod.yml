@@ -58,6 +58,13 @@ jobs:
       - name: OpenAPI document is current
         env:
           DATABASE_URL: Host=localhost;Port=5432;Database=openapi;Username=openapi;Password=unused
+          # SPEC-005 made the JWT settings start-up requirements, and the host refuses a signing key
+          # under 32 bytes. Placeholders on the same footing as the connection string: the document
+          # build signs no token. Never reuse them where a real token is issued.
+          JWT_SIGNING_KEY: openapi-document-build-placeholder-key-not-a-secret
+          JWT_ISSUER: musicroom-openapi
+          JWT_AUDIENCE: musicroom-openapi
+          JWT_ACCESS_TOKEN_MINUTES: 15
           # The OpenAPI generator boots the real host; the SPEC-003 start-up guard
           # refuses an IMailService outside Development.
           ASPNETCORE_ENVIRONMENT: Development

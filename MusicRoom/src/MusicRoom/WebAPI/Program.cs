@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -40,7 +41,8 @@ public class Program
         builder.Services.AddInfrastructureServices(
             EnvironmentConfiguration.ReadBCryptWorkFactor(builder.Configuration),
             builder.Environment.IsDevelopment(),
-            EnvironmentConfiguration.ReadVerificationLinkBaseUrl(builder.Configuration));
+            EnvironmentConfiguration.ReadVerificationLinkBaseUrl(builder.Configuration),
+            EnvironmentConfiguration.RequireJwtOptions(builder.Configuration));
 
         ApiServices.Add(builder.Services);
         Observability.AddTracing(builder.Services, builder.Configuration);
@@ -87,6 +89,32 @@ internal static class EnvironmentConfiguration
     /// </summary>
     internal static int ReadBCryptWorkFactor(IConfiguration configuration) =>
         configuration.GetValue("Security:BCryptWorkFactor", BCryptPasswordHasher.MinimumWorkFactor);
+
+    /// <summary>
+    /// Reads the four JWT settings — SDD §13.1. Read the way <c>DATABASE_URL</c> is: straight from
+    /// configuration, with no default and no fallback, so a host that starts can actually sign a
+    /// token. <see cref="JwtOptions"/> enforces the 32-byte floor on the key, and neither the key nor
+    /// any part of it is logged or named in a failure message.
+    /// </summary>
+    internal static JwtOptions RequireJwtOptions(IConfiguration configuration)
+    {
+        string? signingKey = configuration["JWT_SIGNING_KEY"];
+        string? issuer = configuration["JWT_ISSUER"];
+        string? audience = configuration["JWT_AUDIENCE"];
+        string? accessTokenMinutes = configuration["JWT_ACCESS_TOKEN_MINUTES"];
+
+        if (string.IsNullOrWhiteSpace(issuer)
+            || string.IsNullOrWhiteSpace(audience)
+            || !int.TryParse(accessTokenMinutes, CultureInfo.InvariantCulture, out int minutes))
+        {
+            throw new InvalidOperationException(
+                "JWT_ISSUER, JWT_AUDIENCE and JWT_ACCESS_TOKEN_MINUTES must all be set, and the last "
+                + "must be a whole number of minutes. Copy .env.example to .env and fill it in — see "
+                + "ADR-0026.");
+        }
+
+        return new JwtOptions(signingKey ?? string.Empty, issuer, audience, minutes);
+    }
 
     /// <summary>
     /// Reads where the client serves the verification screen. Read the way <c>DATABASE_URL</c> is —

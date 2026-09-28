@@ -1,8 +1,11 @@
 using FluentValidation;
 using FluentValidation.Results;
 using MediatR;
+using MusicRoom.Application.Features.Auth;
+using MusicRoom.Application.Features.Auth.Commands.Login;
 using MusicRoom.Application.Features.Auth.Commands.Register;
 using MusicRoom.Application.Features.Auth.Commands.RequestEmailVerification;
+using MusicRoom.Application.Features.Auth.Commands.RotateSession;
 using MusicRoom.Application.Features.Auth.Commands.VerifyEmail;
 
 namespace MusicRoom.WebAPI.Endpoints;
@@ -22,6 +25,8 @@ internal static class AuthEndpoints
         MapRegistrations(group);
         MapEmailVerifications(group);
         MapVerificationRequests(group);
+        MapSessions(group);
+        MapTokens(group);
 
         return endpoints;
     }
@@ -63,6 +68,81 @@ internal static class AuthEndpoints
                 + "account.")
             .Produces(StatusCodes.Status202Accepted)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity);
+
+    private static void MapSessions(RouteGroupBuilder group) =>
+        group.MapPost("/sessions", LoginAsync)
+            .AllowAnonymous()
+            .WithName("PostAuthSession")
+            .WithSummary("Sign in")
+            .WithDescription(
+                "Exchanges an address and a password for a token pair. Every failure — unknown "
+                + "address, wrong password, unverified account — answers the same bodiless 401, and "
+                + "the unknown-address path spends the same hashing work as the others, so the "
+                + "response cannot be timed either.")
+            .Produces<TokenPairResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
+
+    private static void MapTokens(RouteGroupBuilder group) =>
+        group.MapPost("/tokens", RotateSessionAsync)
+            .AllowAnonymous()
+            .WithName("PostAuthToken")
+            .WithSummary("Rotate a session")
+            .WithDescription(
+                "Spends a refresh token exactly once and returns a rotated pair. Presenting an "
+                + "already-rotated token revokes the whole family and answers 401: that is the "
+                + "session-theft detector, and it answers exactly as an unknown or expired token "
+                + "does.")
+            .Produces<TokenPairResponse>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status401Unauthorized);
+
+    private static async Task<IResult> LoginAsync(
+        SessionRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        LoginCommand command = new(request.Email, request.Password);
+
+        return await SendForTokenPairAsync(sender, command, cancellationToken);
+    }
+
+    private static async Task<IResult> RotateSessionAsync(
+        TokenRotationRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        RotateSessionCommand command = new(request.RefreshToken);
+
+        return await SendForTokenPairAsync(sender, command, cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs a command that answers with a token pair, and turns every refusal into one bodiless 401.
+    /// </summary>
+    /// <remarks>
+    /// A ValidationException becomes 401 here rather than the 422 registration answers: the contract
+    /// rows for both endpoints list 401 and 429 only, and a rule message describing why a credential
+    /// was rejected is a hint about its shape.
+    /// </remarks>
+    private static async Task<IResult> SendForTokenPairAsync(
+        ISender sender,
+        IRequest<AuthTokenPair?> command,
+        CancellationToken cancellationToken)
+    {
+        AuthTokenPair? pair;
+
+        try
+        {
+            pair = await sender.Send(command, cancellationToken);
+        }
+        catch (ValidationException)
+        {
+            return Results.Unauthorized();
+        }
+
+        return pair is null
+            ? Results.Unauthorized()
+            : Results.Ok(new TokenPairResponse(pair.AccessToken, pair.RefreshToken, pair.ExpiresInSeconds));
+    }
 
     private static async Task<IResult> RegisterAsync(
         RegistrationRequest request,
@@ -174,3 +254,25 @@ internal sealed record EmailVerificationRequest(string Token);
 /// </summary>
 /// <param name="Email">The address to send another verification link to.</param>
 internal sealed record VerificationRequest(string Email);
+
+/// <summary>
+/// The sign-in payload — <c>docs/api/ENDPOINTS.md</c> §1.
+/// </summary>
+/// <param name="Email">The address the account is known by.</param>
+/// <param name="Password">The plaintext password. Never logged or echoed back.</param>
+internal sealed record SessionRequest(string Email, string Password);
+
+/// <summary>
+/// The rotation payload — <c>docs/api/ENDPOINTS.md</c> §1.
+/// </summary>
+/// <param name="RefreshToken">The refresh token issued by the previous exchange.</param>
+internal sealed record TokenRotationRequest(string RefreshToken);
+
+/// <summary>
+/// The token pair both session endpoints answer with — <c>docs/api/ENDPOINTS.md</c> §1.
+/// </summary>
+/// <param name="AccessToken">The signed, short-lived JWT.</param>
+/// <param name="RefreshToken">The opaque refresh token, to be presented to
+/// <c>POST /auth/tokens</c>. The server keeps only its digest.</param>
+/// <param name="ExpiresIn">The access token's lifetime in seconds, for the client's own planning.</param>
+internal sealed record TokenPairResponse(string AccessToken, string RefreshToken, int ExpiresIn);

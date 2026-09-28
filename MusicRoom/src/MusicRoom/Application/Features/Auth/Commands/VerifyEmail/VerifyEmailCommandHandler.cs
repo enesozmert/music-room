@@ -1,7 +1,6 @@
-using System.Security.Cryptography;
-using System.Text;
 using MediatR;
 using MusicRoom.Application.Abstractions.Persistence;
+using MusicRoom.Application.Abstractions.Security;
 
 namespace MusicRoom.Application.Features.Auth.Commands.VerifyEmail;
 
@@ -35,32 +34,9 @@ internal sealed class VerifyEmailCommandHandler : IRequestHandler<VerifyEmailCom
 
         return await _users
             .TryConsumeEmailVerificationTokenAsync(
-                VerificationTokenHash.Of(request.Token),
+                OpaqueTokenHash.Of(request.Token),
                 DateTime.UtcNow,
                 cancellationToken)
             .ConfigureAwait(false);
     }
-}
-
-/// <summary>
-/// The one definition of how a verification token becomes the digest stored in
-/// <c>email_verification_tokens.token_hash</c>.
-/// </summary>
-/// <remarks>
-/// Issuing and spending must agree on this byte for byte, so both sides call this method instead of
-/// repeating the algorithm. A copy in each feature folder is a bug waiting for one of them to be
-/// changed.
-/// </remarks>
-internal static class VerificationTokenHash
-{
-    /// <summary>Hex-encoded SHA-256 of the token's UTF-8 bytes.</summary>
-    /// <param name="token">The plaintext token, as issued and as submitted.</param>
-    /// <returns>The 64-character digest the row is keyed by.</returns>
-    /// <remarks>
-    /// SHA-256 rather than a password hash on purpose: the token carries 256 bits of entropy from a
-    /// cryptographic generator, so there is nothing to brute-force, and the lookup has to be a
-    /// single indexed read — authentication-authorization.
-    /// </remarks>
-    internal static string Of(string token) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 }

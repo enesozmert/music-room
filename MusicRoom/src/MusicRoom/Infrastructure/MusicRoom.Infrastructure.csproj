@@ -9,6 +9,9 @@
     <!-- ADR-0007. The choice is confined to this project: Application declares IPasswordHasher and
          never learns which algorithm implements it — ADR-0028. -->
     <PackageReference Include="BCrypt.Net-Next" />
+    <!-- SPEC-005 escalation 1, option B. Confined to this project: Application declares
+         IAccessTokenIssuer and never learns which library signs the token — ADR-0028. -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
   </ItemGroup>
 
 </Project>

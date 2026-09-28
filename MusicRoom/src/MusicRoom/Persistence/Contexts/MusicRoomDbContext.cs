@@ -23,6 +23,9 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>The outstanding and spent email verification tokens.</summary>
     public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
 
+    /// <summary>The live, spent and revoked refresh tokens.</summary>
+    public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     /// <summary>Stamps the common columns, then saves — SDD §8.3.</summary>
     /// <param name="cancellationToken">The caller's cancellation token.</param>
     /// <returns>The number of rows written.</returns>

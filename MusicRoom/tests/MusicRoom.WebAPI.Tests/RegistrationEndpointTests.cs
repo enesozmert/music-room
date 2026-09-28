@@ -33,7 +33,10 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
         await _database.StartAsync(TestContext.Current.CancellationToken);
 
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(webHost =>
-            webHost.UseSetting("DATABASE_URL", _database.GetConnectionString()));
+        {
+            webHost.UseSetting("DATABASE_URL", _database.GetConnectionString());
+            TestJwtSettings.Apply(webHost);
+        });
 
         using IServiceScope scope = _factory.Services.CreateScope();
         MusicRoomDbContext context = scope.ServiceProvider.GetRequiredService<MusicRoomDbContext>();

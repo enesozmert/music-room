@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Infrastructure;
+using MusicRoom.Infrastructure.Security;
 using Xunit;
 
 namespace MusicRoom.Infrastructure.Tests.Messaging;
@@ -71,16 +72,31 @@ public sealed class LoggingMailServiceTests
 
         // Act
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
-            () => services.AddInfrastructureServices(WorkFactor, isDevelopment: false, BaseUrl));
+            () => services.AddInfrastructureServices(
+                WorkFactor,
+                isDevelopment: false,
+                BaseUrl,
+                JwtSettings()));
 
         // Assert — the message names the decision, not a way to make start-up succeed.
         Assert.Contains("S1a", exception.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Valid JWT settings, so the registration under test fails for the reason each test is about and
+    /// not because <see cref="JwtOptions"/> refused a short key. SPEC-005 added the parameter.
+    /// </summary>
+    private static JwtOptions JwtSettings() =>
+        new(new string('k', JwtOptions.MinimumSigningKeyBytes), "musicroom-tests", "musicroom-tests", 15);
+
     private static IMailService ResolveMailService(MessageLog log, string? verificationLinkBaseUrl)
     {
         ServiceCollection services = new();
-        services.AddInfrastructureServices(WorkFactor, isDevelopment: true, verificationLinkBaseUrl);
+        services.AddInfrastructureServices(
+            WorkFactor,
+            isDevelopment: true,
+            verificationLinkBaseUrl,
+            JwtSettings());
 
         ServiceDescriptor descriptor = services.Single(
             candidate => candidate.ServiceType == typeof(IMailService));

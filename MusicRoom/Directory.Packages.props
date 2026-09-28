@@ -39,6 +39,12 @@
 
   <ItemGroup Label="Security — ADR-0007, ADR-0021">
     <PackageVersion Include="BCrypt.Net-Next" Version="4.2.0" />
+    <!-- Named by no ADR yet. Chosen by the repository owner at the SPEC-005 gate on 2026-09-27,
+         escalation 1 option B: it carries the JsonWebTokenHandler that issues an access token today
+         and the bearer middleware that will validate one at the logout spec, so the dependency set
+         is amended once rather than twice. SPEC-005 registers no authentication handler.
+         The ADR-0021 Consequences entry is the owner's to write. -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup Label="Observability — ADR-0022">
