@@ -75,7 +75,7 @@ public sealed class AuditBehaviourTests
         // Arrange
         RecordingSink sink = new();
         RecordingUnitOfWork work = new();
-        AuditBehaviour<PlainCommand, string> behaviour = new(work, sink, WithContext());
+        AuditBehaviour<PlainCommand, string> behaviour = new(work, sink, WithContext(), new AuditContext());
 
         // Act
         string response = await behaviour.Handle(
@@ -99,7 +99,7 @@ public sealed class AuditBehaviourTests
         // Arrange
         ThrowingSink sink = new();
         RecordingUnitOfWork work = new();
-        AuditBehaviour<AuditableCommand, string> behaviour = new(work, sink, WithContext());
+        AuditBehaviour<AuditableCommand, string> behaviour = new(work, sink, WithContext(), new AuditContext());
 
         // Act
         await Assert.ThrowsAsync<InvalidOperationException>(() => behaviour.Handle(
@@ -161,7 +161,7 @@ public sealed class AuditBehaviourTests
         // Arrange
         RecordingSink sink = new();
         RecordingUnitOfWork work = new() { AlreadyOpen = true };
-        AuditBehaviour<AuditableCommand, string> behaviour = new(work, sink, WithContext());
+        AuditBehaviour<AuditableCommand, string> behaviour = new(work, sink, WithContext(), new AuditContext());
 
         // Act
         await behaviour.Handle(
@@ -174,13 +174,101 @@ public sealed class AuditBehaviourTests
         Assert.Equal(0, work.Commits);
     }
 
+    /// <summary>
+    /// What the handler said reaches the row: outcome, account and target — SPEC-009 escalation 1.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheHandlerStatesAnOutcome_TheRecordCarriesItAsync()
+    {
+        // Arrange
+        RecordingSink sink = new();
+        RecordingUnitOfWork work = new();
+        AuditContext auditContext = new();
+        Guid account = Guid.NewGuid();
+
+        AuditBehaviour<AuditableCommand, string> behaviour =
+            new(work, sink, WithContext(), auditContext);
+
+        // Act — a handler that refuses, names the account and then returns.
+        await behaviour.Handle(
+            new AuditableCommand(),
+            _ =>
+            {
+                auditContext.SetOutcome(AuditOutcome.Throttled);
+                auditContext.SetUserId(account);
+                auditContext.SetTargetId(account);
+
+                return Task.FromResult("refused");
+            },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        AuditRecord record = Assert.Single(sink.Records);
+        Assert.Equal("throttled", record.Outcome);
+        Assert.Equal(account, record.UserId);
+        Assert.Equal(account, record.TargetId);
+    }
+
+    /// <summary>
+    /// A handler that says nothing still produces a true record: the action ran to completion, and no
+    /// account is claimed.
+    /// </summary>
+    [Fact]
+    public async Task Handle_WhenTheHandlerSaysNothing_TheRecordIsCompletedWithNoAccountAsync()
+    {
+        // Arrange
+        (AuditBehaviour<AuditableCommand, string> behaviour, RecordingSink sink, _) = Build(WithContext());
+
+        // Act
+        await behaviour.Handle(
+            new AuditableCommand(),
+            _ => Task.FromResult("handled"),
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        AuditRecord record = Assert.Single(sink.Records);
+        Assert.Equal("completed", record.Outcome);
+        Assert.Null(record.UserId);
+        Assert.Null(record.TargetId);
+    }
+
+    /// <summary>Every outcome value reaches the column as the lower-case string the table stores.</summary>
+    [Theory]
+    [InlineData(AuditOutcome.Completed, "completed")]
+    [InlineData(AuditOutcome.Refused, "refused")]
+    [InlineData(AuditOutcome.Throttled, "throttled")]
+    [InlineData(AuditOutcome.Expired, "expired")]
+    [InlineData(AuditOutcome.ReuseDetected, "reusedetected")]
+    public async Task Handle_WritesEachOutcomeAsItsColumnValueAsync(AuditOutcome outcome, string expected)
+    {
+        // Arrange
+        RecordingSink sink = new();
+        AuditContext auditContext = new();
+        AuditBehaviour<AuditableCommand, string> behaviour =
+            new(new RecordingUnitOfWork(), sink, WithContext(), auditContext);
+
+        // Act
+        await behaviour.Handle(
+            new AuditableCommand(),
+            _ =>
+            {
+                auditContext.SetOutcome(outcome);
+
+                return Task.FromResult("handled");
+            },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(expected, Assert.Single(sink.Records).Outcome);
+    }
+
     private static (AuditBehaviour<AuditableCommand, string> Behaviour, RecordingSink Sink, RecordingUnitOfWork Work)
         Build(IClientContextAccessor clientContext)
     {
         RecordingSink sink = new();
         RecordingUnitOfWork work = new();
 
-        return (new AuditBehaviour<AuditableCommand, string>(work, sink, clientContext), sink, work);
+        return (new AuditBehaviour<AuditableCommand, string>(work, sink, clientContext, new AuditContext()), sink, work);
     }
 
     private static StubClientContextAccessor WithContext() =>

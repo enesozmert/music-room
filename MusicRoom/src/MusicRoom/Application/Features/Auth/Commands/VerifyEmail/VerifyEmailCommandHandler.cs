@@ -1,4 +1,5 @@
 using MediatR;
+using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Persistence;
 using MusicRoom.Application.Abstractions.Security;
 
@@ -10,13 +11,19 @@ namespace MusicRoom.Application.Features.Auth.Commands.VerifyEmail;
 internal sealed class VerifyEmailCommandHandler : IRequestHandler<VerifyEmailCommand, VerifyEmailOutcome>
 {
     private readonly IUserRepository _users;
+    private readonly IAuditContext _audit;
 
-    /// <summary>Takes the write path; the abstraction this layer declares.</summary>
+    /// <summary>Takes the write path and the audit context.</summary>
     /// <param name="users">The account write path.</param>
+    /// <param name="audit">Where this handler states what became of the attempt — SPEC-009.</param>
     /// <remarks>
     /// Public on an internal type: MediatR activates the handler through a public constructor only.
     /// </remarks>
-    public VerifyEmailCommandHandler(IUserRepository users) => _users = users;
+    public VerifyEmailCommandHandler(IUserRepository users, IAuditContext audit)
+    {
+        _users = users;
+        _audit = audit;
+    }
 
     /// <summary>Spends the token, or reports why it could not be spent.</summary>
     /// <param name="request">The validated command.</param>
@@ -32,11 +39,22 @@ internal sealed class VerifyEmailCommandHandler : IRequestHandler<VerifyEmailCom
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        return await _users
+        VerifyEmailOutcome outcome = await _users
             .TryConsumeEmailVerificationTokenAsync(
                 OpaqueTokenHash.Of(request.Token),
                 DateTime.UtcNow,
                 cancellationToken)
             .ConfigureAwait(false);
+
+        // No account is named: this path is keyed on a token, and a row naming the account a refused token
+        // once belonged to would say more than the caller proved.
+        _audit.SetOutcome(outcome switch
+        {
+            VerifyEmailOutcome.Verified => AuditOutcome.Completed,
+            VerifyEmailOutcome.Expired => AuditOutcome.Expired,
+            _ => AuditOutcome.Refused,
+        });
+
+        return outcome;
     }
 }

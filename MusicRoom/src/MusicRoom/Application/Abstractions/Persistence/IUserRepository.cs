@@ -141,12 +141,28 @@ public interface IUserRepository
     /// 15-minute lifetime is the accepted mitigation — SDD §13.1, and the threat register says so.
     /// </para>
     /// </remarks>
-    Task<ResetPasswordOutcome> TryResetPasswordAsync(
+    Task<PasswordResetResult> TryResetPasswordAsync(
         string tokenHash,
         string newPasswordHash,
         DateTime nowUtc,
         CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// What a reset attempt did, and to which account.
+/// </summary>
+/// <param name="Outcome">Reset, expired, or invalid.</param>
+/// <param name="UserId">The account whose password was replaced, or null when nothing was.</param>
+/// <remarks>
+/// The id is here so the audit record can name the account a successful reset acted on — SPEC-009. A failed
+/// attempt carries null: a row naming an account for a token that was refused would say the token once
+/// belonged to it, which is more than the caller proved.
+/// <para>
+/// Declared beside the interface rather than in its own file: it exists only as that method's return value,
+/// and SPEC-009's Files table is the contract for what this change may create.
+/// </para>
+/// </remarks>
+public sealed record PasswordResetResult(ResetPasswordOutcome Outcome, Guid? UserId);
 
 /// <summary>
 /// The three facts a login decision is made from.

@@ -19,20 +19,24 @@ internal static class CredentialEndpointResults
     /// Answers `429` with <c>Retry-After</c> when the per-account limiter refused the attempt.
     /// </summary>
     /// <param name="httpContext">The request being answered.</param>
-    /// <param name="exception">What the limiter reported.</param>
+    /// <param name="throttle">What the limiter reported.</param>
     /// <returns>The bodiless `429`.</returns>
     /// <remarks>
     /// The per-IP half of the limit is middleware and never reaches a handler; this is the half that knows
     /// which account was named (SPEC-006 escalation 2, option B). The body is empty for the same reason
     /// the middleware's is: a message saying which key tripped tells a caller which key to vary.
+    /// <para>
+    /// The refusal arrives as a value rather than an exception since SPEC-009, so that the audit record for a
+    /// throttled attempt commits on the pipeline's ordinary path instead of being rolled back.
+    /// </para>
     /// </remarks>
-    internal static IResult Throttled(HttpContext httpContext, CredentialAttemptThrottledException exception)
+    internal static IResult Throttled(HttpContext httpContext, CredentialThrottle throttle)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
-        ArgumentNullException.ThrowIfNull(exception);
+        ArgumentNullException.ThrowIfNull(throttle);
 
         httpContext.Response.Headers.RetryAfter =
-            ((int)Math.Ceiling(exception.RetryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
+            ((int)Math.Ceiling(throttle.RetryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
 
         return Results.StatusCode(StatusCodes.Status429TooManyRequests);
     }

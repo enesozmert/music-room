@@ -126,14 +126,30 @@ internal static class AuthEndpoints
     {
         LoginCommand command = new(request.Email, request.Password);
 
+        LoginResult result;
+
         try
         {
-            return await SendForTokenPairAsync(sender, command, cancellationToken);
+            result = await sender.Send(command, cancellationToken);
         }
-        catch (CredentialAttemptThrottledException exception)
+        catch (ValidationException)
         {
-            return CredentialEndpointResults.Throttled(httpContext, exception);
+            // 401, not the 422 registration answers: the contract row lists 401 and 429 only, and a rule
+            // message describing why a credential was rejected is a hint about its shape.
+            return Results.Unauthorized();
         }
+
+        if (result.Throttled is not null)
+        {
+            return CredentialEndpointResults.Throttled(httpContext, result.Throttled);
+        }
+
+        return result.Pair is null
+            ? Results.Unauthorized()
+            : Results.Ok(new TokenPairResponse(
+                result.Pair.AccessToken,
+                result.Pair.RefreshToken,
+                result.Pair.ExpiresInSeconds));
     }
 
     private static async Task<IResult> RotateSessionAsync(
@@ -185,13 +201,11 @@ internal static class AuthEndpoints
     {
         RegisterCommand command = new(request.Email, request.Password, request.DisplayName);
 
+        CredentialThrottle? throttled;
+
         try
         {
-            await sender.Send(command, cancellationToken);
-        }
-        catch (CredentialAttemptThrottledException exception)
-        {
-            return CredentialEndpointResults.Throttled(httpContext, exception);
+            throttled = await sender.Send(command, cancellationToken);
         }
         catch (ValidationException exception)
         {
@@ -200,7 +214,9 @@ internal static class AuthEndpoints
                 statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
-        return Results.Accepted();
+        return throttled is null
+            ? Results.Accepted()
+            : CredentialEndpointResults.Throttled(httpContext, throttled);
     }
 
     private static async Task<IResult> RequestEmailVerificationAsync(
@@ -211,13 +227,11 @@ internal static class AuthEndpoints
     {
         RequestEmailVerificationCommand command = new(request.Email);
 
+        CredentialThrottle? throttled;
+
         try
         {
-            await sender.Send(command, cancellationToken);
-        }
-        catch (CredentialAttemptThrottledException exception)
-        {
-            return CredentialEndpointResults.Throttled(httpContext, exception);
+            throttled = await sender.Send(command, cancellationToken);
         }
         catch (ValidationException exception)
         {
@@ -228,7 +242,9 @@ internal static class AuthEndpoints
                 statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
-        return Results.Accepted();
+        return throttled is null
+            ? Results.Accepted()
+            : CredentialEndpointResults.Throttled(httpContext, throttled);
     }
 
     private static async Task<IResult> VerifyEmailAsync(

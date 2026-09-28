@@ -254,6 +254,48 @@ public sealed class CredentialRateLimitingTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.TooManyRequests, answers[^1]);
     }
 
+    /// <summary>
+    /// A throttled attempt leaves a `throttled` row, and the response is unchanged — SPEC-009 escalation 2.
+    /// Before it, the refusal threw and SPEC-008's fail-closed behaviour rolled the row back with it.
+    /// </summary>
+    [Fact]
+    public async Task Login_BeyondThePerAccountLimit_WritesAThrottledAuditRecordAnd429Async()
+    {
+        // Arrange
+        await using WebApplicationFactory<Program> factory = CreateFactory(
+            ("RATE_LIMIT_ACCOUNT_PERMITS", "2"),
+            ("RATE_LIMIT_SESSIONS_PERMITS", TestRateLimitSettings.Permits));
+
+        const string targeted = "throttle-audited@example.com";
+
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            using HttpResponseMessage refused = await PostLoginAsync(factory, targeted, "wrong password");
+            Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+        }
+
+        // Act
+        using HttpResponseMessage throttled = await PostLoginAsync(factory, targeted, "wrong password");
+
+        // Assert — the response is byte-for-byte what SPEC-006 shipped.
+        Assert.Equal(HttpStatusCode.TooManyRequests, throttled.StatusCode);
+        Assert.NotNull(throttled.Headers.RetryAfter);
+        Assert.Empty(await throttled.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
+        // And the row exists, which it did not before this spec.
+        using IServiceScope scope = factory.Services.CreateScope();
+        MusicRoomDbContext context = scope.ServiceProvider.GetRequiredService<MusicRoomDbContext>();
+
+        List<string> outcomes = await context.AuditRecords
+            .AsNoTracking()
+            .Where(record => record.Action == "auth.login")
+            .Select(record => record.Outcome)
+            .ToListAsync(TestContext.Current.CancellationToken);
+
+        Assert.Contains("throttled", outcomes, StringComparer.Ordinal);
+        Assert.Equal(2, outcomes.Count(outcome => outcome == "refused"));
+    }
+
     private WebApplicationFactory<Program> CreateFactory(params (string Key, string Value)[] settings) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(webHost =>
         {
