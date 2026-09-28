@@ -10,12 +10,14 @@ updated: 2026-09-23
 
 How to get from the subject PDF to a defensible submission.
 
-**Status: S0 to S3 built and merged.** Eleven specs are `done` — the walking skeleton, the identity
-surface, bearer validation and session listing, the credential rate limits, the audit log with refusal
-outcomes, and the own-profile surface with music preferences. All of it is on `main` as of 2026-09-28;
-the stack of eight draft pull requests that used to carry it was landed in order.
-Slice S1a is blocked on O17, a mail provider account that does not exist. Every decision recorded so far
-is in [[decisions-index]]; everything still open is in [[sdd]] §17.
+**Status: S0 through S2 are done and S3 has started.** The identity surface, the credential rate limits,
+the audit log, bearer authentication and own-profile editing are built; each unit is a spec in
+`docs/specs/`, which is where the statuses live — this plan deliberately does not count them, because a
+count written in two places is wrong in one of them within a day. The counted figures are
+`docs/progress/PROGRESS.json`, and the `State` column of the slice table below is what the script
+reads. While a stack of pull requests is open, `main` lags all of it. Slice S1a is blocked on O17,
+a mail provider account that does not exist.
+Every decision recorded so far is in [[decisions-index]]; everything still open is in [[sdd]] §17.
 
 This plan sequences work. It does not decide anything — decisions go in ADRs, rules go in
 [[technical-guide-index]], design goes in [[sdd]].
