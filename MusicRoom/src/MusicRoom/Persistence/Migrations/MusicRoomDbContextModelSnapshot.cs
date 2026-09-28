@@ -148,6 +148,44 @@ namespace MusicRoom.Persistence.Migrations
                     b.ToTable("email_verification_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("MusicRoom.Domain.Entities.MusicPreference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "Kind", "Value")
+                        .IsUnique()
+                        .HasDatabaseName("ux_music_preferences_user_id_kind_value");
+
+                    b.ToTable("music_preferences", (string)null);
+                });
+
             modelBuilder.Entity("MusicRoom.Domain.Entities.PasswordResetToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -192,6 +230,69 @@ namespace MusicRoom.Persistence.Migrations
                         .HasDatabaseName("ix_password_reset_tokens_user_id");
 
                     b.ToTable("password_reset_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.Profile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Bio")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("bio");
+
+                    b.Property<short>("BioVisibility")
+                        .HasColumnType("smallint")
+                        .HasColumnName("bio_visibility");
+
+                    b.Property<DateOnly?>("BirthDate")
+                        .HasColumnType("date")
+                        .HasColumnName("birth_date");
+
+                    b.Property<short>("BirthDateVisibility")
+                        .HasColumnType("smallint")
+                        .HasColumnName("birth_date_visibility");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("location");
+
+                    b.Property<short>("LocationVisibility")
+                        .HasColumnType("smallint")
+                        .HasColumnName("location_visibility");
+
+                    b.Property<string>("RealName")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("real_name");
+
+                    b.Property<short>("RealNameVisibility")
+                        .HasColumnType("smallint")
+                        .HasColumnName("real_name_visibility");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_profiles_user_id");
+
+                    b.ToTable("profiles", (string)null);
                 });
 
             modelBuilder.Entity("MusicRoom.Domain.Entities.RefreshToken", b =>
@@ -324,7 +425,25 @@ namespace MusicRoom.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("MusicRoom.Domain.Entities.MusicPreference", b =>
+                {
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("MusicRoom.Domain.Entities.PasswordResetToken", b =>
+                {
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.Profile", b =>
                 {
                     b.HasOne("MusicRoom.Domain.Entities.User", null)
                         .WithMany()

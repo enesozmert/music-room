@@ -80,8 +80,18 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
 
         IssuedVerificationToken issued = VerificationTokenIssuer.Issue(user.Id, nowUtc);
 
+        // Created with the account, in the same transaction: every field empty, every tier at the default the
+        // entity states — SPEC-011 escalation 4.
+        Profile profile = new()
+        {
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            CreatedAtUtc = nowUtc,
+            UpdatedAtUtc = nowUtc,
+        };
+
         bool registered = await _users
-            .TryRegisterAsync(user, issued.Token, cancellationToken)
+            .TryRegisterAsync(user, issued.Token, profile, cancellationToken)
             .ConfigureAwait(false);
 
         if (!registered)

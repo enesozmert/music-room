@@ -28,10 +28,12 @@ internal sealed class UserRepository : IUserRepository
     public async Task<bool> TryRegisterAsync(
         User user,
         EmailVerificationToken verificationToken,
+        Profile profile,
         CancellationToken cancellationToken)
     {
         _context.Users.Add(user);
         _context.EmailVerificationTokens.Add(verificationToken);
+        _context.Profiles.Add(profile);
 
         try
         {
@@ -44,6 +46,7 @@ internal sealed class UserRepository : IUserRepository
             // context is not left holding rows it failed to write.
             _context.Entry(user).State = EntityState.Detached;
             _context.Entry(verificationToken).State = EntityState.Detached;
+            _context.Entry(profile).State = EntityState.Detached;
 
             return false;
         }

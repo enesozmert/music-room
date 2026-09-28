@@ -15,6 +15,8 @@ public interface IUserRepository
     /// </summary>
     /// <param name="user">The account to create.</param>
     /// <param name="verificationToken">The token issued for that account.</param>
+    /// <param name="profile">The account's empty profile. Created with the account so no read path has to
+    /// answer for a missing one — SPEC-011 escalation 4.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>
     /// True when the row was written, false when <c>ux_users_email</c> refused it because the
@@ -25,6 +27,7 @@ public interface IUserRepository
     Task<bool> TryRegisterAsync(
         User user,
         EmailVerificationToken verificationToken,
+        Profile profile,
         CancellationToken cancellationToken);
 
     /// <summary>
