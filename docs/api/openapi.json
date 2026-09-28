@@ -432,6 +432,113 @@
           }
         }
       }
+    },
+    "/api/v1/me": {
+      "get": {
+        "tags": [
+          "ProfileEndpoints"
+        ],
+        "summary": "Read your own profile",
+        "description": "Returns every profile field with the visibility tier that governs it, plus the caller's music preferences. The owner is the one reader who sees every tier; what another user sees is projected per field, which is a different endpoint.",
+        "operationId": "GetMe",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OwnProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/me/profile": {
+      "patch": {
+        "tags": [
+          "ProfileEndpoints"
+        ],
+        "summary": "Update your own profile",
+        "description": "Updates any subset of the profile. Each field carries its value and its visibility tier in the same object, so a field cannot exist without a tier — a value with no tier is 422, never a silent default to public. An absent field is left untouched; sending a null value with a tier clears it.",
+        "operationId": "PatchMeProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/music-preferences": {
+      "put": {
+        "tags": [
+          "ProfileEndpoints"
+        ],
+        "summary": "Replace your music preferences",
+        "description": "Replaces the whole preference set, genres and artists. Preferences are private to their owner and carry no visibility tier of their own. Both lists are bounded: an unbounded array behind an authenticated endpoint is unrestricted resource consumption.",
+        "operationId": "PutMeMusicPreferences",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MusicPreferencesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -496,6 +603,85 @@
           }
         }
       },
+      "MusicPreferencesRequest": {
+        "required": [
+          "genres",
+          "artists"
+        ],
+        "type": "object",
+        "properties": {
+          "genres": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "The genres the user names."
+          },
+          "artists": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "The artists the user names."
+          }
+        },
+        "description": "The music preferences payload — `docs/api/ENDPOINTS.md` §2."
+      },
+      "OwnProfileResponse": {
+        "required": [
+          "displayName",
+          "realName",
+          "bio",
+          "location",
+          "birthDate",
+          "genres",
+          "artists"
+        ],
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "The handle the account is known by. Always public."
+          },
+          "realName": {
+            "description": "The real name and its tier.",
+            "$ref": "#/components/schemas/ProfileFieldResponseOfstring"
+          },
+          "bio": {
+            "description": "The bio and its tier.",
+            "$ref": "#/components/schemas/ProfileFieldResponseOfstring"
+          },
+          "location": {
+            "description": "The location and its tier.",
+            "$ref": "#/components/schemas/ProfileFieldResponseOfstring"
+          },
+          "birthDate": {
+            "description": "The date of birth and its tier.",
+            "$ref": "#/components/schemas/ProfileFieldDateResponse"
+          },
+          "genres": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The genres the user named."
+          },
+          "artists": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The artists the user named."
+          }
+        },
+        "description": "A profile as its owner reads it."
+      },
       "PasswordResetRequest": {
         "required": [
           "email"
@@ -526,6 +712,110 @@
           }
         },
         "description": "The reset payload — `docs/api/ENDPOINTS.md` §1."
+      },
+      "ProfileDateFieldRequest": {
+        "required": [
+          "value",
+          "visibility"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The date, or null to clear the field.",
+            "format": "date"
+          },
+          "visibility": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Who may see it. Absent means `422`.",
+                "$ref": "#/components/schemas/ProfileFieldVisibility"
+              }
+            ]
+          }
+        },
+        "description": "The date-of-birth field as a client sends it."
+      },
+      "ProfileFieldDateResponse": {
+        "required": [
+          "value",
+          "visibility"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The date, or null when the field is empty.",
+            "format": "date"
+          },
+          "visibility": {
+            "description": "Who may see it.",
+            "$ref": "#/components/schemas/ProfileFieldVisibility"
+          }
+        },
+        "description": "The date-of-birth field and its tier."
+      },
+      "ProfileFieldRequestOfstring": {
+        "required": [
+          "value",
+          "visibility"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The value, or null to clear the field."
+          },
+          "visibility": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Who may see it. Absent means `422`: the binder would otherwise default a missing\n    enum to its zero value, which is `Public` — the exact silent default `docs/api/ENDPOINTS.md` forbids.",
+                "$ref": "#/components/schemas/ProfileFieldVisibility"
+              }
+            ]
+          }
+        },
+        "description": "One field as a client sends it: a value and a tier that is **optional on the wire so its absence can be\nrefused**."
+      },
+      "ProfileFieldResponseOfstring": {
+        "required": [
+          "value",
+          "visibility"
+        ],
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The value, or null when the field is empty."
+          },
+          "visibility": {
+            "description": "Who may see it.",
+            "$ref": "#/components/schemas/ProfileFieldVisibility"
+          }
+        },
+        "description": "One field's value and the tier that governs it."
+      },
+      "ProfileFieldVisibility": {
+        "type": "integer",
+        "description": "Who may see one profile field — subject V.1's three tiers, SDD §6.2."
       },
       "RegistrationRequest": {
         "required": [
@@ -650,6 +940,62 @@
         },
         "description": "The rotation payload — `docs/api/ENDPOINTS.md` §1."
       },
+      "UpdateProfileRequest": {
+        "required": [
+          "realName",
+          "bio",
+          "location",
+          "birthDate"
+        ],
+        "type": "object",
+        "properties": {
+          "realName": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The real name and its tier, or absent to leave the field alone.",
+                "$ref": "#/components/schemas/ProfileFieldRequestOfstring"
+              }
+            ]
+          },
+          "bio": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The bio and its tier, or absent.",
+                "$ref": "#/components/schemas/ProfileFieldRequestOfstring"
+              }
+            ]
+          },
+          "location": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The location and its tier, or absent.",
+                "$ref": "#/components/schemas/ProfileFieldRequestOfstring"
+              }
+            ]
+          },
+          "birthDate": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The date of birth and its tier, or absent.",
+                "$ref": "#/components/schemas/ProfileDateFieldRequest"
+              }
+            ]
+          }
+        },
+        "description": "The profile update payload — `docs/api/ENDPOINTS.md` §2."
+      },
       "VerificationRequest": {
         "required": [
           "email"
@@ -680,6 +1026,9 @@
     },
     {
       "name": "PasswordResetEndpoints"
+    },
+    {
+      "name": "ProfileEndpoints"
     }
   ]
 }

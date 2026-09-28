@@ -153,6 +153,15 @@ Subject V.1. The friends graph exists because the `Friends` visibility tier requ
   without a tier. A missing tier is `422`, never a silent default to public.
 - `GET /users` search returns public fields only, paginated, rate limited. Unbounded user
   enumeration is OWASP API4.
+- **The tiered profile fields are `realName`, `bio`, `location` and `birthDate`** (SPEC-011). Each is sent and
+  returned as `{ "value": ..., "visibility": "Public" | "Friends" | "Private" }`, and a field sent without a
+  `visibility` is `422` — the binder would otherwise default a missing enum to `Public`.
+- **`displayName` is always public and carries no tier.** It is the handle an account is known by, and a search
+  result or an attendee list has to show it. Do not build a visibility control for it.
+- **Music preferences are private to their owner and carry no tier.** `PUT /me/music-preferences` replaces the
+  whole set; both lists are bounded at 50 entries of 64 characters.
+- **`Friends` is stored but not yet evaluated.** Until the friends graph exists, every reader who is not the
+  owner is a stranger, so a `Friends` field is as hidden as a `Private` one.
 
 ---
 
