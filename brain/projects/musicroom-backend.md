@@ -1,8 +1,8 @@
 ---
 kind: project-card
 id: musicroom-backend
-status: planned
-updated: 2026-09-23
+status: in-progress
+updated: 2026-09-28
 ---
 
 # Project Card — MusicRoom.Backend
@@ -13,7 +13,7 @@ Single source of truth for all service data. Clients are thin remote controls.
 
 | Field | Value |
 |---|---|
-| Path | **`MusicRoom/`** — the only location for backend source code. Empty, scaffold pending. Layout: [[ADR-0011-solution-layout]] |
+| Path | **`MusicRoom/`** — the only location for backend source code. 13 projects: 5 application, 4 `corePackages`, 4 test. Layout: [[ADR-0011-solution-layout]] |
 | Language / runtime | C# 13 / .NET 10.0.401 |
 | Framework | ASP.NET Core Web API |
 | Dependency set | MediatR, FluentValidation, built-in RateLimiter, built-in OpenAPI, no mapper ([[ADR-0021-backend-dependency-set]]) |
@@ -75,7 +75,30 @@ Via [[standards-router]]: [[engineering-baseline]] · [[git-workflow]] · [[dotn
 [[youtube-integration]] · [[social-oauth]] · [[testing]] · [[logging-observability]] ·
 [[load-testing]] · [[ci-cd-containerization]]
 
+## What exists, as of 2026-09-28
+
+Eight specs are `done` in `docs/specs/`, each on its own branch and draft pull request. They are
+stacked and unmerged, so `main` lags: read `docs/specs/` for status, `git log` for what has landed.
+
+| Slice | Built |
+|---|---|
+| S0 | solution, `Directory.Packages.props`, compose with a local PostgreSQL, `Makefile`, CI, `/health`, `/health/ready`, generated OpenAPI |
+| S1 | registration, email verification, verification resend, login, JWT + refresh rotation with reuse detection, password reset, credential rate limits |
+| S2 | mandatory client headers and the audit log — REST only; the hub filter waits for a hub |
+
+Four migrations exist: `InitialIdentity`, `RefreshTokens`, `PasswordResetTokens`, `AuditRecords`
+([[migrations-index]]). 128 tests pass under `make agent-check`.
+
 ## Open items
 
-- Remaining open: remote deployment target (O11), SignalR backplane (O8, deliberately deferred), concrete schema (O9, resolved by the first migration), `Makefile` + `docker compose` (O10, slice S0).
+- Remaining open: remote deployment target (O11), SignalR backplane (O8, deliberately deferred),
+  fluent assertion library (O12), silent-controller recovery (O13), music preferences consumer (O14),
+  OpenTelemetry evidence (O16), real mail provider (O17 — blocks slice S1a), self-hosted vault (O18).
+- **Four decisions are recorded only in specs and code, and specs are disposable
+  ([[specs]] "Retention"). They need an ADR from the repository owner:**
+  the `Microsoft.AspNetCore.Authentication.JwtBearer` package and the in-process credential backoff,
+  both amendments to [[ADR-0021-backend-dependency-set]]; the 30-day absolute refresh-token lifetime;
+  one repository method writing two aggregates in one transaction, then superseded by `IUnitOfWork`
+  when the audit record joined the same transaction; and the fail-closed audit posture (T-29).
+  No agent writes an ADR.
 - Owner: one backend developer. The React Native client is a parallel workstream owned by the second team member ([[musicroom-mobile]]).

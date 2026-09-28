@@ -10,7 +10,7 @@ updated: 2026-09-23
 
 Consolidated design view of the system, organised by the viewpoints of IEEE 1016.
 
-**Status: draft — design intent.** No application code exists yet (`MusicRoom/` is empty). Every
+**Status: partly implemented.** Slices S0 to S2 are built — the identity surface, the credential rate limits and the audit log — on stacked draft pull requests; §16 says which rows that covers and which are still design only. Every
 section below describes what is decided, and marks what is not with
 `UNKNOWN - requires decision`. A guess is never substituted for a decision.
 
@@ -296,7 +296,7 @@ rewrite the list. See §12.2.
 - Destructive changes follow expand -> migrate -> contract.
 - Every migration is recorded in [[migrations-index]].
 
-Concrete table and column definitions: `UNKNOWN - requires decision` until the first migration.
+Concrete table and column definitions live in the migrations and their `IEntityTypeConfiguration` files, which are authoritative — four migrations so far, `users` through `audit_records` ([[migrations-index]]). For a table no migration has created yet it is still `UNKNOWN - requires decision`.
 
 ---
 
@@ -554,7 +554,7 @@ V10 OAuth and OIDC, and V16 Security Logging and Error Handling.
 |---|---|
 | Password hashing | **BCrypt** (`BCrypt.Net-Next`), work factor >= 12, rehash on login when the stored cost is lower -- [[ADR-0007-password-hashing-bcrypt]] |
 | Password policy | 12 to 64 characters, **<= 72 bytes UTF-8** (BCrypt truncates beyond that), no composition rules, no forced rotation (NIST SP 800-63B) |
-| Session | 15-minute **RS256** JWT access token + opaque, hashed, rotating refresh token. From S8 an **ID token** joins it and both are issued by the API's own OpenID Provider surface -- [[ADR-0031-musicroom-as-openid-provider]] |
+| Session | 15-minute **RS256** JWT access token + opaque, hashed, rotating refresh token. The refresh family's lifetime is **30 days, absolute** — every rotation inherits the family's original expiry, so a stolen family cannot be kept alive by rotating it (owner decision, 2026-09-27, SPEC-005). From S8 an **ID token** joins the access token and both are issued by the API's own OpenID Provider surface -- [[ADR-0031-musicroom-as-openid-provider]] |
 | Theft detection | reuse of a rotated refresh token revokes the whole family |
 | Verification / reset | single-use, hashed, short-TTL tokens; identical responses whether or not the account exists |
 | Social | **OpenID Connect**; one validation core driven by each provider's discovery document, acquisition branching only: Google authorization code + PKCE `S256`, Facebook Limited Login. The ID token is validated server-side including `aud` and `nonce`; one provider identity maps to at most one user -- [[ADR-0008-oidc-social-login]] |
@@ -751,7 +751,7 @@ table to walk through at defence.
 
 | Subject | Requirement | Design element | Status |
 |---|---|---|---|
-| V.1 | email+password or social registration | §10.1, §10.2, §13.1 | **partly implemented** -- `POST /api/v1/auth/registrations` persists an unverified `User` with a BCrypt hash at work factor >= 12, `ux_users_email` arbitrates the race, and both a fresh and an already-registered address answer `202` so the endpoint is not an enumeration oracle. Social registration is designed only. A verified account can now sign in: `POST /api/v1/auth/sessions` verifies the stored hash and answers a 15-minute JWT plus an opaque refresh token, and every failure -- unknown address, wrong password, unverified account -- answers the same bodiless `401` for the same amount of hashing work. Rate limiting is deferred and recorded as T-25, which slice S1a must close before O17 |
+| V.1 | email+password or social registration | §10.1, §10.2, §13.1 | **partly implemented** -- `POST /api/v1/auth/registrations` persists an unverified `User` with a BCrypt hash at work factor >= 12, `ux_users_email` arbitrates the race, and both a fresh and an already-registered address answer `202` so the endpoint is not an enumeration oracle. Social registration is designed only. A verified account can now sign in: `POST /api/v1/auth/sessions` verifies the stored hash and answers a 15-minute JWT plus an opaque refresh token, and every failure -- unknown address, wrong password, unverified account -- answers the same bodiless `401` for the same amount of hashing work. Rate limiting is **in place** on this endpoint and on every other credential endpoint — per-IP policy plus a per-account counter, §13.3 — so T-25 is closed |
 | V.1 | link a social account | §10.2, Identity context | designed |
 | V.1 | email verification + forgot password | §10.1, §13.1 | **partly implemented** -- verification works end to end: registration issues a 256-bit token, stores only its SHA-256 hash and hands the plaintext to `IMailService`; `POST /api/v1/auth/email-verifications` spends it exactly once through a `consumed_at_utc IS NULL AND expires_at_utc > @now` conditional update and sets `is_email_verified`. `204` verified, `410` expired, `400` for unknown, malformed and already-consumed alike, so the endpoint is not an enumeration oracle. A parallel test proves 20 concurrent verifications of one token produce exactly one `204`. Resending works too: `POST /api/v1/auth/verification-requests` issues a fresh token for an existing unverified account and supersedes that account's outstanding tokens in the same transaction, so exactly one link is live at a time; an unknown address, an already-verified account and a failed send are all answered `202` and send nothing, so the endpoint is not an enumeration oracle. The only `IMailService` today is the Development-only `LoggingMailService`, which writes the link to the log and makes any other environment fail at start-up -- the hosted provider is O17, so no mail reaches a real mailbox yet (T-26). **Forgot password works end to end:** `POST /api/v1/auth/password-reset-requests` answers `202` for any well-formed address, issues a single-use hashed token with a one-hour window for an account that exists, supersedes that account's outstanding reset links, and sends nothing for an unknown address; `POST /api/v1/auth/password-resets` spends the token through a `consumed_at_utc IS NULL AND expires_at_utc > @now` conditional update and, in the same transaction, replaces the BCrypt hash and revokes **every** refresh-token family the account holds. `204` reset, `410` expired, `400` for unknown, malformed and spent alike, `422` for a new password that breaks the policy — and a `422` never describes the token. A parallel test proves 20 concurrent resets of one token produce exactly one `204`, one `consumed_at_utc` and no live refresh token. An access token issued before the reset stays valid until it expires, which is the accepted 15-minute window (§13.1). Rate limiting is **no longer deferred**: every endpoint above carries a per-IP policy and a per-account counter — T-25 closed |
 | V.1 | three profile visibility tiers | §6.2, §13.2 | designed |
@@ -766,7 +766,7 @@ table to walk through at defence.
 | V.2.3 | reorder race conditions | §12.1 #2, §12.2 | designed |
 | V.2 | at least 2 of the 3 services | §5.2, [[ADR-0010-service-scope]] | **designed** — all three |
 | V.3 | backend is the single source of truth | §4.2, §8.1 | designed |
-| V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **partly implemented** -- `docs/api/openapi.json` is generated from the code and committed; it documents the two health endpoints and the five identity endpoints that exist: `POST /api/v1/auth/registrations`, `/auth/email-verifications`, `/auth/verification-requests`, `/auth/sessions` and `/auth/tokens` |
+| V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **partly implemented** -- `docs/api/openapi.json` is generated from the code and committed; it documents nine paths — the two health endpoints and the seven identity endpoints that exist: `POST /api/v1/auth/registrations`, `/auth/email-verifications`, `/auth/verification-requests`, `/auth/sessions`, `/auth/tokens`, `/auth/password-reset-requests` and `/auth/password-resets`. Each mutating route documents the `400` its mandatory client headers can produce |
 | V.5 | client is a remote control | §4.1, §9.1 | designed |
 | V.5 | configurable backend address | §9.1, [[musicroom-mobile]] | designed |
 | V.5 | social authentication on mobile | §10.2 | designed |
@@ -777,7 +777,7 @@ table to walk through at defence.
 | V.7 | measure and justify concurrent users | §14.4, [[ADR-0018-load-testing-tool]] | tool decided; measurement not started |
 | V.7 | declare server specification | §14.1, [[ADR-0015-hosting-and-deployment]], [[ADR-0016-supabase-plan-region]] | machine and region decided; measurement not started |
 | V.6 | OWASP conformance of all code | [[asvs-conformance]], §13 | target committed, evidence pending |
-| V.8 | per-layer tests | [[testing]], [[ADR-0012-test-stack]] | **partly implemented** -- 36 tests across four projects: validation (`MusicRoom.Application.Tests`), infrastructure (`MusicRoom.Infrastructure.Tests`), persistence (`MusicRoom.Persistence.Tests`, which holds the built model to the schema naming conventions without needing an engine) and API integration (`MusicRoom.WebAPI.Tests`, Testcontainers-backed against a real PostgreSQL). Includes both concurrency tests AGENTS.md requires, each asserting final database state: 20 parallel registrations of one address create exactly one row, and 20 parallel verifications of one token produce exactly one `204` and one `consumed_at_utc`. Domain and realtime layers arrive with the slices that create them |
+| V.8 | per-layer tests | [[testing]], [[ADR-0012-test-stack]] | **partly implemented** -- 128 tests across four projects: validation and pipeline behaviours (`MusicRoom.Application.Tests`), infrastructure (`MusicRoom.Infrastructure.Tests`), persistence (`MusicRoom.Persistence.Tests`, which holds the built model to the schema naming conventions without needing an engine) and API integration (`MusicRoom.WebAPI.Tests`, Testcontainers-backed against a real PostgreSQL). Includes the four concurrency tests AGENTS.md requires, each asserting final database state: 20 parallel registrations of one address create exactly one row; 20 parallel verifications of one token produce exactly one `204` and one `consumed_at_utc`; 20 parallel rotations of one refresh token produce exactly one `200`, one spent row and one replacement; and 20 parallel resets of one token produce exactly one `204` and no live refresh token. Domain and realtime layers arrive with the slices that create them |
 | V.8 | continuous integration | [[ci-cd-containerization]] | **done** -- `.github/workflows/backend-dev.yml` and `backend-prod.yml`: restore, format, build -warnaserror, test, vulnerable-package scan, OpenAPI drift check; prod also builds the image. No deployment, by [[ADR-0015-hosting-and-deployment]] |
 | V.8 | credentials in a git-ignored `.env` | §14.3, `.env.example` | **done** |
 | V.8 | enforced code quality | [[dotnet-csharp]], `.editorconfig`, `MusicRoom/SonarLint.xml` | **done** -- proven live in S0: a 47-line method fails the build with `S138 ... greater than the 40 lines authorized`, and six parameters fail with `S107`. The thresholds moved to `SonarLint.xml`; in `.editorconfig` they were silently ignored |
@@ -803,14 +803,12 @@ defence, not more.
 | # | Issue | Blocks | Note |
 |---|---|---|---|
 | O8 | SignalR scale-out backplane (Redis) | multi-instance deployment | **deliberately open.** Not needed for a single-instance defence |
-| O9 | concrete table and column definitions | §8.5 | resolved by the first migration, not by a document |
 | O11 | remote deployment target | a live demo URL | [[ADR-0015-hosting-and-deployment]]. Fly.io, Railway, Render, Azure Container Apps. **Not Vercel** |
 | O12 | fluent assertion library | test readability | add only if xUnit's built-ins prove insufficient |
 | O13 | silent-controller recovery | a stalled playback session | [[ADR-0017-playback-session]] accepted no watchdog; takeover is the manual path. Revisit only if it bites in testing |
 | O18 | self-hosted Infisical vault | API keys sitting readable in `.env` | [[ADR-0029-containerised-dev-and-secret-vault]], amended 2026-09-27: **required scope, not optional.** The provider abstraction lands early, the vault at S1b, after the mail adapter at S1a (O17). Self-hosted Infisical needs its own PostgreSQL, Redis and encryption key — roughly five compose services instead of two. Subject V.8 does not ask for it; the owner does, and the delivered system runs on it. It is planned alongside S1 to S9, not after them |
 | O17 | real mail provider adapter | V.1 email verification actually reaching a mailbox | owner decision 2026-09-24: SPEC-003 ships a Development-only logging `IMailService`; the hosted-provider adapter is a separate spec at the end of S1. A logging implementation cannot satisfy V.1 at the defence |
 | O14 | music preferences have no consumer | nothing | V.1 requires storing and updating them, which is met. Note for defence: storage-only today |
-| O15 | MediatR licence terms | adding the package | [[ADR-0021-backend-dependency-set]]: verify the current free-tier terms before `dotnet add package` and record the result. Fallback is a hand-written dispatcher |
 | O19 | RS256 key pair: generation, storage, JWKS exposure and rotation with an overlap window | the OpenID Provider surface at S8 | [[ADR-0031-musicroom-as-openid-provider]]. `EnvSecretProvider` holds the private key until the vault lands at S1b, after which it belongs there. Rotation needs an overlap so tokens signed by the outgoing key keep verifying |
 | O16 | OpenTelemetry must earn its place | credibility of the V.7 bottleneck claim | [[ADR-0022-observability-stack]]: capture one trace during the Gatling run showing EF Core, HttpClient and total request time together |
 
@@ -819,6 +817,8 @@ defence, not more.
 | # | Issue | Closed by |
 |---|---|---|
 | O1 | which services ship | [[ADR-0010-service-scope]] — all three |
+| O9 | concrete table and column definitions | the migrations, not a document: `InitialIdentity`, `RefreshTokens`, `PasswordResetTokens` and `AuditRecords` ([[migrations-index]]). `SchemaConventionTests` holds the built model to the naming rules |
+| O15 | MediatR licence terms | [[ADR-0021-backend-dependency-set]] records the verification of 2026-09-24: the free Community License covers this project, so MediatR stays and the hand-written dispatcher is not needed |
 | O10 | `Makefile` and `docker compose` | slice S0 — both exist, `make up` verified end to end against the compose PostgreSQL |
 | O2 | solution and folder layout | [[ADR-0011-solution-layout]] |
 | O3 | test framework | [[ADR-0012-test-stack]] |

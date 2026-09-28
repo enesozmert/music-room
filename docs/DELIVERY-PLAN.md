@@ -10,8 +10,10 @@ updated: 2026-09-23
 
 How to get from the subject PDF to a defensible submission.
 
-**Status: pre-implementation.** `MusicRoom/` is empty. Every decision recorded so far is in
-[[decisions-index]]; everything still open is in [[sdd]] §17.
+**Status: S0 to S2 built.** Eight specs are `done` — the walking skeleton, the identity surface, the
+credential rate limits and the audit log — on stacked draft pull requests, so `main` lags `docs/specs/`.
+Slice S1a is blocked on O17, a mail provider account that does not exist. Every decision recorded so far
+is in [[decisions-index]]; everything still open is in [[sdd]] §17.
 
 This plan sequences work. It does not decide anything — decisions go in ADRs, rules go in
 [[technical-guide-index]], design goes in [[sdd]].

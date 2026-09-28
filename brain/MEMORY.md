@@ -16,8 +16,11 @@ MEMORY -> Project Registry -> Project Card -> Architecture / ADR / Standard -> S
 
 `music-room` is an École 42 group project: a collaborative music platform
 (Music Track Vote, Music Control Delegation, Music Playlist Editor).
-Backend is the current work scope. Repository is **greenfield** — one commit,
-no application source code yet.
+Backend is the current work scope. Slices **S0 to S2 are in progress**: the solution, the
+identity surface (registration, email verification and resend, login, refresh rotation, password
+reset), the credential rate limits and the audit log all exist under `MusicRoom/` as eight
+completed specs on stacked draft pull requests. `MusicRoomApp/` is still empty by design — the
+client workstream starts after S9 ([[delivery-plan]]).
 
 ## Router
 
@@ -44,9 +47,14 @@ no application source code yet.
 ## Hard facts (safe to trust without re-reading)
 
 - Workspace root: `/Users/eozmert/ecole42/music-room`
-- Git: single repo, branch `main`, 1 commit (`1b76d0c Initial commit`).
+- Git: single repo. `main` carries branch protection with `enforce_admins: true`. Work lands as one
+  branch and one draft pull request per spec ([[ADR-0025-agent-git-protocol]],
+  [[ADR-0027-agent-push-and-pr]]); several may be stacked and unmerged at once, so `main` lags the
+  spec statuses in `docs/specs/`. **Check `git log` rather than trusting a commit id written here.**
 - **`MusicRoom/` holds backend source code, `MusicRoomApp/` holds the React Native client**
-  ([[ADR-0020-monorepo-layout]]). Both currently empty. An agent stays inside one root.
+  ([[ADR-0020-monorepo-layout]]). `MusicRoom/` holds 13 projects — 5 application, 4 `corePackages`,
+  4 test — and `MusicRoomApp/` is empty until the client workstream starts. An agent stays inside one
+  root.
 - **`reference/` is read-only study material.** Nested, unrelated git repo. Never edit it, never
   build it, never reference it from a project, never copy a file out of it. Read it to learn a
   pattern; then write the code yourself under `MusicRoom/`.
