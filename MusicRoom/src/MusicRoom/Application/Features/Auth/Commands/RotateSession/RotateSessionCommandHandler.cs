@@ -55,13 +55,16 @@ internal sealed class RotateSessionCommandHandler : IRequestHandler<RotateSessio
         DateTime nowUtc = DateTime.UtcNow;
         string plaintext = RefreshTokenSecret.Create();
 
-        // UserId, FamilyId and ExpiresAtUtc are filled in by the repository, inside the transaction
-        // that spends the presented row: the family and its absolute expiry are read there, never
-        // from an earlier read here.
+        // UserId, FamilyId, ExpiresAtUtc and the client context are filled in by the repository, inside the
+        // transaction that spends the presented row: the family, its absolute expiry and the device that
+        // started it are read there, never from an earlier read here.
         RefreshToken replacement = new()
         {
             Id = Guid.NewGuid(),
             TokenHash = OpaqueTokenHash.Of(plaintext),
+            Platform = string.Empty,
+            Device = string.Empty,
+            AppVersion = string.Empty,
         };
 
         RefreshTokenRotation rotation = await _refreshTokens
@@ -94,7 +97,7 @@ internal sealed class RotateSessionCommandHandler : IRequestHandler<RotateSessio
         _audit.SetUserId(rotation.UserId);
         _audit.SetTargetId(rotation.UserId);
 
-        IssuedAccessToken accessToken = _accessTokens.Issue(rotation.UserId, nowUtc);
+        IssuedAccessToken accessToken = _accessTokens.Issue(rotation.UserId, rotation.FamilyId, nowUtc);
 
         return new AuthTokenPair(accessToken.Token, plaintext, accessToken.ExpiresInSeconds);
     }

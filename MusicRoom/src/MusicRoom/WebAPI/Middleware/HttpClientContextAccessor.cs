@@ -24,6 +24,11 @@ internal sealed class HttpClientContextAccessor : IClientContextAccessor
     public ClientContext? Current =>
         _httpContextAccessor.HttpContext?.Items[ClientContextMiddleware.ContextItemKey]
             is ClientContextValues values
-            ? new ClientContext(values.Platform, values.Device, values.AppVersion, values.CorrelationId)
+            ? new ClientContext(
+                values.Platform,
+                values.Device,
+                values.AppVersion,
+                values.CorrelationId,
+                values.UserId)
             : null;
 }

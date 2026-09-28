@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using MusicRoom.Application.Abstractions.Persistence;
+using MusicRoom.Application.Features.Auth.Queries.ListSessions;
 using MusicRoom.Domain.Entities;
 using MusicRoom.Persistence.Contexts;
 
@@ -78,8 +79,69 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
         return rotated;
     }
 
+    /// <inheritdoc />
+    public async Task<bool> TryRevokeFamilyAsync(
+        Guid userId,
+        Guid familyId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        // The account is part of the predicate, not checked before it: one statement, and another caller's
+        // family simply does not match, so there is no window in which it could.
+        int revokedRows = await _context.RefreshTokens
+            .Where(token => token.FamilyId == familyId
+                && token.UserId == userId
+                && token.RevokedAtUtc == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(token => token.RevokedAtUtc, nowUtc)
+                    // ExecuteUpdateAsync does not run through SaveChangesAsync, so the column the context
+                    // would have stamped is stamped here — SDD §8.3.
+                    .SetProperty(token => token.UpdatedAtUtc, nowUtc),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return revokedRows > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(
+        Guid userId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        // Projected in the database, so no token digest is ever materialised on the way to a response
+        // (§13.5), and ordered there too. One row per live token, which is at most a handful per family.
+        List<SessionSummary> rows = await _context.RefreshTokens
+            .AsNoTracking()
+            .Where(token => token.UserId == userId
+                && token.RevokedAtUtc == null
+                && token.ExpiresAtUtc > nowUtc)
+            .OrderBy(token => token.CreatedAtUtc)
+            .Select(token => new SessionSummary(
+                token.FamilyId,
+                token.Platform,
+                token.Device,
+                token.AppVersion,
+                token.CreatedAtUtc,
+                token.ExpiresAtUtc))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        // One entry per family, folded here rather than in SQL: a grouped projection that picks each group's
+        // first row does not translate — `The LINQ expression ... GroupBy ... could not be translated` — and
+        // the alternative is a window function this repository has no other reason to reach for. The set is
+        // one account's live sessions, so the fold is over a handful of rows the database already narrowed.
+        return rows
+            .GroupBy(session => session.SessionId)
+            .Select(family => family.First())
+            .OrderByDescending(session => session.StartedAtUtc)
+            .ToList();
+    }
+
     /// <summary>
-    /// Copies the family's identity and its absolute expiry onto the replacement, then writes it.
+    /// Copies the family's identity, its absolute expiry and the device that started it onto the replacement,
+    /// then writes it.
     /// </summary>
     /// <remarks>
     /// The expiry is inherited rather than recalculated — the owner's absolute-lifetime decision of
@@ -100,11 +162,16 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
         replacement.FamilyId = spent.FamilyId;
         replacement.ExpiresAtUtc = spent.ExpiresAtUtc;
 
+        // The same session continues, so it is remembered by the same device — SPEC-010.
+        replacement.Platform = spent.Platform;
+        replacement.Device = spent.Device;
+        replacement.AppVersion = spent.AppVersion;
+
         _context.RefreshTokens.Add(replacement);
 
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return new RefreshTokenRotation(RefreshTokenRotationStatus.Rotated, spent.UserId);
+        return new RefreshTokenRotation(RefreshTokenRotationStatus.Rotated, spent.UserId, spent.FamilyId);
     }
 
     /// <summary>
@@ -130,7 +197,7 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
 
         if (token is null || token.ConsumedAtUtc is null)
         {
-            return new RefreshTokenRotation(RefreshTokenRotationStatus.Rejected, Guid.Empty);
+            return new RefreshTokenRotation(RefreshTokenRotationStatus.Rejected, Guid.Empty, Guid.Empty);
         }
 
         await RevokeFamilyAsync(token.FamilyId, nowUtc, cancellationToken).ConfigureAwait(false);
@@ -138,7 +205,7 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
 
         // The account is named on this path, unlike the rejected one: a reuse proves the presented value was
         // once issued to that account, so the audit row may say whose family was revoked — SPEC-009.
-        return new RefreshTokenRotation(RefreshTokenRotationStatus.Reused, token.UserId);
+        return new RefreshTokenRotation(RefreshTokenRotationStatus.Reused, token.UserId, token.FamilyId);
     }
 
     /// <summary>

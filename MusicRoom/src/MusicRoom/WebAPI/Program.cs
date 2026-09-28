@@ -1,7 +1,9 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MusicRoom.Application;
 using MusicRoom.Application.Abstractions.Auditing;
+using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Infrastructure;
 using MusicRoom.Infrastructure.Security;
 using MusicRoom.Persistence;
@@ -50,8 +52,7 @@ public class Program
 
         // The audit behaviour reads the client context through this abstraction; the implementation is a
         // WebAPI type because HttpContext is — SPEC-008.
-        builder.Services.AddHttpContextAccessor();
-        builder.Services.AddScoped<IClientContextAccessor, HttpClientContextAccessor>();
+        CallerServices.Add(builder.Services, builder.Configuration);
         Observability.AddTracing(builder.Services, builder.Configuration);
         HealthRegistration.Add(builder.Services, connectionString);
 
@@ -60,8 +61,12 @@ public class Program
         app.UseSerilogRequestLogging();
         app.UseRateLimiter();
 
-        // After the limiter on purpose: a request the limiter refuses must not be answered 400 for a
-        // missing header instead of 429 — SPEC-008.
+        // Order is load-bearing. The limiter stays first, so a flood is refused before the server verifies a
+        // signature — SPEC-006. Authentication comes next, so the client-context middleware can put the
+        // validated `sub` into the audit record — SPEC-010. The client-context middleware is last of the
+        // three, so a request the limiter refuses is not answered 400 for a missing header — SPEC-008.
+        app.UseAuthentication();
+        app.UseAuthorization();
         app.UseMiddleware<ClientContextMiddleware>();
 
         // openapi-documentation: the raw document is served in every environment. An interactive UI
@@ -162,6 +167,45 @@ internal static class EnvironmentConfiguration
     /// </summary>
     internal static string? ReadVerificationLinkBaseUrl(IConfiguration configuration) =>
         configuration["VERIFICATION_LINK_BASE_URL"];
+}
+
+/// <summary>
+/// Who is calling: the bearer handler, and the two accessors that read the validated principal.
+/// </summary>
+/// <remarks>
+/// Its own class rather than more lines in <c>Main</c>, which CA1506 caps at 41 coupled types and which this
+/// wiring pushed to 42 — SPEC-010.
+/// </remarks>
+internal static class CallerServices
+{
+    /// <summary>
+    /// Registers bearer validation of the token SPEC-005 issues, and the accessors the pipeline reads it
+    /// through. The validation parameters are built in <c>Infrastructure</c>, so the signing key's shape stays
+    /// in the project that signs with it.
+    /// </summary>
+    /// <param name="services">The container being built.</param>
+    /// <param name="configuration">Where the JWT settings come from.</param>
+    internal static void Add(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddHttpContextAccessor();
+        services.AddScoped<IClientContextAccessor, HttpClientContextAccessor>();
+        services.AddScoped<ICurrentUserAccessor, HttpCurrentUserAccessor>();
+
+        JwtOptions jwtOptions = EnvironmentConfiguration.RequireJwtOptions(configuration);
+
+        services
+            .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = JwtBearerConfiguration.Build(jwtOptions);
+
+                // No metadata endpoint to reach and no HTTPS requirement on the handler itself: the token is
+                // symmetric and TLS is the deployment's job, not this handler's.
+                options.RequireHttpsMetadata = false;
+            });
+
+        services.AddAuthorization();
+    }
 }
 
 /// <summary>

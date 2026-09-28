@@ -33,6 +33,10 @@ internal static class AuthEndpoints
         // .editorconfig enforces (S104, S1200).
         PasswordResetEndpoints.Map(group);
 
+        // The authenticated routes, also its own class — this file is one line under the 300 the
+        // .editorconfig allows.
+        SessionEndpoints.Map(group);
+
         return endpoints;
     }
 

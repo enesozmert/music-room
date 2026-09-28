@@ -1,3 +1,4 @@
+using MusicRoom.Application.Features.Auth.Queries.ListSessions;
 using MusicRoom.Domain.Entities;
 
 namespace MusicRoom.Application.Abstractions.Persistence;
@@ -36,12 +37,45 @@ public interface IRefreshTokenRepository
         RefreshToken replacement,
         DateTime nowUtc,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Revokes one of an account's refresh-token families — logout, SPEC-010.
+    /// </summary>
+    /// <param name="userId">The account whose session it must be.</param>
+    /// <param name="familyId">The family to revoke, from the token's <c>sid</c> or from the route.</param>
+    /// <param name="nowUtc">The instant the rows are stamped with.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// True when a live family of that account was revoked. False when there was none — an unknown id, one
+    /// already revoked, or **one belonging to somebody else**. The three are deliberately one answer: the
+    /// endpoint replies <c>404</c> to all of them, because a distinct answer would confirm that another
+    /// account's session exists (`docs/api/ENDPOINTS.md`, "a resource the caller may not see returns 404").
+    /// </returns>
+    Task<bool> TryRevokeFamilyAsync(
+        Guid userId,
+        Guid familyId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Lists an account's live sessions, newest first.
+    /// </summary>
+    /// <param name="userId">The account whose sessions to list. Never widened: this is the <c>self</c> gate.</param>
+    /// <param name="nowUtc">The instant expiry is judged against.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>One entry per live family, carrying no token and no digest (§13.5).</returns>
+    Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(
+        Guid userId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>
 /// What an attempted exchange did.
 /// </summary>
 /// <param name="Status">Rotated, reused or rejected.</param>
+/// <param name="FamilyId">The family the rotated token belongs to, so the replacement's access token can
+/// carry the same <c>sid</c> — a rotation continues the same session (SPEC-010).</param>
 /// <param name="UserId">The account the session belongs to. Set on
 /// <see cref="RefreshTokenRotationStatus.Rotated"/> and on
 /// <see cref="RefreshTokenRotationStatus.Reused"/> — a reuse proves the presented value was once issued to
@@ -51,7 +85,7 @@ public interface IRefreshTokenRepository
 /// Declared beside the interface rather than in its own file: it exists only as this method's return
 /// value, and SPEC-005's Files table is the contract for what this change may create.
 /// </remarks>
-public sealed record RefreshTokenRotation(RefreshTokenRotationStatus Status, Guid UserId);
+public sealed record RefreshTokenRotation(RefreshTokenRotationStatus Status, Guid UserId, Guid FamilyId);
 
 /// <summary>
 /// The three ways an exchange ends.

@@ -25,8 +25,16 @@ public interface IClientContextAccessor
 /// <param name="Device">From <c>X-Client-Device</c>.</param>
 /// <param name="AppVersion">From <c>X-Client-App-Version</c>.</param>
 /// <param name="CorrelationId">The request's trace id — ADR-0022.</param>
+/// <param name="UserId">The authenticated account, from the validated <c>sub</c> claim, or null on an
+/// anonymous request. It is where an audit record's <c>user_id</c> comes from for an authenticated command,
+/// so a handler does not have to remember — SPEC-010 escalation 4.</param>
 /// <remarks>
 /// Declared beside the accessor rather than in its own file: it exists only as that property's type, and
 /// SPEC-008's Files table is the contract for what this change may create.
 /// </remarks>
-public sealed record ClientContext(string Platform, string Device, string AppVersion, string CorrelationId);
+public sealed record ClientContext(
+    string Platform,
+    string Device,
+    string AppVersion,
+    string CorrelationId,
+    Guid? UserId = null);

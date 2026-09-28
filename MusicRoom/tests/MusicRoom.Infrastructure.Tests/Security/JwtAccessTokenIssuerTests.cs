@@ -21,6 +21,9 @@ public sealed class JwtAccessTokenIssuerTests
     internal const string Audience = "musicroom-tests-client";
     internal const int AccessTokenMinutes = 15;
 
+    /// <summary>The refresh-token family a test token belongs to — it becomes the `sid` claim.</summary>
+    internal static readonly Guid SessionId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+
     private static readonly DateTime _nowUtc = new(2026, 9, 27, 12, 0, 0, DateTimeKind.Utc);
     private static readonly JsonWebTokenHandler _handler = new();
 
@@ -46,6 +49,20 @@ public sealed class JwtAccessTokenIssuerTests
             claim => claim.Type is "email" or "name" or "display_name" or "password_hash");
     }
 
+    /// <summary>
+    /// The token names the session it belongs to, which is what lets logout end this one and no other —
+    /// SPEC-010 escalation 1.
+    /// </summary>
+    [Fact]
+    public void Issue_CarriesTheSessionIdAsTheSidClaim()
+    {
+        // Act
+        JsonWebToken token = Issue(Guid.NewGuid());
+
+        // Assert
+        Assert.Equal(SessionId.ToString(), token.GetClaim("sid").Value);
+    }
+
     /// <summary>15 minutes, from the instant the caller passed in — SDD §13.1.</summary>
     [Fact]
     public void Issue_ExpiresFifteenMinutesAfterTheIssuedInstant()
@@ -67,7 +84,7 @@ public sealed class JwtAccessTokenIssuerTests
         JwtAccessTokenIssuer issuer = new(Options());
 
         // Act
-        IssuedAccessToken issued = issuer.Issue(Guid.NewGuid(), _nowUtc);
+        IssuedAccessToken issued = issuer.Issue(Guid.NewGuid(), Guid.NewGuid(), _nowUtc);
 
         // Assert
         Assert.Equal(AccessTokenMinutes * secondsPerMinute, issued.ExpiresInSeconds);
@@ -79,7 +96,7 @@ public sealed class JwtAccessTokenIssuerTests
     {
         // Arrange
         JwtAccessTokenIssuer issuer = new(Options());
-        IssuedAccessToken issued = issuer.Issue(Guid.NewGuid(), DateTime.UtcNow);
+        IssuedAccessToken issued = issuer.Issue(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow);
 
         // Act
         TokenValidationResult accepted = await _handler.ValidateTokenAsync(issued.Token, Parameters(SigningKey));
@@ -120,7 +137,7 @@ public sealed class JwtAccessTokenIssuerTests
     {
         JwtAccessTokenIssuer issuer = new(Options());
 
-        return _handler.ReadJsonWebToken(issuer.Issue(userId, _nowUtc).Token);
+        return _handler.ReadJsonWebToken(issuer.Issue(userId, SessionId, _nowUtc).Token);
     }
 
     private static TokenValidationParameters Parameters(string signingKey) => new()
