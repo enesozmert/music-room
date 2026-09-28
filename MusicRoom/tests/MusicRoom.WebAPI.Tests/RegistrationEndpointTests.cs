@@ -36,6 +36,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
         {
             webHost.UseSetting("DATABASE_URL", _database.GetConnectionString());
             TestJwtSettings.Apply(webHost);
+            TestRateLimitSettings.Relax(webHost);
         });
 
         using IServiceScope scope = _factory.Services.CreateScope();

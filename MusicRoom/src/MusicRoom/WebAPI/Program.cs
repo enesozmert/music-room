@@ -1,6 +1,4 @@
 using System.Globalization;
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MusicRoom.Application;
 using MusicRoom.Infrastructure;
@@ -8,6 +6,7 @@ using MusicRoom.Infrastructure.Security;
 using MusicRoom.Persistence;
 using MusicRoom.WebAPI.Endpoints;
 using MusicRoom.WebAPI.HealthChecks;
+using MusicRoom.WebAPI.RateLimiting;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
@@ -38,13 +37,14 @@ public class Program
 
         builder.Services.AddApplicationServices();
         builder.Services.AddPersistenceServices(connectionString);
-        builder.Services.AddInfrastructureServices(
+        builder.Services.AddInfrastructureServices(new InfrastructureOptions(
             EnvironmentConfiguration.ReadBCryptWorkFactor(builder.Configuration),
             builder.Environment.IsDevelopment(),
             EnvironmentConfiguration.ReadVerificationLinkBaseUrl(builder.Configuration),
-            EnvironmentConfiguration.RequireJwtOptions(builder.Configuration));
+            EnvironmentConfiguration.RequireJwtOptions(builder.Configuration),
+            EnvironmentConfiguration.ReadCredentialAttemptLimits(builder.Configuration)));
 
-        ApiServices.Add(builder.Services);
+        ApiServices.Add(builder.Services, builder.Configuration);
         Observability.AddTracing(builder.Services, builder.Configuration);
         HealthRegistration.Add(builder.Services, connectionString);
 
@@ -117,6 +117,32 @@ internal static class EnvironmentConfiguration
     }
 
     /// <summary>
+    /// Reads the per-account credential limits — SPEC-006 escalation 1. The approved numbers are the
+    /// defaults, so a host with no override still limits at what was signed off; configuration may
+    /// change them, which is what lets a test host raise a limit for a suite proving something else.
+    /// A non-positive override is ignored rather than trusted: the one outcome configuration must not be
+    /// able to produce is no limit at all.
+    /// </summary>
+    internal static CredentialAttemptLimits ReadCredentialAttemptLimits(IConfiguration configuration)
+    {
+        int permits = configuration.GetValue(
+            "RATE_LIMIT_ACCOUNT_PERMITS",
+            CredentialAttemptLimits.DefaultPermitsPerWindow);
+        int windowMinutes = configuration.GetValue(
+            "RATE_LIMIT_ACCOUNT_WINDOW_MINUTES",
+            CredentialAttemptLimits.DefaultWindowMinutes);
+        int penaltyWindows = configuration.GetValue(
+            "RATE_LIMIT_ACCOUNT_MAX_PENALTY_WINDOWS",
+            CredentialAttemptLimits.DefaultMaximumPenaltyWindows);
+
+        return new CredentialAttemptLimits(
+            permits > 0 ? permits : CredentialAttemptLimits.DefaultPermitsPerWindow,
+            TimeSpan.FromMinutes(
+                windowMinutes > 0 ? windowMinutes : CredentialAttemptLimits.DefaultWindowMinutes),
+            penaltyWindows > 0 ? penaltyWindows : CredentialAttemptLimits.DefaultMaximumPenaltyWindows);
+    }
+
+    /// <summary>
     /// Reads where the client serves the verification screen. Read the way <c>DATABASE_URL</c> is —
     /// straight from configuration, with no default — but unset is tolerated rather than fatal: the
     /// Development sender then logs the bare token and says the variable is missing. A hard-coded
@@ -133,28 +159,15 @@ internal static class EnvironmentConfiguration
 internal static class ApiServices
 {
     /// <summary>
-    /// ADR-0021 chose the built-in rate limiting middleware. The policy below is registered but
-    /// attached to no endpoint: partitioning by account and by IP belongs to S1, with
-    /// authentication-authorization. Health endpoints are never rate limited.
+    /// ADR-0021 chose the built-in rate limiting middleware. SPEC-006 replaced the S0 placeholder
+    /// policy, which was registered and attached to nothing, with one policy per credential endpoint —
+    /// each attached to its route in <c>AuthEndpoints</c>. Health endpoints are never rate limited.
     /// </summary>
-    internal static void Add(IServiceCollection services)
+    internal static void Add(IServiceCollection services, IConfiguration configuration)
     {
         services.AddOpenApi();
         services.AddProblemDetails();
-        services.AddRateLimiter(options => options.AddPolicy("fixed", PartitionByRemoteIp));
-    }
-
-    private static RateLimitPartition<string> PartitionByRemoteIp(HttpContext httpContext)
-    {
-        const int permitsPerWindow = 100;
-
-        return RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = permitsPerWindow,
-                Window = TimeSpan.FromMinutes(1),
-            });
+        CredentialRateLimiterPolicies.Add(services, configuration);
     }
 }
 

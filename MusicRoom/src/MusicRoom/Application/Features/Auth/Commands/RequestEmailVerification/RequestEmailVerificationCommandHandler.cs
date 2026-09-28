@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Application.Abstractions.Persistence;
+using MusicRoom.Application.Abstractions.Security;
 
 namespace MusicRoom.Application.Features.Auth.Commands.RequestEmailVerification;
 
@@ -12,11 +13,14 @@ internal sealed class RequestEmailVerificationCommandHandler : IRequestHandler<R
 {
     private readonly IUserRepository _users;
     private readonly IMailService _mail;
+    private readonly ICredentialAttemptLimiter _attempts;
     private readonly ILogger<RequestEmailVerificationCommandHandler> _logger;
 
-    /// <summary>Takes the write path and the mail sender; both abstractions this layer declares.</summary>
+    /// <summary>Takes the write path, the mail sender and the attempt limiter; all abstractions this
+    /// layer declares.</summary>
     /// <param name="users">The account write path.</param>
     /// <param name="mail">The mail sender.</param>
+    /// <param name="attempts">The per-account half of the credential rate limit — SPEC-006.</param>
     /// <param name="logger">The handler's logger.</param>
     /// <remarks>
     /// Public on an internal type: MediatR activates the handler through a public constructor only.
@@ -24,10 +28,12 @@ internal sealed class RequestEmailVerificationCommandHandler : IRequestHandler<R
     public RequestEmailVerificationCommandHandler(
         IUserRepository users,
         IMailService mail,
+        ICredentialAttemptLimiter attempts,
         ILogger<RequestEmailVerificationCommandHandler> logger)
     {
         _users = users;
         _mail = mail;
+        _attempts = attempts;
         _logger = logger;
     }
 
@@ -43,6 +49,18 @@ internal sealed class RequestEmailVerificationCommandHandler : IRequestHandler<R
         // Lower-cased exactly as registration stores it, so Alice@example.com finds the account
         // alice@example.com registered.
         string email = request.Email.Trim().ToLowerInvariant();
+
+        // Every attempt is charged here, not only a failing one: each success supersedes the account's
+        // outstanding tokens, inserts a row and, once O17 lands a real sender, spends mail quota. The
+        // cost is in the attempt — T-19, and the reason the limiter was made a precondition of S1a.
+        CredentialAttemptDecision decision = _attempts.Check(email);
+
+        if (!decision.Allowed)
+        {
+            throw new CredentialAttemptThrottledException(decision.RetryAfter);
+        }
+
+        _attempts.RecordChargeableAttempt(email);
 
         // The account id is left empty on purpose: resolving an address to an account is a read
         // this layer must not perform, because doing it here and then inserting would be a
