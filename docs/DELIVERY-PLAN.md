@@ -10,8 +10,10 @@ updated: 2026-09-23
 
 How to get from the subject PDF to a defensible submission.
 
-**Status: S0 to S2 built.** Eight specs are `done` — the walking skeleton, the identity surface, the
-credential rate limits and the audit log — on stacked draft pull requests, so `main` lags `docs/specs/`.
+**Status: S0 to S3 built and merged.** Eleven specs are `done` — the walking skeleton, the identity
+surface, bearer validation and session listing, the credential rate limits, the audit log with refusal
+outcomes, and the own-profile surface with music preferences. All of it is on `main` as of 2026-09-28;
+the stack of eight draft pull requests that used to carry it was landed in order.
 Slice S1a is blocked on O17, a mail provider account that does not exist. Every decision recorded so far
 is in [[decisions-index]]; everything still open is in [[sdd]] §17.
 

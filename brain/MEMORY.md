@@ -16,11 +16,13 @@ MEMORY -> Project Registry -> Project Card -> Architecture / ADR / Standard -> S
 
 `music-room` is an École 42 group project: a collaborative music platform
 (Music Track Vote, Music Control Delegation, Music Playlist Editor).
-Backend is the current work scope. Slices **S0 to S2 are in progress**: the solution, the
+Backend is the current work scope. Slices **S0 to S3 are merged to `main`**: the solution, the
 identity surface (registration, email verification and resend, login, refresh rotation, password
-reset), the credential rate limits and the audit log all exist under `MusicRoom/` as eight
-completed specs on stacked draft pull requests. `MusicRoomApp/` is still empty by design — the
-client workstream starts after S9 ([[delivery-plan]]).
+reset), bearer validation and session listing, the credential rate limits, the audit log with
+refusal outcomes, and the own-profile surface with music preferences. Eleven completed specs, all
+landed — the stack of draft pull requests that used to carry them was merged on 2026-09-28.
+`MusicRoomApp/` is still empty by design — the client workstream starts after S9
+([[delivery-plan]]).
 
 ## Router
 
@@ -49,8 +51,12 @@ client workstream starts after S9 ([[delivery-plan]]).
 - Workspace root: `/Users/eozmert/ecole42/music-room`
 - Git: single repo. `main` carries branch protection with `enforce_admins: true`. Work lands as one
   branch and one draft pull request per spec ([[ADR-0025-agent-git-protocol]],
-  [[ADR-0027-agent-push-and-pr]]); several may be stacked and unmerged at once, so `main` lags the
-  spec statuses in `docs/specs/`. **Check `git log` rather than trusting a commit id written here.**
+  [[ADR-0027-agent-push-and-pr]]). Several may be stacked and unmerged at once, and then `main` lags
+  the spec statuses in `docs/specs/` — it did for eight specs until 2026-09-28. **Check `git log`
+  rather than trusting a commit id or a "merged" claim written here.**
+- A stacked pull request is retargeted to `main` **before** its base merges. GitHub closes a pull
+  request whose base branch is deleted instead of retargeting it, and a closed one cannot be
+  reopened once that branch is gone — #22 was lost that way and had to be reopened as #31.
 - **`MusicRoom/` holds backend source code, `MusicRoomApp/` holds the React Native client**
   ([[ADR-0020-monorepo-layout]]). `MusicRoom/` holds 13 projects — 5 application, 4 `corePackages`,
   4 test — and `MusicRoomApp/` is empty until the client workstream starts. An agent stays inside one
