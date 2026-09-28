@@ -14,6 +14,7 @@ Unattended agent operation. Recipes: `docs/prompt-library/PROMPTS.md` Part 2.
 | `permissions.json` | scoped Claude Code permissions. Without it a non-interactive run cannot ask, so every ungranted write is refused and the cycle ends with nothing on disk |
 | `STOP` | create this file to halt after the current cycle. Delete it to resume |
 | `.lock` | pid of the running cycle. The driver refuses to start a second one — two drivers switch branches under each other and commit each other's work. **Git-ignored** |
+| `land-stack.sh` | lands a stack of open pull requests onto `main`, bottom first. Plan-only unless `--ready` |
 | `runs/` | per-cycle logs. **Git-ignored** — transient, never committed, never copied into `brain/` |
 
 ## Use
@@ -106,3 +107,42 @@ the public API contract, and anything touching authentication, authorisation, to
 ## Related
 
 `../AGENTS.md` · [[prompt-library]] · [[specs]] · [[delivery-plan]]
+
+## Landing a stack
+
+```bash
+make land                 # plan only, changes nothing
+make land READY=1         # land them
+make land READY=1 LIMIT=3 # land the bottom three and stop
+```
+
+Spec work arrives as one branch and one draft pull request each ([[ADR-0025-agent-git-protocol]],
+[[ADR-0027-agent-push-and-pr]]), and several stack up. Merging a stack by hand is three commands
+per pull request and two traps:
+
+- **Branch protection requires the head to be up to date with `main`**, so every child needs
+  rebasing the moment its parent lands.
+- **GitHub closes a pull request whose base branch is deleted** rather than retargeting it, and a
+  closed one cannot be reopened once that branch is gone. #22 was lost that way on 2026-09-28.
+
+`land-stack.sh` reads the base chain **before** touching anything, retargets every pull request in
+the stack to `main` while the chain still exists, then for each one in order: replays its single
+commit onto `main` with `git rebase --onto`, regenerates the PDFs, force-pushes with a lease, waits
+for `gate`, and merges.
+
+It replays **one commit per branch** on purpose. A stacked branch still carries the pre-rebase
+copies of its ancestors, and those conflict with the same changes already landed under a different
+sha. One spec is one commit, so `HEAD~1` is the whole of it.
+
+A conflict in a `.pdf` is resolved by rerunning `docs/build-pdf.sh`, because Markdown is the source
+and the PDF is an artifact. A conflict anywhere else stops the run and names the files: everything
+below that pull request is on `main`, nothing above it was touched.
+
+`--ready` marks the batch ready for review, which is the human signal ADR-0027 asks for — one flag
+instead of one command per pull request. **A human runs this.** Wiring it into CI would mean an
+agent merging its own work, which ADR-0027 forbids; amend the ADR first if that is ever wanted.
+
+It takes the same `.lock` as `run.sh` and refuses to start under a live cycle, and it works in its
+own detached worktree so a branch checked out in the main working copy is never disturbed.
+
+After a stack lands, the knowledge layer is behind: run `/brain-check`, then `/sdd-sync`.
