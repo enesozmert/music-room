@@ -1,3 +1,4 @@
+using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Persistence;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Domain.Entities;
@@ -23,14 +24,22 @@ public sealed class SessionIssuer
 
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IAccessTokenIssuer _accessTokens;
+    private readonly IClientContextAccessor _clientContext;
 
-    /// <summary>Takes the refresh-token write path and the access-token issuer.</summary>
+    /// <summary>Takes the refresh-token write path, the access-token issuer and the client context.</summary>
     /// <param name="refreshTokens">The refresh-token write path.</param>
     /// <param name="accessTokens">The access-token issuer.</param>
-    public SessionIssuer(IRefreshTokenRepository refreshTokens, IAccessTokenIssuer accessTokens)
+    /// <param name="clientContext">The platform, device and app version the session is remembered by —
+    /// SPEC-010 escalation 2. It is the same accessor the audit behaviour reads, so no new plumbing crosses a
+    /// boundary.</param>
+    public SessionIssuer(
+        IRefreshTokenRepository refreshTokens,
+        IAccessTokenIssuer accessTokens,
+        IClientContextAccessor clientContext)
     {
         _refreshTokens = refreshTokens;
         _accessTokens = accessTokens;
+        _clientContext = clientContext;
     }
 
     /// <summary>Issues the first pair of a new session.</summary>
@@ -42,20 +51,32 @@ public sealed class SessionIssuer
         DateTime nowUtc = DateTime.UtcNow;
         string plaintext = RefreshTokenSecret.Create();
 
+        // The middleware refuses a mutating request without these, so a sign-in always has them. Failing
+        // loudly beats writing a session nobody can recognise in their own session list.
+        ClientContext client = _clientContext.Current
+            ?? throw new InvalidOperationException(
+                "A session cannot be issued without client context: the mandatory client headers are "
+                + "validated by middleware — SDD §10.7, SPEC-010.");
+
+        // A login starts its own family. Everything rotated from it carries this id, so one indexed UPDATE
+        // can revoke the whole lineage, and the access token names it as `sid`.
+        Guid familyId = Guid.NewGuid();
+
         RefreshToken token = new()
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            // A login starts its own family. Everything rotated from it carries this id, so one indexed
-            // UPDATE can revoke the whole lineage if a spent token is ever replayed.
-            FamilyId = Guid.NewGuid(),
+            FamilyId = familyId,
             TokenHash = OpaqueTokenHash.Of(plaintext),
             ExpiresAtUtc = nowUtc.AddDays(RefreshTokenLifetimeDays),
+            Platform = client.Platform,
+            Device = client.Device,
+            AppVersion = client.AppVersion,
         };
 
         await _refreshTokens.IssueAsync(token, cancellationToken).ConfigureAwait(false);
 
-        IssuedAccessToken accessToken = _accessTokens.Issue(userId, nowUtc);
+        IssuedAccessToken accessToken = _accessTokens.Issue(userId, familyId, nowUtc);
 
         return new AuthTokenPair(accessToken.Token, plaintext, accessToken.ExpiresInSeconds);
     }

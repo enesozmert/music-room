@@ -310,6 +310,80 @@ internal static class TestRateLimitSettings
 }
 
 /// <summary>
+/// Builds a client that carries a bearer token — SPEC-010.
+/// </summary>
+/// <remarks>
+/// The token comes from a real sign-in rather than being forged: a suite that minted its own would pass with a
+/// broken issuer, and the point of these endpoints is that the two halves agree.
+/// </remarks>
+internal static class TestBearer
+{
+    /// <summary>Registers, verifies, signs in, and returns a client that presents the access token.</summary>
+    /// <param name="factory">The test host.</param>
+    /// <param name="mail">The recording sender, which is the only way to read the verification token.</param>
+    /// <param name="email">The address to create.</param>
+    /// <returns>An authenticated client and the pair it was signed in with.</returns>
+    internal static async Task<(HttpClient Client, TokenPair Pair)> SignInAsync(
+        WebApplicationFactory<Program> factory,
+        RecordingMailService mail,
+        string email)
+    {
+        using HttpClient anonymous = factory.CreateAuditedClient();
+
+        int before = mail.Tokens.Count;
+
+        using HttpResponseMessage registered = await anonymous.PostAsJsonAsync(
+            LoginEndpointTests.RegistrationPath,
+            new { email, password = LoginEndpointTests.AccountPassword, displayName = "Player One" },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Accepted, registered.StatusCode);
+        Assert.Equal(before + 1, mail.Tokens.Count);
+
+        using HttpResponseMessage verified = await anonymous.PostAsJsonAsync(
+            LoginEndpointTests.VerificationsPath,
+            new { token = mail.Tokens[^1] },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, verified.StatusCode);
+
+        TokenPair pair = await PairAsync(anonymous, email);
+
+        HttpClient authenticated = factory.CreateAuditedClient();
+        authenticated.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", pair.AccessToken);
+
+        return (authenticated, pair);
+    }
+
+    /// <summary>Signs an existing account in again, which starts a second session.</summary>
+    /// <param name="factory">The test host.</param>
+    /// <param name="email">The address to sign in.</param>
+    /// <returns>The new pair.</returns>
+    internal static async Task<TokenPair> SignInAgainAsync(
+        WebApplicationFactory<Program> factory,
+        string email)
+    {
+        using HttpClient anonymous = factory.CreateAuditedClient();
+
+        return await PairAsync(anonymous, email);
+    }
+
+    private static async Task<TokenPair> PairAsync(HttpClient client, string email)
+    {
+        using HttpResponseMessage signedIn = await client.PostAsJsonAsync(
+            LoginEndpointTests.SessionsPath,
+            new { email, password = LoginEndpointTests.AccountPassword },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, signedIn.StatusCode);
+
+        TokenPair? pair = await signedIn.Content.ReadFromJsonAsync<TokenPair>(
+            TestContext.Current.CancellationToken);
+        Assert.NotNull(pair);
+
+        return pair;
+    }
+}
+
+/// <summary>
 /// The token pair the session endpoints answer with, as a client reads it.
 /// </summary>
 /// <param name="AccessToken">The signed JWT.</param>

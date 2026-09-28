@@ -223,6 +223,32 @@
             "description": "Too Many Requests"
           }
         }
+      },
+      "get": {
+        "tags": [
+          "SessionEndpoints"
+        ],
+        "summary": "List your own sessions",
+        "description": "Lists the caller's live sessions, newest first, each with the platform, device and app version that started it so a session can be recognised. No token and no digest is returned: the list exists to be read, not to be replayed.",
+        "operationId": "GetAuthSessions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
       }
     },
     "/api/v1/auth/tokens": {
@@ -347,6 +373,62 @@
           },
           "429": {
             "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/current": {
+      "delete": {
+        "tags": [
+          "SessionEndpoints"
+        ],
+        "summary": "Sign out",
+        "description": "Revokes the refresh-token family this access token belongs to, named by its sid claim, so no token from this session can be rotated again. The access token already issued stays valid until it expires — at most 15 minutes and 30 seconds — which is the accepted window in the threat register rather than an oversight.",
+        "operationId": "DeleteAuthCurrentSession",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/sessions/{sessionId}": {
+      "delete": {
+        "tags": [
+          "SessionEndpoints"
+        ],
+        "summary": "End one of your sessions",
+        "description": "Revokes one named session of the calling account. An unknown id, one already ended and one belonging to another account all answer 404, because a distinct answer would confirm that another account's session exists.",
+        "operationId": "DeleteAuthSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
           }
         }
       }
@@ -486,6 +568,47 @@
         },
         "description": "The sign-in payload — `docs/api/ENDPOINTS.md` §1."
       },
+      "SessionResponse": {
+        "required": [
+          "sessionId",
+          "platform",
+          "device",
+          "appVersion",
+          "startedAt",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "The id to pass to `DELETE /auth/sessions/{sessionId}`.",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string",
+            "description": "The client platform that started the session."
+          },
+          "device": {
+            "type": "string",
+            "description": "The device that started it."
+          },
+          "appVersion": {
+            "type": "string",
+            "description": "The app version that started it."
+          },
+          "startedAt": {
+            "type": "string",
+            "description": "When the session began.",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "description": "When it stops being renewable.",
+            "format": "date-time"
+          }
+        },
+        "description": "One session, as a client reads it — `docs/api/ENDPOINTS.md` §1."
+      },
       "TokenPairResponse": {
         "required": [
           "accessToken",
@@ -551,6 +674,9 @@
     },
     {
       "name": "AuthEndpoints"
+    },
+    {
+      "name": "SessionEndpoints"
     },
     {
       "name": "PasswordResetEndpoints"

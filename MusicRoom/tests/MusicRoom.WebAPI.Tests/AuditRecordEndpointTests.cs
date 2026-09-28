@@ -115,7 +115,9 @@ public sealed class AuditRecordEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Empty(await RecordsForEmailAsync("rejected@example.com"));
+        Assert.DoesNotContain(
+            await AllRecordsAsync(),
+            record => record.Action == "auth.register" && record.Outcome == "refused");
     }
 
     /// <summary>
@@ -302,6 +304,30 @@ public sealed class AuditRecordEndpointTests : IAsyncLifetime
         Assert.All(records, record => Assert.Equal("completed", record.Outcome));
     }
 
+    /// <summary>An authenticated command's record names the account from the token — SPEC-010.</summary>
+    [Fact]
+    public async Task AuditRecord_ForAnAuthenticatedCommand_NamesTheAccountAsync()
+    {
+        // Arrange
+        (HttpClient client, _) = await TestBearer.SignInAsync(_factory, _mail, "authenticated@example.com");
+
+        using HttpClient authenticated = client;
+
+        // Act — logout is the first authenticated command in the codebase.
+        using HttpResponseMessage response = await authenticated.DeleteAsync(
+            SessionEndpointTests.CurrentSessionPath,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        AuditRecord record = Assert.Single(await RecordsForAsync("auth.logout"));
+        Assert.NotNull(record.UserId);
+        Assert.NotNull(record.TargetId);
+        Assert.Equal("session", record.TargetType);
+        Assert.Equal("completed", record.Outcome);
+    }
+
     private async Task RegisterAndVerifyAsync(string email)
     {
         using HttpResponseMessage registered = await PostRegistrationAsync(email);
@@ -413,18 +439,4 @@ public sealed class AuditRecordEndpointTests : IAsyncLifetime
             .ToListAsync(TestContext.Current.CancellationToken);
     }
 
-    /// <summary>
-    /// Records that mention an address anywhere. The expectation is none: the table stores identifiers, and
-    /// this is the query that would find a leak.
-    /// </summary>
-    private async Task<IReadOnlyList<AuditRecord>> RecordsForEmailAsync(string email)
-    {
-        using IServiceScope scope = _factory.Services.CreateScope();
-        MusicRoomDbContext context = scope.ServiceProvider.GetRequiredService<MusicRoomDbContext>();
-
-        return await context.AuditRecords
-            .AsNoTracking()
-            .Where(record => record.Action.Contains(email) || record.TargetType.Contains(email))
-            .ToListAsync(TestContext.Current.CancellationToken);
-    }
 }

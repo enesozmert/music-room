@@ -35,12 +35,12 @@ public sealed class JwtAccessTokenIssuer : IAccessTokenIssuer
 
     /// <inheritdoc />
     /// <remarks>
-    /// The payload is <c>sub</c> and <c>jti</c> plus the instants: no address, no display name, no
-    /// role. A JWT is signed, not secret, and everything in it is readable by whoever holds it. The
+    /// The payload is <c>sub</c>, <c>sid</c> and <c>jti</c> plus the instants: no address, no display name,
+    /// no role. A JWT is signed, not secret, and everything in it is readable by whoever holds it. The
     /// handler also stamps <c>iss</c>, <c>aud</c> and <c>nbf</c>, none of which says anything about
     /// the account beyond what <c>sub</c> already does.
     /// </remarks>
-    public IssuedAccessToken Issue(Guid userId, DateTime nowUtc)
+    public IssuedAccessToken Issue(Guid userId, Guid sessionId, DateTime nowUtc)
     {
         const int secondsPerMinute = 60;
 
@@ -57,6 +57,10 @@ public sealed class JwtAccessTokenIssuer : IAccessTokenIssuer
                 // The account this token speaks for, and a unique id per token so a single issued
                 // token can be named in an audit entry without naming its bearer's secret.
                 [JwtRegisteredClaimNames.Sub] = userId.ToString(),
+
+                // The refresh-token family, so logout can end this session and leave the others —
+                // SPEC-010. It is stable across a rotation, because a rotation continues the same session.
+                [JwtRegisteredClaimNames.Sid] = sessionId.ToString(),
                 [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString(),
             },
         };

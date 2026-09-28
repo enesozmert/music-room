@@ -123,10 +123,10 @@ public sealed class AuditBehaviour<TRequest, TResponse> : IPipelineBehavior<TReq
         {
             Id = Guid.NewGuid(),
 
-            // Named by the handler where it knows the account, null where it does not — an anonymous
-            // refusal must not claim an account, and naming one on a failed login would make the table an
-            // account-existence oracle.
-            UserId = auditContext.UserId,
+            // The handler's answer wins, because it knows more: a failed login deliberately names nobody
+            // even when an address matched. Otherwise the validated `sub` fills it in, so an authenticated
+            // command cannot produce a row that looks anonymous — SPEC-010 escalation 4.
+            UserId = auditContext.UserId ?? context.UserId,
             Action = command.AuditAction,
             TargetType = command.AuditTargetType,
             TargetId = auditContext.TargetId,

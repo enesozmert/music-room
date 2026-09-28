@@ -15,11 +15,19 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        // A hex-encoded SHA-256 digest is exactly 64 characters.
-        const int tokenHashLength = 64;
-
         builder.ToTable("refresh_tokens");
         builder.HasKey(token => token.Id);
+
+        MapIdentityColumns(builder);
+        MapClientColumns(builder);
+        MapTimestampColumns(builder);
+        MapIndexesAndKeys(builder);
+    }
+
+    private static void MapIdentityColumns(EntityTypeBuilder<RefreshToken> builder)
+    {
+        // A hex-encoded SHA-256 digest is exactly 64 characters.
+        const int tokenHashLength = 64;
 
         builder.Property(token => token.Id).HasColumnName("id");
         builder.Property(token => token.UserId).HasColumnName("user_id");
@@ -30,7 +38,34 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
             .HasMaxLength(tokenHashLength)
             .IsFixedLength()
             .IsRequired();
+    }
 
+    /// <summary>
+    /// The client that started the session, so its owner can recognise it in a session list — SPEC-010.
+    /// Bounded at the same 64 characters the middleware enforces on the header.
+    /// </summary>
+    private static void MapClientColumns(EntityTypeBuilder<RefreshToken> builder)
+    {
+        const int clientTextLength = 64;
+
+        builder.Property(token => token.Platform)
+            .HasColumnName("platform")
+            .HasMaxLength(clientTextLength)
+            .IsRequired();
+
+        builder.Property(token => token.Device)
+            .HasColumnName("device")
+            .HasMaxLength(clientTextLength)
+            .IsRequired();
+
+        builder.Property(token => token.AppVersion)
+            .HasColumnName("app_version")
+            .HasMaxLength(clientTextLength)
+            .IsRequired();
+    }
+
+    private static void MapTimestampColumns(EntityTypeBuilder<RefreshToken> builder)
+    {
         builder.Property(token => token.ExpiresAtUtc)
             .HasColumnName("expires_at_utc")
             .HasColumnType("timestamp with time zone");
@@ -50,9 +85,12 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
         builder.Property(token => token.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
             .HasColumnType("timestamp with time zone");
+    }
 
-        // The exchange looks a token up by digest, and a second row with the same digest would mean
-        // the generator repeated itself. The index makes that a write failure, not an ambiguous read.
+    private static void MapIndexesAndKeys(EntityTypeBuilder<RefreshToken> builder)
+    {
+        // The exchange looks a token up by digest, and a second row with the same digest would mean the
+        // generator repeated itself. The index makes that a write failure, not an ambiguous read.
         builder.HasIndex(token => token.TokenHash)
             .IsUnique()
             .HasDatabaseName("ux_refresh_tokens_token_hash");
@@ -61,13 +99,13 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
         builder.HasIndex(token => token.FamilyId)
             .HasDatabaseName("ix_refresh_tokens_family_id");
 
-        // The foreign key, and the column a later "list my sessions" endpoint reads.
+        // The foreign key, and the column the session list reads.
         builder.HasIndex(token => token.UserId)
             .HasDatabaseName("ix_refresh_tokens_user_id");
 
-        // Deleting an account takes its sessions with it: a refresh token that outlived its user is a
-        // row nothing can ever resolve. No navigation property — the token is read by digest or by
-        // user id, never traversed from the account.
+        // Deleting an account takes its sessions with it: a refresh token that outlived its user is a row
+        // nothing can ever resolve. No navigation property — the token is read by digest or by user id,
+        // never traversed from the account.
         builder.HasOne<User>()
             .WithMany()
             .HasForeignKey(token => token.UserId)

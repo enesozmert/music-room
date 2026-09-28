@@ -67,10 +67,25 @@ public sealed class ClientContextMiddleware
             platform,
             device,
             appVersion,
-            Activity.Current?.TraceId.ToString() ?? httpContext.TraceIdentifier);
+            Activity.Current?.TraceId.ToString() ?? httpContext.TraceIdentifier,
+            // Present only when the bearer middleware has already validated a token, which is why this
+            // middleware runs after UseAuthentication — SPEC-010.
+            ClaimedUserId(httpContext));
 
         await _next(httpContext);
     }
+
+    /// <summary>
+    /// The account on the validated principal, or null when the request is anonymous. Nothing is trusted
+    /// here that the bearer handler did not already verify.
+    /// </summary>
+    private static Guid? ClaimedUserId(HttpContext httpContext) =>
+        Guid.TryParse(
+            httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? httpContext.User.FindFirst("sub")?.Value,
+            out Guid userId)
+            ? userId
+            : null;
 
     private static bool RequiresClientContext(HttpContext httpContext) =>
         _mutatingMethods.Contains(httpContext.Request.Method, StringComparer.OrdinalIgnoreCase)
@@ -97,6 +112,7 @@ public sealed class ClientContextMiddleware
 /// <param name="Device">From <c>X-Client-Device</c>.</param>
 /// <param name="AppVersion">From <c>X-Client-App-Version</c>.</param>
 /// <param name="CorrelationId">The request's trace id — ADR-0022.</param>
+/// <param name="UserId">The validated account, or null when the request is anonymous.</param>
 /// <remarks>
 /// A `WebAPI` type rather than the `Application` record, so nothing in the pipeline depends on how the
 /// values travelled. The accessor maps one to the other.
@@ -105,4 +121,5 @@ internal sealed record ClientContextValues(
     string Platform,
     string Device,
     string AppVersion,
-    string CorrelationId);
+    string CorrelationId,
+    Guid? UserId);

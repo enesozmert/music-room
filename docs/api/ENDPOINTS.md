@@ -110,6 +110,14 @@ replacement passes.
 - `/auth/tokens` performs refresh **rotation**. Presenting an already-rotated refresh token
   revokes the whole family and returns `401` — this is the session-theft detector (T-03).
 - `/auth/password-resets` revokes every refresh token for that account on success.
+- **A session is a refresh-token family.** `GET /auth/sessions` returns one entry per live family with the
+  `platform`, `device` and `appVersion` that started it, when it started and when it stops being renewable —
+  never a token or a digest. `DELETE /auth/sessions/current` ends the family named by the access token's
+  `sid` claim, so signing out of one device leaves the others signed in. `DELETE /auth/sessions/{sessionId}`
+  ends a named one, and answers `404` for an id that is unknown, already ended or another account's.
+- **An access token outlives a logout** by up to 15 minutes and 30 seconds, which is its remaining lifetime
+  plus the accepted clock skew. Revoking the family stops renewal, not a token already signed — recorded as
+  T-28.
 - `/auth/sessions/social` both registers and signs in. Identity comes from the validated **ID
   token**, never an access token ([[ADR-0008-oidc-social-login]]).
 - `DELETE /auth/social-links/{provider}` refuses with `409` when it would leave the account with

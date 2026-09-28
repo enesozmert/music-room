@@ -42,4 +42,16 @@ public sealed class RefreshToken : Entity
     /// <summary>When the token was revoked, or null while it is live. Reuse of a spent sibling
     /// stamps every unrevoked row in the family, which is the theft response SDD §13.1 requires.</summary>
     public DateTime? RevokedAtUtc { get; set; }
+
+    /// <summary>
+    /// The platform of the client that started this family, from <c>X-Client-Platform</c> — SPEC-010
+    /// escalation 2. Copied to every rotated row, because a rotation continues the same session.
+    /// </summary>
+    public required string Platform { get; set; }
+
+    /// <summary>The device that started this family, from <c>X-Client-Device</c>.</summary>
+    public required string Device { get; set; }
+
+    /// <summary>The app version that started this family, from <c>X-Client-App-Version</c>.</summary>
+    public required string AppVersion { get; set; }
 }
