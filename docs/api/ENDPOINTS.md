@@ -148,7 +148,15 @@ Subject V.1. The friends graph exists because the `Friends` visibility tier requ
 
 - `GET /users/{userId}` projects **per field** according to the requester's relationship
   (self / friend / stranger) against each field's `ProfileFieldVisibility`. The full row never
-  leaves the server for the client to filter — OWASP API3.
+  leaves the server for the client to filter — OWASP API3. **Implemented in SPEC-013:** the decision is made in
+  the SQL projection, so a field the reader may not see is never read at all; it is absent from the body, and a
+  reader cannot tell a hidden field from an empty one. An account that does not exist answers the same sparse
+  shape as one whose owner hid everything, so asking does not confirm existence — which is why this row has no
+  `404`.
+- **Search reads the display name only**, as a case-insensitive prefix through `ILIKE`, with `%` and `_` escaped
+  so a query cannot become a wildcard probe. Matching a profile field would let a stranger confirm a
+  friends-only value by searching for it. A blank query returns nothing rather than everybody, and `pageSize` is
+  capped at 50.
 - `PATCH /me/profile` sets both value and visibility in one call, so a new field cannot exist
   without a tier. A missing tier is `422`, never a silent default to public.
 - `GET /users` search returns public fields only, paginated, rate limited. Unbounded user
