@@ -33,6 +33,12 @@ internal static class CredentialRateLimiterPolicies
     /// <summary>Email verification.</summary>
     internal const string EmailVerifications = "credential-email-verifications";
 
+    /// <summary>Asking for a password reset link.</summary>
+    internal const string PasswordResetRequests = "credential-password-reset-requests";
+
+    /// <summary>Spending a password reset token.</summary>
+    internal const string PasswordResets = "credential-password-resets";
+
     /// <summary>Registers every credential policy and the shared rejection behaviour.</summary>
     /// <param name="services">The container being built.</param>
     /// <param name="configuration">Where the approved numbers may be overridden.</param>
@@ -51,6 +57,13 @@ internal static class CredentialRateLimiterPolicies
             limiter.AddPolicy(
                 EmailVerifications,
                 context => PartitionByRemoteIp(context, options.EmailVerifications));
+
+            limiter.AddPolicy(
+                PasswordResetRequests,
+                context => PartitionByRemoteIp(context, options.PasswordResetRequests));
+            limiter.AddPolicy(
+                PasswordResets,
+                context => PartitionByRemoteIp(context, options.PasswordResets));
 
             limiter.OnRejected = OnRejectedAsync;
         });

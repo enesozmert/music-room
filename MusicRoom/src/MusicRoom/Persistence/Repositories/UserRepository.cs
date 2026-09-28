@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using MusicRoom.Application.Abstractions.Persistence;
+using MusicRoom.Application.Features.Auth.Commands.ResetPassword;
 using MusicRoom.Application.Features.Auth.Commands.VerifyEmail;
 using MusicRoom.Domain.Entities;
 using MusicRoom.Persistence.Contexts;
@@ -135,6 +136,162 @@ internal sealed class UserRepository : IUserRepository
             // address that would make an accidental log entry a profile.
             .Select(user => new UserCredential(user.Id, user.PasswordHash, user.IsEmailVerified))
             .SingleOrDefaultAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<bool> TryIssuePasswordResetTokenAsync(
+        string email,
+        PasswordResetToken token,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+
+        // The supersede and the insert must not be separable, for the reason SPEC-004 gives for
+        // verification: a crash between them would leave an account with every link spent and no
+        // replacement.
+        await using IDbContextTransaction transaction = await _context.Database
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        // Unlike verification, an unverified account is eligible: someone who mistyped a password before
+        // confirming their address must still be able to recover it.
+        Guid userId = await _context.Users
+            .AsNoTracking()
+            .Where(user => user.Email == email)
+            .Select(user => user.Id)
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (userId == Guid.Empty)
+        {
+            return false;
+        }
+
+        await SupersedeOutstandingResetTokensAsync(userId, nowUtc, cancellationToken).ConfigureAwait(false);
+
+        token.UserId = userId;
+        _context.PasswordResetTokens.Add(token);
+
+        await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+        return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<ResetPasswordOutcome> TryResetPasswordAsync(
+        string tokenHash,
+        string newPasswordHash,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        // All three writes or none — SPEC-007 escalation 1, option A. A reset that replaced the password
+        // and failed to revoke the families would leave a thief holding a live session behind a password
+        // its owner had already changed.
+        await using IDbContextTransaction transaction = await _context.Database
+            .BeginTransactionAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        // One conditional UPDATE. Whoever affects the row won the token; everybody else is told so by the
+        // database, under its own row lock, rather than by a read this code performed earlier.
+        int consumedRows = await _context.PasswordResetTokens
+            .Where(token => token.TokenHash == tokenHash
+                && token.ConsumedAtUtc == null
+                && token.ExpiresAtUtc > nowUtc)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(token => token.ConsumedAtUtc, nowUtc)
+                    // ExecuteUpdateAsync does not run through SaveChangesAsync, so the column the context
+                    // would have stamped is stamped here — SDD §8.3.
+                    .SetProperty(token => token.UpdatedAtUtc, nowUtc),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (consumedRows == 0)
+        {
+            return await ClassifyLostResetRaceAsync(tokenHash, nowUtc, cancellationToken).ConfigureAwait(false);
+        }
+
+        Guid userId = await _context.PasswordResetTokens
+            .AsNoTracking()
+            .Where(token => token.TokenHash == tokenHash)
+            .Select(token => token.UserId)
+            .SingleAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        await ReplacePasswordHashAsync(userId, newPasswordHash, nowUtc, cancellationToken).ConfigureAwait(false);
+        await RevokeEveryRefreshTokenAsync(userId, nowUtc, cancellationToken).ConfigureAwait(false);
+        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+
+        return ResetPasswordOutcome.Reset;
+    }
+
+    /// <summary>
+    /// Stamps every unspent reset token of an account, so exactly one reset link is live once the caller
+    /// inserts the new one.
+    /// </summary>
+    private Task<int> SupersedeOutstandingResetTokensAsync(
+        Guid userId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken) =>
+        _context.PasswordResetTokens
+            .Where(token => token.UserId == userId && token.ConsumedAtUtc == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(token => token.ConsumedAtUtc, nowUtc)
+                    .SetProperty(token => token.UpdatedAtUtc, nowUtc),
+                cancellationToken);
+
+    /// <summary>Writes the new hash. The old one is overwritten, never kept for comparison.</summary>
+    private Task<int> ReplacePasswordHashAsync(
+        Guid userId,
+        string newPasswordHash,
+        DateTime nowUtc,
+        CancellationToken cancellationToken) =>
+        _context.Users
+            .Where(user => user.Id == userId)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(user => user.PasswordHash, newPasswordHash)
+                    .SetProperty(user => user.UpdatedAtUtc, nowUtc),
+                cancellationToken);
+
+    /// <summary>
+    /// Revokes every unrevoked refresh token of an account, which is what ends the sessions opened with
+    /// the old password — `docs/api/ENDPOINTS.md` §1 and SDD §13.1.
+    /// </summary>
+    private Task<int> RevokeEveryRefreshTokenAsync(
+        Guid userId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken) =>
+        _context.RefreshTokens
+            .Where(token => token.UserId == userId && token.RevokedAtUtc == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(token => token.RevokedAtUtc, nowUtc)
+                    .SetProperty(token => token.UpdatedAtUtc, nowUtc),
+                cancellationToken);
+
+    /// <summary>
+    /// Tells an expired reset token from one that is unknown or already spent. Only reached when the
+    /// UPDATE affected nothing, so the happy path stays a single statement.
+    /// </summary>
+    private async Task<ResetPasswordOutcome> ClassifyLostResetRaceAsync(
+        string tokenHash,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        PasswordResetToken? token = await _context.PasswordResetTokens
+            .AsNoTracking()
+            .SingleOrDefaultAsync(candidate => candidate.TokenHash == tokenHash, cancellationToken)
+            .ConfigureAwait(false);
+
+        // Absent and already consumed both answer Invalid: a caller holding a token that was spent must
+        // not learn that it once existed. Only an unspent token past its window is Expired.
+        return token is { ConsumedAtUtc: null } && token.ExpiresAtUtc <= nowUtc
+            ? ResetPasswordOutcome.Expired
+            : ResetPasswordOutcome.Invalid;
+    }
 
     /// <summary>
     /// Stamps every unspent token of an account as consumed, so exactly one link is live once the

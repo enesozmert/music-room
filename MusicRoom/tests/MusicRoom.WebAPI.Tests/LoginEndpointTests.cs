@@ -264,6 +264,8 @@ internal static class TestRateLimitSettings
             "RATE_LIMIT_REGISTRATIONS",
             "RATE_LIMIT_VERIFICATION_REQUESTS",
             "RATE_LIMIT_EMAIL_VERIFICATIONS",
+            "RATE_LIMIT_PASSWORD_RESET_REQUESTS",
+            "RATE_LIMIT_PASSWORD_RESETS",
         })
         {
             webHost.UseSetting($"{prefix}_PERMITS", Permits);

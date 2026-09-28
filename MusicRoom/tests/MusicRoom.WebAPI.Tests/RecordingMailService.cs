@@ -10,7 +10,9 @@ internal sealed class RecordingMailService : IMailService
 {
     private readonly List<string> _tokens = [];
 
-    /// <summary>The plaintext tokens handed to the sender, in order.</summary>
+    private readonly List<string> _resetTokens = [];
+
+    /// <summary>The plaintext verification tokens handed to the sender, in order.</summary>
     internal IReadOnlyList<string> Tokens
     {
         get
@@ -18,6 +20,18 @@ internal sealed class RecordingMailService : IMailService
             lock (_tokens)
             {
                 return [.. _tokens];
+            }
+        }
+    }
+
+    /// <summary>The plaintext password reset tokens handed to the sender, in order.</summary>
+    internal IReadOnlyList<string> ResetTokens
+    {
+        get
+        {
+            lock (_resetTokens)
+            {
+                return [.. _resetTokens];
             }
         }
     }
@@ -32,6 +46,20 @@ internal sealed class RecordingMailService : IMailService
         lock (_tokens)
         {
             _tokens.Add(token);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task SendPasswordResetAsync(
+        string emailAddress,
+        string token,
+        CancellationToken cancellationToken)
+    {
+        lock (_resetTokens)
+        {
+            _resetTokens.Add(token);
         }
 
         return Task.CompletedTask;

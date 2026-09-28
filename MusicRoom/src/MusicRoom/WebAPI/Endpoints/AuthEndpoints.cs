@@ -1,6 +1,4 @@
-using System.Globalization;
 using FluentValidation;
-using FluentValidation.Results;
 using MediatR;
 using MusicRoom.Application.Features.Auth;
 using MusicRoom.Application.Features.Auth.Commands.Login;
@@ -30,6 +28,10 @@ internal static class AuthEndpoints
         MapVerificationRequests(group);
         MapSessions(group);
         MapTokens(group);
+
+        // Its own class: SPEC-007 pushed this file past the 300-line and 30-type limits the root
+        // .editorconfig enforces (S104, S1200).
+        PasswordResetEndpoints.Map(group);
 
         return endpoints;
     }
@@ -122,7 +124,7 @@ internal static class AuthEndpoints
         }
         catch (CredentialAttemptThrottledException exception)
         {
-            return Throttled(httpContext, exception);
+            return CredentialEndpointResults.Throttled(httpContext, exception);
         }
     }
 
@@ -181,12 +183,12 @@ internal static class AuthEndpoints
         }
         catch (CredentialAttemptThrottledException exception)
         {
-            return Throttled(httpContext, exception);
+            return CredentialEndpointResults.Throttled(httpContext, exception);
         }
         catch (ValidationException exception)
         {
             return Results.ValidationProblem(
-                ToErrors(exception),
+                CredentialEndpointResults.ToErrors(exception),
                 statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
@@ -207,14 +209,14 @@ internal static class AuthEndpoints
         }
         catch (CredentialAttemptThrottledException exception)
         {
-            return Throttled(httpContext, exception);
+            return CredentialEndpointResults.Throttled(httpContext, exception);
         }
         catch (ValidationException exception)
         {
             // 422 with the rule messages, as registration answers: the rules describe the shape of
             // an address, which is public knowledge, and say nothing about which addresses exist.
             return Results.ValidationProblem(
-                ToErrors(exception),
+                CredentialEndpointResults.ToErrors(exception),
                 statusCode: StatusCodes.Status422UnprocessableEntity);
         }
 
@@ -252,36 +254,6 @@ internal static class AuthEndpoints
             _ => Results.BadRequest(),
         };
     }
-
-    /// <summary>
-    /// Answers `429` with <c>Retry-After</c> when the per-account limiter refused the attempt.
-    /// </summary>
-    /// <remarks>
-    /// The per-IP half of the limit is middleware and never reaches a handler; this is the half that
-    /// knows which account was named (SPEC-006 escalation 2, option B). The body is empty for the same
-    /// reason the middleware's is: a message saying which key tripped tells a caller which key to vary.
-    /// </remarks>
-    private static IResult Throttled(HttpContext httpContext, CredentialAttemptThrottledException exception)
-    {
-        httpContext.Response.Headers.RetryAfter =
-            ((int)Math.Ceiling(exception.RetryAfter.TotalSeconds)).ToString(CultureInfo.InvariantCulture);
-
-        return Results.StatusCode(StatusCodes.Status429TooManyRequests);
-    }
-
-    /// <summary>
-    /// Turns validation failures into the ProblemDetails error dictionary. Only rule messages cross
-    /// this boundary — never the submitted value, which for one of these fields is a password.
-    /// </summary>
-    private static Dictionary<string, string[]> ToErrors(ValidationException exception) =>
-        exception.Errors
-            .GroupBy(failure => failure.PropertyName, StringComparer.Ordinal)
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(ErrorMessage).ToArray(),
-                StringComparer.Ordinal);
-
-    private static string ErrorMessage(ValidationFailure failure) => failure.ErrorMessage;
 }
 
 /// <summary>
