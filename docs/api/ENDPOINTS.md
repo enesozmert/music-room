@@ -160,8 +160,15 @@ Subject V.1. The friends graph exists because the `Friends` visibility tier requ
   result or an attendee list has to show it. Do not build a visibility control for it.
 - **Music preferences are private to their owner and carry no tier.** `PUT /me/music-preferences` replaces the
   whole set; both lists are bounded at 50 entries of 64 characters.
-- **`Friends` is stored but not yet evaluated.** Until the friends graph exists, every reader who is not the
-  owner is a stranger, so a `Friends` field is as hidden as a `Private` one.
+- **The friends graph is live** (SPEC-012), so `Friends` is now a tier that can be evaluated. A friendship is
+  **symmetric and one row**: both parties see it, and there is no state in which one of them does not.
+- `POST /me/friend-requests` answers `409` for three cases the caller can tell apart from what they attempted:
+  already friends, a request already pending **in either direction**, and asking yourself. A crossing request is
+  not auto-accepted — nobody becomes a friend without accepting. An unknown account is `404`.
+- Only the recipient may `PATCH` a request, and only the sender may `DELETE` one. A request that is not the
+  caller's to act on answers `404`, as does one already answered.
+- `DELETE /me/friends/{userId}` ends the friendship for both sides and clears the request rows between the pair,
+  so they may befriend again later.
 
 ---
 

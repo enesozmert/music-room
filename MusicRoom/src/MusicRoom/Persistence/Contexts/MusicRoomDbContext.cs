@@ -38,6 +38,12 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>The genres and artists each account named — subject V.1.</summary>
     public DbSet<MusicPreference> MusicPreferences => Set<MusicPreference>();
 
+    /// <summary>Pending, accepted and declined friend requests — the only way a friendship begins.</summary>
+    public DbSet<FriendRequest> FriendRequests => Set<FriendRequest>();
+
+    /// <summary>Symmetric friendships, one row per pair in canonical order.</summary>
+    public DbSet<Friendship> Friendships => Set<Friendship>();
+
     /// <summary>Stamps the common columns, then saves — SDD §8.3.</summary>
     /// <param name="cancellationToken">The caller's cancellation token.</param>
     /// <returns>The number of rows written.</returns>
