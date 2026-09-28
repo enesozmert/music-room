@@ -44,6 +44,12 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>Symmetric friendships, one row per pair in canonical order.</summary>
     public DbSet<Friendship> Friendships => Set<Friendship>();
 
+    /// <summary>Collaboratively edited playlists — subject V.2.3. Soft-deleted rows are filtered out.</summary>
+    public DbSet<Playlist> Playlists => Set<Playlist>();
+
+    /// <summary>The people named on a playlist, and whether each may write to it.</summary>
+    public DbSet<PlaylistCollaborator> PlaylistCollaborators => Set<PlaylistCollaborator>();
+
     /// <summary>Stamps the common columns, then saves — SDD §8.3.</summary>
     /// <param name="cancellationToken">The caller's cancellation token.</param>
     /// <returns>The number of rows written.</returns>

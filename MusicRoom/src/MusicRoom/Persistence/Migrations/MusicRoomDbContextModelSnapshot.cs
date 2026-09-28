@@ -306,6 +306,96 @@ namespace MusicRoom.Persistence.Migrations
                     b.ToTable("password_reset_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("MusicRoom.Domain.Entities.Playlist", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<short>("Licence")
+                        .HasColumnType("smallint")
+                        .HasColumnName("licence");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<short>("Visibility")
+                        .HasColumnType("smallint")
+                        .HasColumnName("visibility");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_playlists_owner_id");
+
+                    b.ToTable("playlists", (string)null);
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.PlaylistCollaborator", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("CanEdit")
+                        .HasColumnType("boolean")
+                        .HasColumnName("can_edit");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("PlaylistId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("playlist_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_playlist_collaborators_user_id");
+
+                    b.HasIndex("PlaylistId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_playlist_collaborators_playlist_id_user_id");
+
+                    b.ToTable("playlist_collaborators", (string)null);
+                });
+
             modelBuilder.Entity("MusicRoom.Domain.Entities.Profile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -540,6 +630,30 @@ namespace MusicRoom.Persistence.Migrations
 
             modelBuilder.Entity("MusicRoom.Domain.Entities.PasswordResetToken", b =>
                 {
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.Playlist", b =>
+                {
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.PlaylistCollaborator", b =>
+                {
+                    b.HasOne("MusicRoom.Domain.Entities.Playlist", null)
+                        .WithMany()
+                        .HasForeignKey("PlaylistId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("MusicRoom.Domain.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
