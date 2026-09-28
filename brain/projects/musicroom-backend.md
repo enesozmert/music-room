@@ -96,16 +96,10 @@ written down twice.
 - Remaining open: remote deployment target (O11), SignalR backplane (O8, deliberately deferred),
   fluent assertion library (O12), silent-controller recovery (O13), music preferences consumer (O14),
   OpenTelemetry evidence (O16), real mail provider (O17 — blocks slice S1a), self-hosted vault (O18).
-- **Seven decisions are recorded only in specs and code, and specs are disposable
-  ([[specs]] "Retention"). They need an ADR from the repository owner. No agent writes an ADR:**
-  1. the `Microsoft.AspNetCore.Authentication.JwtBearer` package — amends [[ADR-0021-backend-dependency-set]];
-  2. the in-process credential backoff — amends the same ADR's "state is held in process";
-  3. the 30-day absolute refresh-token lifetime (now also stated in [[sdd]] §13.1);
-  4. one repository method writing two aggregates in one transaction, superseded by `IUnitOfWork` when
-     the audit record joined that transaction;
-  5. the fail-closed audit posture (T-29);
-  6. a credential refusal as a returned value rather than an exception, which amends 5;
-  7. the `sid` claim, which amends [[sdd]] §13.1's "`sub`, `iat`, `exp`, `jti` and nothing else", and the
-     profile storage shape — typed columns with a visibility column each, `displayName` untiered, and
-     always-private normalised preferences.
+- **The decisions taken during S1 to S3 are now recorded as ADRs**, so deleting a spec loses nothing:
+  [[ADR-0036-access-token-mechanics]], [[ADR-0037-credential-rate-limiting]],
+  [[ADR-0032-refresh-token-lifetime]], [[ADR-0033-audit-write-posture]] and
+  [[ADR-0034-profile-storage-and-visibility]]. ADR-0030 and ADR-0031 amend
+  [[ADR-0021-backend-dependency-set]]; ADR-0030 amends [[sdd]] §13.1's claim list. Accepted ADRs are never
+  edited — a later change supersedes one.
 - Owner: one backend developer. The React Native client is a parallel workstream owned by the second team member ([[musicroom-mobile]]).
