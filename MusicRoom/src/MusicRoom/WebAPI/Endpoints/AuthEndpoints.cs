@@ -46,6 +46,8 @@ internal static class AuthEndpoints
                 "Accepts the registration and answers 202 whether or not the address is already "
                 + "registered. A 409 here would tell an anonymous caller who holds an account; the "
                 + "mailbox tells the real user what happened.")
+            // 400 from the client-context middleware, not from this handler — SPEC-008, SDD §10.7.
+            .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status202Accepted)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .Produces(StatusCodes.Status429TooManyRequests);
@@ -76,6 +78,8 @@ internal static class AuthEndpoints
                 + "not stated and cannot be inferred from the response: a distinct answer here "
                 + "would tell an anonymous caller which addresses hold a registered or confirmed "
                 + "account.")
+            // 400 from the client-context middleware, not from this handler — SPEC-008, SDD §10.7.
+            .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status202Accepted)
             .ProducesValidationProblem(StatusCodes.Status422UnprocessableEntity)
             .Produces(StatusCodes.Status429TooManyRequests);
@@ -91,6 +95,8 @@ internal static class AuthEndpoints
                 + "address, wrong password, unverified account — answers the same bodiless 401, and "
                 + "the unknown-address path spends the same hashing work as the others, so the "
                 + "response cannot be timed either.")
+            // 400 from the client-context middleware, not from this handler — SPEC-008, SDD §10.7.
+            .Produces(StatusCodes.Status400BadRequest)
             .Produces<TokenPairResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status429TooManyRequests);
@@ -106,6 +112,8 @@ internal static class AuthEndpoints
                 + "already-rotated token revokes the whole family and answers 401: that is the "
                 + "session-theft detector, and it answers exactly as an unknown or expired token "
                 + "does.")
+            // 400 from the client-context middleware, not from this handler — SPEC-008, SDD §10.7.
+            .Produces(StatusCodes.Status400BadRequest)
             .Produces<TokenPairResponse>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status429TooManyRequests);

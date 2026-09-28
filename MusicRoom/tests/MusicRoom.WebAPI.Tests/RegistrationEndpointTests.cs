@@ -63,7 +63,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
     {
         // Arrange
         const string email = "fresh@example.com";
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
 
         // Act
         using HttpResponseMessage response = await PostRegistrationAsync(client, email);
@@ -82,7 +82,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
     {
         // Arrange
         const string email = "hashed@example.com";
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
 
         // Act
         using HttpResponseMessage response = await PostRegistrationAsync(client, email);
@@ -104,7 +104,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
     {
         // Arrange
         const string email = "duplicate@example.com";
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
         using HttpResponseMessage first = await PostRegistrationAsync(client, email);
         Assert.Equal(HttpStatusCode.Accepted, first.StatusCode);
 
@@ -128,7 +128,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
         const string email = "contended@example.com";
         const int writers = 20;
 
-        List<HttpClient> clients = [.. Enumerable.Range(0, writers).Select(_ => _factory.CreateClient())];
+        List<HttpClient> clients = [.. Enumerable.Range(0, writers).Select(_ => _factory.CreateAuditedClient())];
 
         try
         {
@@ -160,7 +160,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
     {
         // Arrange
         const string email = "tooshort@example.com";
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
 
         // Act
         using HttpResponseMessage response = await client.PostAsJsonAsync(

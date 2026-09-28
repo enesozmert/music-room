@@ -202,7 +202,7 @@ public sealed class VerificationRequestEndpointTests : IAsyncLifetime
     {
         int before = _mail.Tokens.Count;
 
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
         using HttpResponseMessage response = await client.PostAsJsonAsync(
             RegistrationPath,
             new { email, password = AccountPassword, displayName = "Player One" },
@@ -218,7 +218,7 @@ public sealed class VerificationRequestEndpointTests : IAsyncLifetime
 
     private async Task<HttpResponseMessage> PostVerificationRequestAsync(string email)
     {
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
 
         return await client.PostAsJsonAsync(
             VerificationRequestsPath,
@@ -228,7 +228,7 @@ public sealed class VerificationRequestEndpointTests : IAsyncLifetime
 
     private async Task<HttpResponseMessage> PostVerificationAsync(string token)
     {
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
 
         return await client.PostAsJsonAsync(
             VerificationsPath,

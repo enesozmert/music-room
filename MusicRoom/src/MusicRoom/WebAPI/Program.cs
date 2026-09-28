@@ -1,11 +1,13 @@
 using System.Globalization;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MusicRoom.Application;
+using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Infrastructure;
 using MusicRoom.Infrastructure.Security;
 using MusicRoom.Persistence;
 using MusicRoom.WebAPI.Endpoints;
 using MusicRoom.WebAPI.HealthChecks;
+using MusicRoom.WebAPI.Middleware;
 using MusicRoom.WebAPI.RateLimiting;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -45,6 +47,11 @@ public class Program
             EnvironmentConfiguration.ReadCredentialAttemptLimits(builder.Configuration)));
 
         ApiServices.Add(builder.Services, builder.Configuration);
+
+        // The audit behaviour reads the client context through this abstraction; the implementation is a
+        // WebAPI type because HttpContext is — SPEC-008.
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddScoped<IClientContextAccessor, HttpClientContextAccessor>();
         Observability.AddTracing(builder.Services, builder.Configuration);
         HealthRegistration.Add(builder.Services, connectionString);
 
@@ -52,6 +59,10 @@ public class Program
 
         app.UseSerilogRequestLogging();
         app.UseRateLimiter();
+
+        // After the limiter on purpose: a request the limiter refuses must not be answered 400 for a
+        // missing header instead of 429 — SPEC-008.
+        app.UseMiddleware<ClientContextMiddleware>();
 
         // openapi-documentation: the raw document is served in every environment. An interactive UI
         // is a separate, Development-only concern, and it needs a UI package no ADR has chosen yet.

@@ -194,7 +194,7 @@ public sealed class EmailVerificationEndpointTests : IAsyncLifetime
 
     private async Task<HttpResponseMessage> PostRegistrationAsync(string email)
     {
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
 
         return await client.PostAsJsonAsync(
             RegistrationPath,
@@ -204,7 +204,7 @@ public sealed class EmailVerificationEndpointTests : IAsyncLifetime
 
     private async Task<HttpResponseMessage> PostVerificationAsync(string token)
     {
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
 
         return await client.PostAsJsonAsync(
             VerificationsPath,

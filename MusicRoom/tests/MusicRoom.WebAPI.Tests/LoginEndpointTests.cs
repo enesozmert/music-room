@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Persistence.Contexts;
+using MusicRoom.WebAPI.Middleware;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -158,7 +159,7 @@ public sealed class LoginEndpointTests : IAsyncLifetime
     {
         string token = await RegisterAndCaptureTokenAsync(email);
 
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
         using HttpResponseMessage verified = await client.PostAsJsonAsync(
             VerificationsPath,
             new { token },
@@ -171,7 +172,7 @@ public sealed class LoginEndpointTests : IAsyncLifetime
     {
         int before = _mail.Tokens.Count;
 
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
         using HttpResponseMessage response = await client.PostAsJsonAsync(
             RegistrationPath,
             new { email, password = AccountPassword, displayName = "Player One" },
@@ -185,7 +186,7 @@ public sealed class LoginEndpointTests : IAsyncLifetime
 
     private async Task<HttpResponseMessage> PostLoginAsync(string email, string password)
     {
-        using HttpClient client = _factory.CreateClient();
+        using HttpClient client = _factory.CreateAuditedClient();
 
         return await client.PostAsJsonAsync(
             SessionsPath,
@@ -236,6 +237,39 @@ internal static class TestJwtSettings
         webHost.UseSetting("JWT_ISSUER", "musicroom-tests");
         webHost.UseSetting("JWT_AUDIENCE", "musicroom-tests-client");
         webHost.UseSetting("JWT_ACCESS_TOKEN_MINUTES", "15");
+    }
+}
+
+/// <summary>
+/// A client that carries the mandatory client headers on every request — SDD §10.7, enforced by SPEC-008.
+/// </summary>
+/// <remarks>
+/// Every mutating call in every suite needs them, so the helper is here rather than repeated. A suite that
+/// is proving the header rule itself builds its own client instead.
+/// </remarks>
+internal static class TestClientContext
+{
+    /// <summary>The platform value the suites send.</summary>
+    internal const string Platform = "test-harness";
+
+    /// <summary>The device value the suites send.</summary>
+    internal const string Device = "ci-runner";
+
+    /// <summary>The app version the suites send.</summary>
+    internal const string AppVersion = "0.0.0-test";
+
+    /// <summary>Creates a client whose default headers satisfy the middleware.</summary>
+    /// <param name="factory">The test host.</param>
+    /// <returns>A client ready to send a mutating request.</returns>
+    internal static HttpClient CreateAuditedClient(this WebApplicationFactory<Program> factory)
+    {
+        HttpClient client = factory.CreateClient();
+
+        client.DefaultRequestHeaders.Add(ClientContextMiddleware.PlatformHeader, Platform);
+        client.DefaultRequestHeaders.Add(ClientContextMiddleware.DeviceHeader, Device);
+        client.DefaultRequestHeaders.Add(ClientContextMiddleware.AppVersionHeader, AppVersion);
+
+        return client;
     }
 }
 

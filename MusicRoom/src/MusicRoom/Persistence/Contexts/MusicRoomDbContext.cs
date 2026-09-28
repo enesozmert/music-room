@@ -29,6 +29,9 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>The outstanding and spent password reset tokens.</summary>
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
+    /// <summary>The mandatory audit log — subject V.6, SDD §13.4.</summary>
+    public DbSet<AuditRecord> AuditRecords => Set<AuditRecord>();
+
     /// <summary>Stamps the common columns, then saves — SDD §8.3.</summary>
     /// <param name="cancellationToken">The caller's cancellation token.</param>
     /// <returns>The number of rows written.</returns>

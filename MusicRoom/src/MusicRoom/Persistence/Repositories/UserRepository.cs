@@ -58,9 +58,8 @@ internal sealed class UserRepository : IUserRepository
         // The spend and the flag must not be separable. A crash between them would leave a token
         // consumed and its account unverified, and no later request could repair that: the only
         // token that could set the flag is the one already spent.
-        await using IDbContextTransaction transaction = await _context.Database
-            .BeginTransactionAsync(cancellationToken)
-            .ConfigureAwait(false);
+        await using IDbContextTransaction? transaction =
+            await BeginIfNoneAsync(cancellationToken).ConfigureAwait(false);
 
         // One conditional UPDATE. Whoever affects a row won the token; everybody else is told so by
         // the database, under its own row lock, rather than by a read this code performed earlier.
@@ -81,7 +80,7 @@ internal sealed class UserRepository : IUserRepository
         }
 
         await MarkEmailVerifiedAsync(tokenHash, nowUtc, cancellationToken).ConfigureAwait(false);
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        await CommitIfOwnedAsync(transaction, cancellationToken).ConfigureAwait(false);
 
         return VerifyEmailOutcome.Verified;
     }
@@ -98,9 +97,8 @@ internal sealed class UserRepository : IUserRepository
         // The supersede and the insert must not be separable. A crash between them would leave an
         // account with every link consumed and no replacement, which no later request could repair
         // except by asking for yet another resend.
-        await using IDbContextTransaction transaction = await _context.Database
-            .BeginTransactionAsync(cancellationToken)
-            .ConfigureAwait(false);
+        await using IDbContextTransaction? transaction =
+            await BeginIfNoneAsync(cancellationToken).ConfigureAwait(false);
 
         Guid userId = await _context.Users
             .AsNoTracking()
@@ -120,7 +118,7 @@ internal sealed class UserRepository : IUserRepository
         _context.EmailVerificationTokens.Add(token);
 
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        await CommitIfOwnedAsync(transaction, cancellationToken).ConfigureAwait(false);
 
         return true;
     }
@@ -149,9 +147,8 @@ internal sealed class UserRepository : IUserRepository
         // The supersede and the insert must not be separable, for the reason SPEC-004 gives for
         // verification: a crash between them would leave an account with every link spent and no
         // replacement.
-        await using IDbContextTransaction transaction = await _context.Database
-            .BeginTransactionAsync(cancellationToken)
-            .ConfigureAwait(false);
+        await using IDbContextTransaction? transaction =
+            await BeginIfNoneAsync(cancellationToken).ConfigureAwait(false);
 
         // Unlike verification, an unverified account is eligible: someone who mistyped a password before
         // confirming their address must still be able to recover it.
@@ -173,7 +170,7 @@ internal sealed class UserRepository : IUserRepository
         _context.PasswordResetTokens.Add(token);
 
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        await CommitIfOwnedAsync(transaction, cancellationToken).ConfigureAwait(false);
 
         return true;
     }
@@ -188,9 +185,8 @@ internal sealed class UserRepository : IUserRepository
         // All three writes or none — SPEC-007 escalation 1, option A. A reset that replaced the password
         // and failed to revoke the families would leave a thief holding a live session behind a password
         // its owner had already changed.
-        await using IDbContextTransaction transaction = await _context.Database
-            .BeginTransactionAsync(cancellationToken)
-            .ConfigureAwait(false);
+        await using IDbContextTransaction? transaction =
+            await BeginIfNoneAsync(cancellationToken).ConfigureAwait(false);
 
         // One conditional UPDATE. Whoever affects the row won the token; everybody else is told so by the
         // database, under its own row lock, rather than by a read this code performed earlier.
@@ -221,7 +217,7 @@ internal sealed class UserRepository : IUserRepository
 
         await ReplacePasswordHashAsync(userId, newPasswordHash, nowUtc, cancellationToken).ConfigureAwait(false);
         await RevokeEveryRefreshTokenAsync(userId, nowUtc, cancellationToken).ConfigureAwait(false);
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        await CommitIfOwnedAsync(transaction, cancellationToken).ConfigureAwait(false);
 
         return ResetPasswordOutcome.Reset;
     }
@@ -355,4 +351,28 @@ internal sealed class UserRepository : IUserRepository
         exception.InnerException is PostgresException postgresException
         && string.Equals(postgresException.SqlState, PostgresErrorCodes.UniqueViolation, StringComparison.Ordinal)
         && string.Equals(postgresException.ConstraintName, "ux_users_email", StringComparison.Ordinal);
+
+    /// <summary>
+    /// Opens a transaction only when the request does not already have one.
+    /// </summary>
+    /// <remarks>
+    /// SPEC-008 put the audit record inside the command's transaction, so a behaviour now opens one before
+    /// the handler runs. EF Core refuses a second <c>BeginTransactionAsync</c> on the same context, so this
+    /// method enlists instead of beginning, and returns null to say "not yours to commit".
+    /// </remarks>
+    private async Task<IDbContextTransaction?> BeginIfNoneAsync(CancellationToken cancellationToken) =>
+        _context.Database.CurrentTransaction is null
+            ? await _context.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)
+            : null;
+
+    /// <summary>
+    /// Commits only a transaction this repository opened. A null one belongs to the caller — today, the
+    /// audit behaviour, which commits after the record is written.
+    /// </summary>
+    private static Task CommitIfOwnedAsync(
+        IDbContextTransaction? transaction,
+        CancellationToken cancellationToken) =>
+        transaction is null
+            ? Task.CompletedTask
+            : transaction.CommitAsync(cancellationToken);
 }

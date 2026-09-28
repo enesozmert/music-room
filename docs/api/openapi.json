@@ -87,6 +87,9 @@
           "required": true
         },
         "responses": {
+          "400": {
+            "description": "Bad Request"
+          },
           "202": {
             "description": "Accepted"
           },
@@ -159,6 +162,9 @@
           "required": true
         },
         "responses": {
+          "400": {
+            "description": "Bad Request"
+          },
           "202": {
             "description": "Accepted"
           },
@@ -197,6 +203,9 @@
           "required": true
         },
         "responses": {
+          "400": {
+            "description": "Bad Request"
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -235,6 +244,9 @@
           "required": true
         },
         "responses": {
+          "400": {
+            "description": "Bad Request"
+          },
           "200": {
             "description": "OK",
             "content": {
@@ -273,6 +285,9 @@
           "required": true
         },
         "responses": {
+          "400": {
+            "description": "Bad Request"
+          },
           "202": {
             "description": "Accepted"
           },
