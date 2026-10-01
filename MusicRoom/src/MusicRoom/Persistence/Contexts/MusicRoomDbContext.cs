@@ -77,6 +77,9 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>Registered devices and who holds playback control of each — subject V.2.2, ADR-0017.</summary>
     public DbSet<Device> Devices => Set<Device>();
 
+    /// <summary>Who is playing what, on which device — ADR-0017. One live session per device.</summary>
+    public DbSet<PlaybackSession> PlaybackSessions => Set<PlaybackSession>();
+
     /// <summary>Stamps the common columns, then saves — SDD §8.3.</summary>
     /// <param name="cancellationToken">The caller's cancellation token.</param>
     /// <returns>The number of rows written.</returns>

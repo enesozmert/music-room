@@ -2612,6 +2612,252 @@
           }
         }
       }
+    },
+    "/api/v1/devices/{deviceId}/playback-session": {
+      "get": {
+        "tags": [
+          "DevicePlaybackEndpoints"
+        ],
+        "summary": "Read what a device is playing",
+        "description": "The device's owner or its current controller: the people who could change what it plays are the people entitled to know what it is playing. A device that is not playing answers 404.",
+        "operationId": "GetDevicePlaybackSession",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybackSessionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/playback-sessions": {
+      "post": {
+        "tags": [
+          "PlaybackEndpoints"
+        ],
+        "summary": "Start playing a source on a device",
+        "description": "The device's owner starts playback, on a source they may see. The server picks what plays first. A device already playing answers 409: it holds at most one live session.",
+        "operationId": "PostPlaybackSession",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaybackStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/playback-sessions/{sessionId}": {
+      "get": {
+        "tags": [
+          "PlaybackEndpoints"
+        ],
+        "summary": "Read one playback session",
+        "description": "Anybody who may see the source may see what it is playing, with the ETag a command sends back as If-Match. A caller who may not see the source answers 404.",
+        "operationId": "GetPlaybackSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybackSessionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "PlaybackEndpoints"
+        ],
+        "summary": "Jump to a named item",
+        "description": "The one route where the client chooses what plays, so it is guarded and bounded: the controller may jump, and only to an item of the source already playing.",
+        "operationId": "PatchPlaybackSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaybackJumpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "412": {
+            "description": "Precondition Failed"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "PlaybackEndpoints"
+        ],
+        "summary": "Stop playback",
+        "description": "The device's owner stops it: a delegate steers what plays and does not get to switch the speaker off. The row is stamped ended rather than deleted, and the device may start again.",
+        "operationId": "DeletePlaybackSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/playback-sessions/{sessionId}/advances": {
+      "post": {
+        "tags": [
+          "PlaybackEndpoints"
+        ],
+        "summary": "Report that the track ended",
+        "description": "The controller's route. The server picks the next item — highest vote count for an event, next position for a playlist. `expectedNowPlayingId` makes a retry harmless: a stale expectation returns the current state rather than skipping a second track. A stale If-Match is 412. Nothing left to play ends the session and answers 409.",
+        "operationId": "PostPlaybackAdvance",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PlaybackAdvanceRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaybackSessionDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "412": {
+            "description": "Precondition Failed"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3402,6 +3648,131 @@
         },
         "description": "The reset payload — `docs/api/ENDPOINTS.md` §1."
       },
+      "PlaybackAdvanceRequest": {
+        "required": [
+          "expectedNowPlayingId"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedNowPlayingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What the client believes is playing. A mismatch means this is a retry of a move that already happened.",
+            "format": "uuid"
+          }
+        },
+        "description": "The advance payload."
+      },
+      "PlaybackJumpRequest": {
+        "required": [
+          "nowPlayingId"
+        ],
+        "type": "object",
+        "properties": {
+          "nowPlayingId": {
+            "type": "string",
+            "description": "The item to play, which must belong to the session's source.",
+            "format": "uuid"
+          }
+        },
+        "description": "The jump payload."
+      },
+      "PlaybackSessionDetail": {
+        "required": [
+          "sessionId",
+          "deviceId",
+          "sourceType",
+          "sourceId",
+          "nowPlayingId",
+          "startedAtUtc",
+          "endedAtUtc",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "description": "The session.",
+            "format": "uuid"
+          },
+          "deviceId": {
+            "type": "string",
+            "description": "The device doing the playing.",
+            "format": "uuid"
+          },
+          "sourceType": {
+            "description": "Whether the source is an event or a playlist.",
+            "$ref": "#/components/schemas/PlaybackSourceType"
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "The event or the playlist.",
+            "format": "uuid"
+          },
+          "nowPlayingId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What is playing now, or null once the queue is exhausted.",
+            "format": "uuid"
+          },
+          "startedAtUtc": {
+            "type": "string",
+            "description": "When playback began.",
+            "format": "date-time"
+          },
+          "endedAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When it stopped, or null while it is live.",
+            "format": "date-time"
+          },
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The `xmin`, which the endpoint publishes as the `ETag`.",
+            "format": "uint32"
+          }
+        },
+        "description": "One playback session, as a caller who may see its source reads it."
+      },
+      "PlaybackSourceType": {
+        "type": "integer",
+        "description": "What a playback session is playing from — ADR-0017."
+      },
+      "PlaybackStartRequest": {
+        "required": [
+          "deviceId",
+          "sourceType",
+          "sourceId"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "The device, which the caller must own.",
+            "format": "uuid"
+          },
+          "sourceType": {
+            "description": "Whether the source is an event or a playlist.",
+            "$ref": "#/components/schemas/PlaybackSourceType"
+          },
+          "sourceId": {
+            "type": "string",
+            "description": "The event or the playlist.",
+            "format": "uuid"
+          }
+        },
+        "description": "The session-start payload — `docs/api/ENDPOINTS.md` §7."
+      },
       "PlaylistCreation": {
         "required": [
           "name",
@@ -4161,6 +4532,12 @@
     },
     {
       "name": "DeviceEndpoints"
+    },
+    {
+      "name": "DevicePlaybackEndpoints"
+    },
+    {
+      "name": "PlaybackEndpoints"
     }
   ]
 }

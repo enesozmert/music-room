@@ -26,19 +26,61 @@ public static class PersistenceServiceRegistration
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddDbContext<MusicRoomDbContext>(options => options.UseNpgsql(connectionString));
+
+        IdentityRepositories.Add(services);
+        CollaborationRepositories.Add(services);
+        PlaybackRepositories.Add(services);
+
+        services.AddScoped<IAuditSink, AuditSink>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        return services;
+    }
+}
+
+/// <summary>The identity and profile read and write paths.</summary>
+/// <remarks>
+/// Grouped by context rather than listed in one method, which the coupling gate caps at 30 types — the same
+/// reason <c>CallerServices</c> and <c>PlaylistChildRoutes</c> exist. The grouping follows SDD §5.2's bounded
+/// contexts, so a new repository has one obvious home.
+/// </remarks>
+internal static class IdentityRepositories
+{
+    /// <summary>Registers them.</summary>
+    /// <param name="services">The container being built.</param>
+    internal static void Add(IServiceCollection services)
+    {
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IProfileRepository, ProfileRepository>();
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();
+    }
+}
+
+/// <summary>The playlist and event read and write paths — the two collaboration contexts.</summary>
+internal static class CollaborationRepositories
+{
+    /// <summary>Registers them.</summary>
+    /// <param name="services">The container being built.</param>
+    internal static void Add(IServiceCollection services)
+    {
         services.AddScoped<IPlaylistRepository, PlaylistRepository>();
         services.AddScoped<IPlaylistTrackRepository, PlaylistTrackRepository>();
         services.AddScoped<IEventRepository, EventRepository>();
         services.AddScoped<IEventQueueRepository, EventQueueRepository>();
         services.AddScoped<IEventCodeRepository, EventCodeRepository>();
-        services.AddScoped<IDeviceRepository, DeviceRepository>();
-        services.AddScoped<IAuditSink, AuditSink>();
-        services.AddScoped<IUnitOfWork, UnitOfWork>();
+    }
+}
 
-        return services;
+/// <summary>The device and playback read and write paths.</summary>
+internal static class PlaybackRepositories
+{
+    /// <summary>Registers them.</summary>
+    /// <param name="services">The container being built.</param>
+    internal static void Add(IServiceCollection services)
+    {
+        services.AddScoped<IDeviceRepository, DeviceRepository>();
+        services.AddScoped<IPlaybackSessionRepository, PlaybackSessionRepository>();
+        services.AddScoped<IPlaybackQueueReader, PlaybackQueueReader>();
     }
 }

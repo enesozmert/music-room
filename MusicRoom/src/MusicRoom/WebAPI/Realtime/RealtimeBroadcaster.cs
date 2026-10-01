@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using MusicRoom.Application.Abstractions.Realtime;
+using MusicRoom.Domain.Common;
 using MusicRoom.WebAPI.Hubs;
 
 namespace MusicRoom.WebAPI.Realtime;
@@ -19,6 +20,15 @@ namespace MusicRoom.WebAPI.Realtime;
 /// </remarks>
 internal sealed class RealtimeBroadcaster : IRealtimeBroadcaster
 {
+    /// <summary>
+    /// The `NowPlayingChanged` event name, which both hubs publish — SDD §9.2.
+    /// </summary>
+    /// <remarks>
+    /// Declared here rather than on either hub, because it is the one event that belongs to both: a session plays
+    /// from an event or from a playlist, and its listeners are grouped by whichever it is.
+    /// </remarks>
+    internal const string NowPlayingChangedEvent = "NowPlayingChanged";
+
     private readonly IHubContext<PlaylistHub> _playlists;
     private readonly IHubContext<EventHub> _events;
     private readonly ILogger<RealtimeBroadcaster> _logger;
@@ -68,26 +78,55 @@ internal sealed class RealtimeBroadcaster : IRealtimeBroadcaster
         }
     }
 
-    /// <summary>The group and the event name one payload goes to — SDD §9.2 names all seven.</summary>
+    /// <summary>The group and the event name one payload goes to — SDD §9.2 names all eight.</summary>
     /// <exception cref="ArgumentOutOfRangeException">
     /// A payload type with no route. It is a programming error, not a delivery failure, so it is not swallowed
     /// with the two exceptions above.
     /// </exception>
+    /// <remarks>
+    /// One table per hub, because one table for all of them is a switch the complexity gate refuses — and because
+    /// a reader looking for "what does PlaylistHub publish" should find one list, not a filter.
+    /// </remarks>
     private (IClientProxy Group, string EventName) Route(IRealtimeBroadcast broadcast) => broadcast switch
     {
-        TrackAdded => (PlaylistGroup(broadcast), PlaylistHub.TrackAddedEvent),
-        TrackMoved => (PlaylistGroup(broadcast), PlaylistHub.TrackMovedEvent),
-        TrackRemoved => (PlaylistGroup(broadcast), PlaylistHub.TrackRemovedEvent),
-        CollaboratorChanged => (PlaylistGroup(broadcast), PlaylistHub.CollaboratorChangedEvent),
+        PlaylistBroadcast => (PlaylistGroup(broadcast), PlaylistEventName(broadcast)),
+        EventBroadcast => (EventGroup(broadcast), EventEventName(broadcast)),
 
-        TrackSuggested => (EventGroup(broadcast), EventHub.TrackSuggestedEvent),
-        VoteChanged => (EventGroup(broadcast), EventHub.VoteChangedEvent),
-        QueueReordered => (EventGroup(broadcast), EventHub.QueueReorderedEvent),
+        // The one payload that belongs to both: a session plays from an event or from a playlist, and its
+        // listeners are grouped by whichever it is — SDD §9.2.
+        NowPlayingChanged playback => (
+            playback.SourceType == PlaybackSourceType.Event
+                ? EventGroup(broadcast)
+                : PlaylistGroup(broadcast),
+            NowPlayingChangedEvent),
 
         _ => throw new ArgumentOutOfRangeException(
             nameof(broadcast),
             broadcast.GetType().Name,
             "No hub route is declared for this payload — SDD §9.2."),
+    };
+
+    private static string PlaylistEventName(IRealtimeBroadcast broadcast) => broadcast switch
+    {
+        TrackAdded => PlaylistHub.TrackAddedEvent,
+        TrackMoved => PlaylistHub.TrackMovedEvent,
+        TrackRemoved => PlaylistHub.TrackRemovedEvent,
+        CollaboratorChanged => PlaylistHub.CollaboratorChangedEvent,
+        _ => throw new ArgumentOutOfRangeException(
+            nameof(broadcast),
+            broadcast.GetType().Name,
+            "No PlaylistHub event name is declared for this payload — SDD §9.2."),
+    };
+
+    private static string EventEventName(IRealtimeBroadcast broadcast) => broadcast switch
+    {
+        TrackSuggested => EventHub.TrackSuggestedEvent,
+        VoteChanged => EventHub.VoteChangedEvent,
+        QueueReordered => EventHub.QueueReorderedEvent,
+        _ => throw new ArgumentOutOfRangeException(
+            nameof(broadcast),
+            broadcast.GetType().Name,
+            "No EventHub event name is declared for this payload — SDD §9.2."),
     };
 
     private IClientProxy PlaylistGroup(IRealtimeBroadcast broadcast) =>
