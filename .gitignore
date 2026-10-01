@@ -31,6 +31,10 @@ reference/
 .agent/STOP
 .agent/.lock
 .agent/*.local
+# land-stack.sh works in a git worktree here. It is inside the repository on purpose — one
+# directory for the whole project — so it has to be ignored, or `git status` is dirty while a
+# stack lands and run.sh refuses to start on a dirty tree.
+.agent/.land-worktree/
 
 # Claude Code: personal settings stay out of the shared configuration.
 .claude/settings.local.json
