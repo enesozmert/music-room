@@ -313,6 +313,7 @@ internal static class ApiServices
         services.AddOpenApi();
         services.AddProblemDetails();
         CredentialRateLimiterPolicies.Add(services, configuration);
+        EventRateLimiterPolicies.Add(services);
     }
 }
 

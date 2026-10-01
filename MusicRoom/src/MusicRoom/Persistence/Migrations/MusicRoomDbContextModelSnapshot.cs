@@ -261,6 +261,89 @@ namespace MusicRoom.Persistence.Migrations
                     b.ToTable("event_attendances", (string)null);
                 });
 
+            modelBuilder.Entity("MusicRoom.Domain.Entities.EventCode", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("code_hash");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<DateTime>("ExpiresAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at_utc");
+
+                    b.Property<Guid>("IssuedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("issued_by_user_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeHash")
+                        .IsUnique()
+                        .HasDatabaseName("ux_event_codes_code_hash");
+
+                    b.HasIndex("EventId")
+                        .HasDatabaseName("ix_event_codes_event_id");
+
+                    b.HasIndex("IssuedByUserId")
+                        .HasDatabaseName("ix_event_codes_issued_by_user_id");
+
+                    b.ToTable("event_codes", (string)null);
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.EventCodeRedemption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("EventCodeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_code_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_event_code_redemptions_user_id");
+
+                    b.HasIndex("EventCodeId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_event_code_redemptions_event_code_id_user_id");
+
+                    b.ToTable("event_code_redemptions", (string)null);
+                });
+
             modelBuilder.Entity("MusicRoom.Domain.Entities.EventInvitation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -294,6 +377,89 @@ namespace MusicRoom.Persistence.Migrations
                         .HasDatabaseName("ux_event_invitations_event_id_user_id");
 
                     b.ToTable("event_invitations", (string)null);
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.EventSuggestion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("SuggestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("suggested_by_user_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("YoutubeVideoId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("youtube_video_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SuggestedByUserId")
+                        .HasDatabaseName("ix_event_suggestions_suggested_by_user_id");
+
+                    b.HasIndex("EventId", "YoutubeVideoId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_event_suggestions_event_id_youtube_video_id");
+
+                    b.ToTable("event_suggestions", (string)null);
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.EventVote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("SuggestionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("suggestion_id");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SuggestionId")
+                        .HasDatabaseName("ix_event_votes_suggestion_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_event_votes_user_id");
+
+                    b.HasIndex("EventId", "SuggestionId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_event_votes_event_id_suggestion_id_user_id");
+
+                    b.ToTable("event_votes", (string)null);
                 });
 
             modelBuilder.Entity("MusicRoom.Domain.Entities.FriendRequest", b =>
@@ -805,11 +971,77 @@ namespace MusicRoom.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("MusicRoom.Domain.Entities.EventCode", b =>
+                {
+                    b.HasOne("MusicRoom.Domain.Entities.Event", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("IssuedByUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.EventCodeRedemption", b =>
+                {
+                    b.HasOne("MusicRoom.Domain.Entities.EventCode", null)
+                        .WithMany()
+                        .HasForeignKey("EventCodeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("MusicRoom.Domain.Entities.EventInvitation", b =>
                 {
                     b.HasOne("MusicRoom.Domain.Entities.Event", null)
                         .WithMany()
                         .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.EventSuggestion", b =>
+                {
+                    b.HasOne("MusicRoom.Domain.Entities.Event", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("SuggestedByUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.EventVote", b =>
+                {
+                    b.HasOne("MusicRoom.Domain.Entities.Event", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MusicRoom.Domain.Entities.EventSuggestion", null)
+                        .WithMany()
+                        .HasForeignKey("SuggestionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

@@ -31,6 +31,21 @@ public interface IEventRepository
         DateTime nowUtc,
         CancellationToken cancellationToken);
 
+    /// <summary>What the licence requires of a voter right now — ADR-0014.</summary>
+    /// <param name="eventId">The event.</param>
+    /// <param name="nowUtc">Server time, which decides the window.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The policy and the window, or null when there is no such event.</returns>
+    /// <remarks>
+    /// Separate from <see cref="FindAccessAsync"/> because the gate and the proof are two different questions:
+    /// the gate says whether this caller may vote at all, and this says what they must show. Only the vote path
+    /// asks the second one.
+    /// </remarks>
+    Task<EventPresence?> FindPresenceAsync(
+        Guid eventId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken);
+
     /// <summary>One event, if the caller may see it.</summary>
     /// <param name="eventId">The event.</param>
     /// <param name="userId">The caller.</param>

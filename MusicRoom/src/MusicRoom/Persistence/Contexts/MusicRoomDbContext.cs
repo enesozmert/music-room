@@ -62,6 +62,18 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>Who is on an event's roster — a roster, never a gate (SPEC-017 decision 5).</summary>
     public DbSet<EventAttendance> EventAttendances => Set<EventAttendance>();
 
+    /// <summary>The tracks suggested for an event — subject V.2.1.</summary>
+    public DbSet<EventSuggestion> EventSuggestions => Set<EventSuggestion>();
+
+    /// <summary>The votes. There is no counter: the queue counts these rows — SPEC-018 decision 2.</summary>
+    public DbSet<EventVote> EventVotes => Set<EventVote>();
+
+    /// <summary>The short-lived venue codes, stored as digests — ADR-0014.</summary>
+    public DbSet<EventCode> EventCodes => Set<EventCode>();
+
+    /// <summary>One row per account per code: single use, enforced by the database.</summary>
+    public DbSet<EventCodeRedemption> EventCodeRedemptions => Set<EventCodeRedemption>();
+
     /// <summary>Stamps the common columns, then saves — SDD §8.3.</summary>
     /// <param name="cancellationToken">The caller's cancellation token.</param>
     /// <returns>The number of rows written.</returns>

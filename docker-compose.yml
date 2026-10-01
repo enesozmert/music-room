@@ -7,6 +7,9 @@
 services:
   db:
     image: postgres:18.2-alpine
+    env_file:
+      - .env
+
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
@@ -28,6 +31,9 @@ services:
     build:
       context: ./MusicRoom
       dockerfile: Dockerfile
+    env_file:
+      - .env
+
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       # Vendor-neutral by design — ADR-0026. Inside the compose network the host is `db`, so the
