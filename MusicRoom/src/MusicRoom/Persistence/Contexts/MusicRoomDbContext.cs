@@ -50,6 +50,9 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>The people named on a playlist, and whether each may write to it.</summary>
     public DbSet<PlaylistCollaborator> PlaylistCollaborators => Set<PlaylistCollaborator>();
 
+    /// <summary>The tracks of a playlist, in sparse position order — SPEC-015.</summary>
+    public DbSet<PlaylistTrack> PlaylistTracks => Set<PlaylistTrack>();
+
     /// <summary>Stamps the common columns, then saves — SDD §8.3.</summary>
     /// <param name="cancellationToken">The caller's cancellation token.</param>
     /// <returns>The number of rows written.</returns>

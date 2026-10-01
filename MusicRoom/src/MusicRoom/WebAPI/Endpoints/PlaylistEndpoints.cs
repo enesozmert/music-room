@@ -25,7 +25,7 @@ public static class PlaylistEndpoints
     /// <summary>The largest page a caller may ask for — an unbounded list is OWASP API4.</summary>
     public const int MaximumPageSize = 50;
 
-    /// <summary>Maps the playlist routes and, through its own class, the collaborator routes.</summary>
+    /// <summary>Maps the playlist routes, and through one child class the collaborator and track routes.</summary>
     /// <param name="endpoints">The route builder.</param>
     /// <returns>The same builder, so calls chain.</returns>
     public static IEndpointRouteBuilder MapPlaylistEndpoints(this IEndpointRouteBuilder endpoints)
@@ -39,7 +39,7 @@ public static class PlaylistEndpoints
         MapSetLicence(group);
         MapDelete(group);
 
-        PlaylistCollaboratorEndpoints.Map(group);
+        PlaylistChildRoutes.Map(group);
 
         return endpoints;
     }
@@ -267,7 +267,7 @@ public static class PlaylistEndpoints
     /// Reads `If-Match` back into an `xmin`. A missing, malformed or wildcard header fails: a wildcard means
     /// "whatever is there", which is exactly the last-write-wins behaviour this guard exists to prevent.
     /// </summary>
-    private static bool TryReadIfMatch(HttpContext httpContext, out uint expectedVersion)
+    internal static bool TryReadIfMatch(HttpContext httpContext, out uint expectedVersion)
     {
         expectedVersion = 0;
 

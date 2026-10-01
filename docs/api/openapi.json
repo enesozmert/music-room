@@ -1345,6 +1345,241 @@
           }
         }
       }
+    },
+    "/api/v1/playlists/{playlistId}/tracks": {
+      "get": {
+        "tags": [
+          "PlaylistTrackEndpoints"
+        ],
+        "summary": "List a playlist's tracks in order",
+        "description": "Anybody who may see the playlist may see its tracks. The response carries the ETag the client sends back as If-Match when it adds, moves or removes one. A caller who may not see the playlist answers 404, not an empty list, because an empty list would confirm it exists.",
+        "operationId": "GetPlaylistTracks",
+        "parameters": [
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaylistTrackSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "PlaylistTrackEndpoints"
+        ],
+        "summary": "Add a track to a playlist",
+        "description": "Requires If-Match carrying the ETag of the track list the client last read. Appends by default; atHead or afterTrackId names a position. A playlist already holding its maximum number of tracks answers 409. The same video may appear twice: a playlist that plays a track twice is a playlist, not an error.",
+        "operationId": "PostPlaylistTrack",
+        "parameters": [
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrackAddition"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "412": {
+            "description": "Precondition Failed"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/playlists/{playlistId}/tracks/{playlistTrackId}": {
+      "patch": {
+        "tags": [
+          "PlaylistTrackEndpoints"
+        ],
+        "summary": "Move a track within a playlist",
+        "description": "Exactly one of afterTrackId or beforeTrackId. Requires If-Match: when two clients reorder the same list at once exactly one is applied and the other is told 412 and reloads, which is the whole point of versioning a collection.",
+        "operationId": "PatchPlaylistTrack",
+        "parameters": [
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "playlistTrackId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The track.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrackDestination"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "412": {
+            "description": "Precondition Failed"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "PlaylistTrackEndpoints"
+        ],
+        "summary": "Remove a track from a playlist",
+        "description": "Requires If-Match. Removing leaves the remaining order untouched: positions are sparse, so the hole costs nothing and no other row is rewritten.",
+        "operationId": "DeletePlaylistTrack",
+        "parameters": [
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "playlistTrackId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "412": {
+            "description": "Precondition Failed"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1786,6 +2021,41 @@
         },
         "description": "One playlist in a list."
       },
+      "PlaylistTrackSummary": {
+        "required": [
+          "playlistTrackId",
+          "youtubeVideoId",
+          "position",
+          "addedByUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "playlistTrackId": {
+            "type": "string",
+            "description": "The id the move and remove routes take.",
+            "format": "uuid"
+          },
+          "youtubeVideoId": {
+            "type": "string",
+            "description": "The video id, verbatim. No title or duration: that is slice S4's catalog."
+          },
+          "position": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The sparse ordering key. Exposed because it is not a secret and a client that has it\n            can render a stable list without inferring order from array indices.",
+            "format": "int64"
+          },
+          "addedByUserId": {
+            "type": "string",
+            "description": "Who added it.",
+            "format": "uuid"
+          }
+        },
+        "description": "One track in a playlist, as a client reads it — `GET /api/v1/playlists/{playlistId}/tracks`."
+      },
       "ProfileDateFieldRequest": {
         "required": [
           "value",
@@ -2013,6 +2283,62 @@
         },
         "description": "The rotation payload — `docs/api/ENDPOINTS.md` §1."
       },
+      "TrackAddition": {
+        "required": [
+          "youtubeVideoId",
+          "afterTrackId",
+          "atHead"
+        ],
+        "type": "object",
+        "properties": {
+          "youtubeVideoId": {
+            "type": "string",
+            "description": "The video."
+          },
+          "afterTrackId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Put it after this track. Absent means the tail.",
+            "format": "uuid"
+          },
+          "atHead": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "True to put it before everything."
+          }
+        },
+        "description": "The add-a-track payload — `docs/api/ENDPOINTS.md` §5."
+      },
+      "TrackDestination": {
+        "required": [
+          "afterTrackId",
+          "beforeTrackId"
+        ],
+        "type": "object",
+        "properties": {
+          "afterTrackId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Put it after this track.",
+            "format": "uuid"
+          },
+          "beforeTrackId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Put it before this track.",
+            "format": "uuid"
+          }
+        },
+        "description": "The move payload. Exactly one neighbour, or `422`."
+      },
       "UpdateProfileRequest": {
         "required": [
           "realName",
@@ -2188,6 +2514,9 @@
     },
     {
       "name": "PlaylistCollaboratorEndpoints"
+    },
+    {
+      "name": "PlaylistTrackEndpoints"
     }
   ]
 }

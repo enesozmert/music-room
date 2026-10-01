@@ -264,10 +264,10 @@ Subject V.2.3. The second contended write path.
 | GET | `/playlists/{playlistId}/collaborators` | paged | `200` | `404` | `member` |
 | POST | `/playlists/{playlistId}/collaborators` | `userId`, `canEdit` | `201` | `404`, `409` | `owner` |
 | DELETE | `/playlists/{playlistId}/collaborators/{userId}` | — | `204` | `404` | `owner` |
-| GET | `/playlists/{playlistId}/tracks` | paged, ordered | `200` + `ETag` | `404` | `member` |
-| POST | `/playlists/{playlistId}/tracks` | `youtubeVideoId`, `afterTrackId?` | `201` | `404`, `422` | `licence` |
-| PATCH | `/playlists/{playlistId}/tracks/{playlistTrackId}` | `afterTrackId` or `beforeTrackId` | `200` | `404`, `409`, `412` | `licence` |
-| DELETE | `/playlists/{playlistId}/tracks/{playlistTrackId}` | — | `204` | `404` | `licence` |
+| GET | `/playlists/{playlistId}/tracks` | query: `page`, `pageSize` | `200` + `ETag` | `404` | `member` |
+| POST | `/playlists/{playlistId}/tracks` | `youtubeVideoId`, `afterTrackId?`, `atHead?` | `201` | `404`, `409` full, `412`, `422` | `licence` |
+| PATCH | `/playlists/{playlistId}/tracks/{playlistTrackId}` | `afterTrackId` or `beforeTrackId` | `200` | `404`, `412`, `422` | `licence` |
+| DELETE | `/playlists/{playlistId}/tracks/{playlistTrackId}` | — | `204` | `404`, `412` | `licence` |
 
 ### Design notes
 
@@ -287,8 +287,17 @@ Subject V.2.3. The second contended write path.
   other — the exact failure subject V.2.3 grades.
 - Position is a sparse ordering key computed **between the neighbours named in the request**, so
   inserting between two tracks does not rewrite the list.
-- `afterTrackId: null` means "move to the head". Sending both `afterTrackId` and `beforeTrackId`
-  is `422`.
+- **Where a track goes is said explicitly** (SPEC-015). On `POST`, no destination appends, `atHead: true`
+  inserts before everything, and `afterTrackId` inserts after that track; `atHead` together with
+  `afterTrackId` is `422`. On `PATCH`, **exactly one** of `afterTrackId` or `beforeTrackId` is required, and
+  neither or both is `422` — on a `PATCH` an absent field and a null field are the same request, so "null
+  means the head" would make an empty body a silent reorder. Moving to the head is `beforeTrackId` naming the
+  current first track.
+- **The collection's `ETag` is the playlist's `xmin`**, and every track write updates the playlist row in the
+  same transaction. That is what gives a list a version it cannot hold itself, and it makes the guarded
+  `UPDATE` the lock that serialises concurrent reorders: one `200`, the rest `412`.
+- **A playlist holds at most 500 tracks**, and the 501st is `409` (SPEC-015). The same video twice is
+  allowed: a playlist that plays a track twice is a playlist, not a conflict.
 - Conflicts that survive a reload-and-reapply return `409` rather than guessing the user's intent.
 - `PlaylistHub` broadcasts `TrackMoved` with the new version after commit.
 

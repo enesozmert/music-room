@@ -17,7 +17,8 @@ Evaluators ask what you did *not* protect against; this table is the answer.
 ## Status
 
 **Design-stage register.** 29 threats. Slice S0 landed the first verified rows, S1 added T-25,
-T-26 and T-27, and closed T-25; every other mitigation below is *designed*, not verified.
+T-26 and T-27, and closed T-25; S5 closed T-06 — the reorder race subject V.2.3 grades — and gave
+T-11 its first evidence. Every other mitigation below is *designed*, not verified.
 The Verified column stays empty until a test, a config artifact or a named code path proves it.
 
 ## Legend
@@ -33,12 +34,12 @@ Likelihood and Impact: L / M / H. Residual = what remains **after** the planned 
 | T-03 | Refresh-token theft | M | H | opaque, hashed at rest, rotated on every use, family revoked on reuse detection | detection is after the fact, not preventive | | — |
 | T-04 | Broken object-level authorization (another user's data) | M | H | two gates in a pipeline behaviour, checked on every request and hub join; hidden resources return `404` | a new endpoint that bypasses the behaviour; mitigated by a required negative test per endpoint | | — |
 | T-05 | Vote manipulation (double voting, stuffing) | H | M | unique index `(EventId, TrackId, UserId)` as the arbiter, rate limit on the vote endpoint | multiple accounts by one person (sybil) is not prevented; email verification raises the cost only | | — |
-| T-06 | Playlist reorder conflict causing lost or divergent order | H | M | sparse ordering keys plus concurrency token, reload-and-reapply or `409` | rapid concurrent edits still surface as `409` to the user | | — |
+| T-06 | Playlist reorder conflict causing lost or divergent order | H | M | a `bigint` sparse ordering key, and every track write updating the playlist row inside its own transaction keyed on the `xmin` the caller read — so the guarded `UPDATE` is both the precondition and the lock that serialises writers | rapid concurrent edits still surface as `412` to the user, who must reload and reapply. The status is `412` rather than `409`: the precondition in the request is what failed, and the fix is a reload either way | **closed by SPEC-015 on 2026-10-01** | S5: `PlaylistTrackConcurrencyTests.Reorder_TwentyParallelMovesOfOneTrack_ProduceOneWinnerAsync` — twenty parallel moves of one track with one token give exactly one `200`, nineteen `412`, and a final order that is a permutation of the original with distinct positions |
 | T-07 | Account takeover through unverified provider email matching | L | H | match an existing account only when the provider asserts `email_verified` | a provider that wrongly asserts verification | | — |
 | T-08 | ID token substitution (token minted for another app) | L | H | validate `aud`, `iss`, `exp`, `nonce` against JWKS, server-side | depends on correct JWKS caching and key rotation handling | | — |
 | T-09 | API key or secret committed to git | L | **critical** | `.env` git-ignored from commit 1, `.env.example` placeholders only, rotate-first leak procedure | subject V.8 makes this an **automatic project failure**; process discipline is the only control | | S0: `MusicRoom/.dockerignore` excludes `.env`; no `.env` and no credential string in any layer of the built image; `docker-compose.yml` carries no literal |
 | T-10 | YouTube quota exhaustion during the demo | M | M | prefer `videos.list` over `search.list`, debounce, cache `TrackRef`, handle `403 quotaExceeded` explicitly | a determined user can still burn quota; no per-user quota budget at launch | | — |
-| T-11 | Denial of service via unbounded input or list requests | M | M | capped `pageSize`, bounded string and collection lengths, global plus per-endpoint rate limits | a single instance has no upstream protection; capacity is whatever V.7 measures | | — |
+| T-11 | Denial of service via unbounded input or list requests | M | M | capped `pageSize`, bounded string and collection lengths, global plus per-endpoint rate limits, and a hard **500-track cap per playlist** answered `409` (SPEC-015), which also bounds the renumber a sparse key occasionally needs | a single instance has no upstream protection; capacity is whatever V.7 measures. The cap is per playlist, not per account: an account may still hold many playlists | | S5: `PlaylistTrackEndpointTests.AddTrack_ToAFullPlaylist_Returns409Async` |
 | T-12 | SignalR connection exhaustion | M | M | bounded payloads, explicit keep-alive and timeout settings | no backplane (issue O8), so one instance is the ceiling | | — |
 | T-13 | Database connection-pool exhaustion | M | M | small pool, short-lived connections, pooled connection string for the API | Supabase enforces a hard connection ceiling above ours | | — |
 | T-14 | Personal data over-exposure in profile responses | M | M | per-field filtering server-side by requester relationship | a new profile field added without a visibility tier; mitigated by making the tier non-nullable | | — |

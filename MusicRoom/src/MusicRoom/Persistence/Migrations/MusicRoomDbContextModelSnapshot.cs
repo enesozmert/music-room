@@ -396,6 +396,50 @@ namespace MusicRoom.Persistence.Migrations
                     b.ToTable("playlist_collaborators", (string)null);
                 });
 
+            modelBuilder.Entity("MusicRoom.Domain.Entities.PlaylistTrack", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AddedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("added_by_user_id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("PlaylistId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("playlist_id");
+
+                    b.Property<long>("Position")
+                        .HasColumnType("bigint")
+                        .HasColumnName("position");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("YoutubeVideoId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("youtube_video_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AddedByUserId")
+                        .HasDatabaseName("ix_playlist_tracks_added_by_user_id");
+
+                    b.HasIndex("PlaylistId", "Position")
+                        .HasDatabaseName("ix_playlist_tracks_playlist_id_position");
+
+                    b.ToTable("playlist_tracks", (string)null);
+                });
+
             modelBuilder.Entity("MusicRoom.Domain.Entities.Profile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -657,6 +701,21 @@ namespace MusicRoom.Persistence.Migrations
                     b.HasOne("MusicRoom.Domain.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.PlaylistTrack", b =>
+                {
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("AddedByUserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MusicRoom.Domain.Entities.Playlist", null)
+                        .WithMany()
+                        .HasForeignKey("PlaylistId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
