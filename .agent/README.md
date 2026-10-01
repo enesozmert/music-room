@@ -167,8 +167,15 @@ grepping can tell:
 GitHub Actions job `progress` recounts the snapshot on every push to `main` that touches the plan,
 the SDD, the endpoint inventory, the specs, the decision log or `MusicRoom/`. It cannot push to
 `main` — the branch is protected and `enforce_admins` is on — so it force-pushes one fixed branch,
-`chore/progress-snapshot`, and opens a pull request if none is open. There is at most one of those
-at a time, and `make land` picks it up like any other. `/progress` then republishes the board. A stale column is therefore a stale
+`chore/progress-snapshot`, and writes the progress table plus a compare link into the run summary.
+
+**It does not open the pull request, on purpose.** A pull request opened with `GITHUB_TOKEN` does
+not trigger workflow runs, so `gate` never starts on it, and `gate` is a required check on `main`:
+the result is a pull request blocked forever that cannot be rescued. #43 was exactly that. A person
+opens it from the compare link, or `/progress` does — either way the checks run.
+
+The snapshot on `main` is a convenience for the next session. `/progress` does not need it: it runs
+the script itself, then republishes the board. A stale column is therefore a stale
 number on a page someone is reading, not a stale note nobody sees.
 
 The snapshot is a generated file. Never edit `docs/progress/PROGRESS.json` by hand — fix what it
