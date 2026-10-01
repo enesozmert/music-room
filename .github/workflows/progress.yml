@@ -1,0 +1,56 @@
+# Keep docs/progress/PROGRESS.json true on main, automatically.
+#
+# The snapshot is counted from the repository, so every merge can move it. Regenerating it by hand
+# means it is right on the day someone remembers and wrong afterwards — which is exactly the kind
+# of claim docs/SDD.md section 16 is not allowed to make.
+#
+# This job only ever writes the snapshot. It never touches a document a human wrote.
+
+name: progress
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/DELIVERY-PLAN.md"
+      - "docs/SDD.md"
+      - "docs/api/ENDPOINTS.md"
+      - "docs/specs/**"
+      - "brain/decisions/decisions-index.md"
+      - "MusicRoom/**"
+      - ".agent/progress.sh"
+      - ".github/workflows/progress.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: progress-main
+  cancel-in-progress: true
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Count
+        run: ./.agent/progress.sh --write
+
+      - name: Commit the snapshot if it moved
+        run: |
+          if git diff --quiet -- docs/progress/PROGRESS.json; then
+            echo "snapshot unchanged."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/progress/PROGRESS.json
+          git commit -m "chore(progress): refresh the snapshot
+
+          Counted by .agent/progress.sh on this commit. Generated file, no judgement in it.
+
+          [skip ci]"
+          git push

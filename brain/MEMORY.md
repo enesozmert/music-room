@@ -41,6 +41,7 @@ landed — the stack of draft pull requests that used to carry them was merged o
 | Consolidated design view | [[sdd]] |
 | The API contract | [[endpoint-inventory]] |
 | What to build next, in what order | [[delivery-plan]] |
+| How far it has got, counted | `docs/progress/PROGRESS.json` — written by `.agent/progress.sh`, refreshed by the `progress` workflow on every push to `main`. The board is https://claude.ai/artifact/4fLzR9r23v7syYnYhUUoS7, republished in place by `/progress` |
 | How this repo is operated | [[user-manual]] |
 | Reusable prompts, autonomous recipes | [[prompt-library]] |
 | Shared contract for any AI agent | `AGENTS.md` |
@@ -66,6 +67,18 @@ landed — the stack of draft pull requests that used to carry them was merged o
   pattern; then write the code yourself under `MusicRoom/`.
 - Authoritative requirement source: `docs/subject/en.subject tr.pdf` (Turkish, v6) — distilled into [[subject-requirements]].
 - Toolchain present: dotnet 10.0.401, node v24.21.0, npm 11.19.0, Swift 6.3.3, Docker 29.8.0, pandoc, tectonic. **Absent**: flutter, psql, java.
+
+## Two columns that are data, not notes
+
+`.agent/progress.sh` counts everything it can and reads two things it cannot count:
+
+- the `State` column of the slice table in [[delivery-plan]] — `merged`, `in progress`, `blocked`,
+  `not started`
+- the `Lands in` column of [[decisions-index]] — `landed`, `landed, <slice>`, or the slice id
+
+A stale value in either one becomes a wrong number on the progress board, which the `progress`
+workflow regenerates on every push to `main`. Update the column in the same change that makes it
+true, the way a migration row goes in with its migration.
 
 ## Rules for agents
 

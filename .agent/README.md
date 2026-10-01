@@ -15,6 +15,7 @@ Unattended agent operation. Recipes: `docs/prompt-library/PROMPTS.md` Part 2.
 | `STOP` | create this file to halt after the current cycle. Delete it to resume |
 | `.lock` | pid of the running cycle. The driver refuses to start a second one — two drivers switch branches under each other and commit each other's work. **Git-ignored** |
 | `land-stack.sh` | lands a stack of open pull requests onto `main`, bottom first. Plan-only unless `--ready` |
+| `progress.sh` | counts how far the backend has got, from the repository. `--write` refreshes `docs/progress/PROGRESS.json` |
 | `runs/` | per-cycle logs. **Git-ignored** — transient, never committed, never copied into `brain/` |
 
 ## Use
@@ -146,3 +147,27 @@ It takes the same `.lock` as `run.sh` and refuses to start under a live cycle, a
 own detached worktree so a branch checked out in the main working copy is never disturbed.
 
 After a stack lands, the knowledge layer is behind: run `/brain-check`, then `/sdd-sync`.
+
+## Measuring progress
+
+```bash
+make progress             # print the summary
+make progress WRITE=1     # also refresh docs/progress/PROGRESS.json
+```
+
+Everything in the snapshot is counted, never estimated — except two values, which no amount of
+grepping can tell:
+
+| Source | Column | Values |
+|---|---|---|
+| `docs/DELIVERY-PLAN.md` slice table | `State` | `merged`, `in progress`, `blocked`, `not started` |
+| `brain/decisions/decisions-index.md` | `Lands in` | `landed`, `landed, <slice>`, `<slice>` |
+
+**Those two columns are the contract.** They are data, not notes: the script reads them, the
+GitHub Actions job `progress` regenerates the snapshot on every push to `main` that touches the
+plan, the SDD, the endpoint inventory, the specs, the decision log or `MusicRoom/`, and the
+`/progress` slash command republishes the board from it. A stale column is therefore a stale
+number on a page someone is reading, not a stale note nobody sees.
+
+The snapshot is a generated file. Never edit `docs/progress/PROGRESS.json` by hand — fix what it
+counted.

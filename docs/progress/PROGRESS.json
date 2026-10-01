@@ -1,0 +1,12 @@
+{
+  "generated": "2026-10-01",
+  "commit": "6583c98",
+  "branch": "feat/progress-snapshot",
+  "slices":       { "total": 12, "merged": 3, "in_progress": 1, "blocked": 1, "not_started": 7 },
+  "requirements": { "total": 35, "built": 6, "done": 5, "implemented": 1, "partly": 7, "designed": 18, "other": 4 },
+  "adrs":         { "total": 31, "landed": 14, "partly": 3, "waiting": 14 },
+  "issues":       { "open": 9, "closed": 14 },
+  "specs":        { "total": 11, "done": 11 },
+  "surface":      { "endpoints_mapped": 15, "endpoints_inventory": 81 },
+  "size":         { "tests_declared": 174, "migrations": 7, "projects": 13 }
+}
