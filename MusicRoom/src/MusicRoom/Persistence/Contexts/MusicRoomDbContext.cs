@@ -53,6 +53,15 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>The tracks of a playlist, in sparse position order — SPEC-015.</summary>
     public DbSet<PlaylistTrack> PlaylistTracks => Set<PlaylistTrack>();
 
+    /// <summary>Track-vote events — subject V.2.1. Soft-deleted rows are filtered out.</summary>
+    public DbSet<Event> Events => Set<Event>();
+
+    /// <summary>Who the owner invited to an event. On a private event this is the `member` gate.</summary>
+    public DbSet<EventInvitation> EventInvitations => Set<EventInvitation>();
+
+    /// <summary>Who is on an event's roster — a roster, never a gate (SPEC-017 decision 5).</summary>
+    public DbSet<EventAttendance> EventAttendances => Set<EventAttendance>();
+
     /// <summary>Stamps the common columns, then saves — SDD §8.3.</summary>
     /// <param name="cancellationToken">The caller's cancellation token.</param>
     /// <returns>The number of rows written.</returns>

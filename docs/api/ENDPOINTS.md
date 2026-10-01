@@ -207,12 +207,12 @@ Subject V.2.1. The contended write path. Rules: [[realtime-architecture]],
 
 | Method | Path | Body | Success | Failures | Auth |
 |---|---|---|---|---|---|
-| POST | `/events` | `name`, `visibility`, `licence`, `startsAtUtc`, `endsAtUtc` | `201` | `422` | `auth` |
+| POST | `/events` | `name`, `visibility`, `licence`, `startsAtUtc`, `endsAtUtc`, `presenceProof?`, `geofence?` | `201` | `422` | `auth` |
 | GET | `/events` | query: `scope=public\|mine\|invited`, paging | `200` paged | `401` | `auth` |
 | GET | `/events/{eventId}` | — | `200` | `404` if hidden | `member` |
-| PATCH | `/events/{eventId}` | metadata subset | `200` | `404`, `412` | `owner` |
+| PATCH | `/events/{eventId}` | `name`, `startsAtUtc`, `endsAtUtc` | `200` | `404`, `412`, `422` | `owner` |
 | DELETE | `/events/{eventId}` | — | `204` soft delete | `404` | `owner` |
-| PUT | `/events/{eventId}/licence` | `visibility`, `mode`, `presenceProof`, `geofence`, `window` | `200` | `422` | `owner` |
+| PUT | `/events/{eventId}/licence` | `visibility`, `licence`, `presenceProof?`, `geofence?` | `200` | `404`, `422` | `owner` |
 | POST | `/events/{eventId}/event-codes` | `ttlSeconds` | `201` short-lived code | `404`, `429` | `owner` |
 | GET | `/events/{eventId}/invitations` | paged | `200` | `404` | `owner` |
 | POST | `/events/{eventId}/invitations` | `userId` | `201` | `404`, `409` | `owner` |
@@ -228,6 +228,17 @@ Subject V.2.1. The contended write path. Rules: [[realtime-architecture]],
 
 ### Design notes
 
+- **The aggregate, its licence policy, invitations and attendance are implemented** (SPEC-017). The
+  contended write path — suggestions, votes, the queue, `now-playing` — and event codes are the second unit of
+  slice S6; `EventHub` is the third.
+- **The window is two required UTC instants and the end must be after the start.** Server time decides
+  everything; a client clock is evidence of nothing ([[ADR-0014-location-time-licence]]).
+- **A `LocationAndTimeRestricted` event must say which presence proof it requires**, and a `Geofence` or
+  `Both` proof must carry a centre and a radius, or the answer is `422`. A licence that claims to restrict by
+  place and time with nothing configured to check would read as a feature and behave as an open door. A
+  presence policy on any other licence mode is `422` for the mirror-image reason: nothing would ever read it.
+- **The `ETag` is the event's `xmin`**, as it is for a playlist, and `If-Match` is compared inside the
+  `UPDATE`; an absent `If-Match` on the `PATCH` is `412`, not `428`.
 - **Voting is `PUT`, not `POST`.** A vote is an idempotent fact: "this user votes for this track".
   A double submit from a flaky mobile network is then harmless — `201` the first time, `200`
   after. `POST` would create a second row and make the race worse.

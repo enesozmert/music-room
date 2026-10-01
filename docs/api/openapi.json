@@ -1580,6 +1580,476 @@
           }
         }
       }
+    },
+    "/api/v1/events": {
+      "post": {
+        "tags": [
+          "EventEndpoints"
+        ],
+        "summary": "Create an event",
+        "description": "The caller owns it. The window is two UTC instants and the end must be after the start. A LocationAndTimeRestricted licence must name the presence proof it requires, and a geofence proof must carry a centre and a radius, or the answer is 422.",
+        "operationId": "PostEvent",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventCreation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "EventEndpoints"
+        ],
+        "summary": "List events",
+        "description": "One scope at a time: mine, the ones I was invited to, or public. Paged with a capped size. A private event the caller was not invited to appears in none of them.",
+        "operationId": "GetEvents",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "mine"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EventSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}": {
+      "get": {
+        "tags": [
+          "EventEndpoints"
+        ],
+        "summary": "Read one event",
+        "description": "Returns the event with an ETag the client sends back as If-Match when it edits. An event the caller may not see answers 404, never 403, because 403 would confirm it exists.",
+        "operationId": "GetEvent",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "EventEndpoints"
+        ],
+        "summary": "Change an event's metadata",
+        "description": "Owner only, and requires If-Match carrying the ETag the client last read. A stale or absent token answers 412 and changes nothing.",
+        "operationId": "PatchEvent",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventMetadataRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "412": {
+            "description": "Precondition Failed"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "EventEndpoints"
+        ],
+        "summary": "Delete an event",
+        "description": "A soft delete, owner only: the row is stamped deleted and disappears from every read, so its audit trail keeps pointing at something that exists.",
+        "operationId": "DeleteEvent",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/licence": {
+      "put": {
+        "tags": [
+          "EventLicenceEndpoints"
+        ],
+        "summary": "Set an event's visibility, licence and presence policy",
+        "description": "Owner only. The same rules creation applies: an event cannot become a LocationAndTimeRestricted event with nothing configured to check.",
+        "operationId": "PutEventLicence",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventLicenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/invitations": {
+      "get": {
+        "tags": [
+          "EventRosterEndpoints"
+        ],
+        "summary": "List who was invited",
+        "description": "Owner only. Who else was invited to a private event is not a participant's business, and an empty list for a non-owner would still confirm the event exists — so the answer is 404.",
+        "operationId": "GetEventInvitations",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InvitationSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "EventRosterEndpoints"
+        ],
+        "summary": "Invite somebody to an event",
+        "description": "Owner only. A duplicate is 409, decided by the unique index rather than by a read-then-write check. Inviting the owner is also 409: they already hold the strongest grant.",
+        "operationId": "PostEventInvitation",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/invitations/{userId}": {
+      "delete": {
+        "tags": [
+          "EventRosterEndpoints"
+        ],
+        "summary": "Withdraw an invitation",
+        "description": "Owner only. The gate is read live on every request, so the invitee loses access on their next call rather than on their next sign-in.",
+        "operationId": "DeleteEventInvitation",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/attendances": {
+      "post": {
+        "tags": [
+          "EventRosterEndpoints"
+        ],
+        "summary": "Join an event's roster",
+        "description": "Any authenticated caller on a public event, an invitee on a private one. This is a roster and never a precondition: voting does not require it.",
+        "operationId": "PostEventAttendance",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/attendances/current": {
+      "delete": {
+        "tags": [
+          "EventRosterEndpoints"
+        ],
+        "summary": "Leave an event's roster",
+        "description": "`current` rather than a user id: the only attendance a caller may remove is their own.",
+        "operationId": "DeleteEventAttendance",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1639,6 +2109,247 @@
           }
         },
         "description": "The email verification payload — `docs/api/ENDPOINTS.md` §1."
+      },
+      "EventCreation": {
+        "required": [
+          "name",
+          "startsAtUtc",
+          "endsAtUtc",
+          "visibility",
+          "licence",
+          "presenceProof",
+          "geofence"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "What it is called."
+          },
+          "startsAtUtc": {
+            "type": "string",
+            "description": "When it begins.",
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": "string",
+            "description": "When it ends.",
+            "format": "date-time"
+          },
+          "visibility": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Who may find it. Defaults to private.",
+                "$ref": "#/components/schemas/Visibility"
+              }
+            ]
+          },
+          "licence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Who may vote in it. Defaults to invited only.",
+                "$ref": "#/components/schemas/LicenceMode"
+              }
+            ]
+          },
+          "presenceProof": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Which proof a voter must supply — required by the restricted licence.",
+                "$ref": "#/components/schemas/PresenceProof"
+              }
+            ]
+          },
+          "geofence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The venue, required when the proof involves one.",
+                "$ref": "#/components/schemas/GeofenceRequest"
+              }
+            ]
+          }
+        },
+        "description": "The event creation payload — `docs/api/ENDPOINTS.md` §4."
+      },
+      "EventLicenceRequest": {
+        "required": [
+          "visibility",
+          "licence",
+          "presenceProof",
+          "geofence"
+        ],
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "description": "Who may find it.",
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "licence": {
+            "description": "Who may vote in it.",
+            "$ref": "#/components/schemas/LicenceMode"
+          },
+          "presenceProof": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Which proof a voter must supply.",
+                "$ref": "#/components/schemas/PresenceProof"
+              }
+            ]
+          },
+          "geofence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The venue.",
+                "$ref": "#/components/schemas/GeofenceRequest"
+              }
+            ]
+          }
+        },
+        "description": "The licence payload."
+      },
+      "EventMetadataRequest": {
+        "required": [
+          "name",
+          "startsAtUtc",
+          "endsAtUtc"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The new name."
+          },
+          "startsAtUtc": {
+            "type": "string",
+            "description": "The new start.",
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": "string",
+            "description": "The new end.",
+            "format": "date-time"
+          }
+        },
+        "description": "The metadata payload for the guarded `PATCH`."
+      },
+      "EventResponse": {
+        "required": [
+          "eventId",
+          "name",
+          "visibility",
+          "licence",
+          "startsAtUtc",
+          "endsAtUtc",
+          "ownerId",
+          "geofence"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "description": "The event.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "visibility": {
+            "description": "Who may find it.",
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "licence": {
+            "description": "Who may vote in it.",
+            "$ref": "#/components/schemas/LicenceMode"
+          },
+          "startsAtUtc": {
+            "type": "string",
+            "description": "When it begins.",
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": "string",
+            "description": "When it ends.",
+            "format": "date-time"
+          },
+          "ownerId": {
+            "type": "string",
+            "description": "Its owner.",
+            "format": "uuid"
+          },
+          "geofence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "The venue, when the licence has one.",
+                "$ref": "#/components/schemas/GeofenceRequest"
+              }
+            ]
+          }
+        },
+        "description": "One event, as a client reads it."
+      },
+      "EventSummary": {
+        "required": [
+          "eventId",
+          "name",
+          "visibility",
+          "startsAtUtc",
+          "endsAtUtc",
+          "ownerId"
+        ],
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "description": "The event.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "What it is called."
+          },
+          "visibility": {
+            "description": "Who may find it.",
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "startsAtUtc": {
+            "type": "string",
+            "description": "When it begins.",
+            "format": "date-time"
+          },
+          "endsAtUtc": {
+            "type": "string",
+            "description": "When it ends.",
+            "format": "date-time"
+          },
+          "ownerId": {
+            "type": "string",
+            "description": "Its owner.",
+            "format": "uuid"
+          }
+        },
+        "description": "One event in a list."
       },
       "FriendRequestCreation": {
         "required": [
@@ -1723,6 +2434,44 @@
         },
         "description": "One friend, as a client reads them."
       },
+      "GeofenceRequest": {
+        "required": [
+          "latitude",
+          "longitude",
+          "radiusMetres"
+        ],
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "The venue's latitude.",
+            "format": "double"
+          },
+          "longitude": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "The venue's longitude.",
+            "format": "double"
+          },
+          "radiusMetres": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How far from the centre still counts.",
+            "format": "int32"
+          }
+        },
+        "description": "A venue and how close counts as present — ADR-0014."
+      },
       "HttpValidationProblemDetails": {
         "type": "object",
         "properties": {
@@ -1769,6 +2518,39 @@
             }
           }
         }
+      },
+      "InvitationRequest": {
+        "required": [
+          "userId"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Who to invite.",
+            "format": "uuid"
+          }
+        },
+        "description": "The invitation payload."
+      },
+      "InvitationSummary": {
+        "required": [
+          "userId",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Who was invited.",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Their display name, so a client needs no second call."
+          }
+        },
+        "description": "One invitation."
       },
       "LicenceMode": {
         "type": "integer"
@@ -2055,6 +2837,9 @@
           }
         },
         "description": "One track in a playlist, as a client reads it — `GET /api/v1/playlists/{playlistId}/tracks`."
+      },
+      "PresenceProof": {
+        "type": "integer"
       },
       "ProfileDateFieldRequest": {
         "required": [
@@ -2517,6 +3302,15 @@
     },
     {
       "name": "PlaylistTrackEndpoints"
+    },
+    {
+      "name": "EventEndpoints"
+    },
+    {
+      "name": "EventLicenceEndpoints"
+    },
+    {
+      "name": "EventRosterEndpoints"
     }
   ]
 }

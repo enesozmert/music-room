@@ -310,6 +310,14 @@ one row; the index on `(playlist_id, position)` is **not unique**, because a ren
 in one batch and nothing needs the uniqueness — every track write first updates the playlist row, which is also
 what gives the track **list** the `ETag` a collection cannot carry itself (SPEC-015).
 
+`events` holds one row per track-vote event with `owner_id`, `visibility`, `licence`, a UTC window, and four
+nullable policy columns carrying [[ADR-0014-location-time-licence]]'s configuration — `presence_proof` and a
+`numeric(9,6)` centre with a radius in metres. It uses `xmin` as its concurrency token and `deleted_at_utc` for
+soft delete, the same mechanisms the playlist aggregate uses. The coordinates are the **venue's**; a voter's are
+checked and discarded and never stored. `event_invitations` is the `member` gate on a private event, unique per
+event and account; `event_attendances` is a roster and is read by nothing that decides whether somebody may act
+(SPEC-017).
+
 `friend_requests` holds one row per ordered pair, unique on `(sender_id, recipient_id)`, with a `smallint`
 status — pending, accepted or declined. `friendships` holds **one row per friendship** with the pair in
 canonical order, `user_a_id < user_b_id`, unique on the pair: symmetry is a property of the data rather than of
@@ -825,8 +833,8 @@ table to walk through at defence.
 | V.1 | three profile visibility tiers | §6.2, §13.2, §8 | **partly implemented** -- every tiered field carries `Public`, `Friends` or `Private` in its own column, set in the same call as the value it governs: `GET /api/v1/me` returns each field with its tier, `PATCH /api/v1/me/profile` updates any subset and answers `422` for a value sent without a tier, and `PUT /api/v1/me/music-preferences` replaces the preference set (subject V.1's other half, storage-only — issue O14). A profile row is created with the account, and the accounts that predate the table were backfilled by an idempotent data migration. **The projection is built** (SPEC-013): `GET /api/v1/users/{userId}` returns each field only when the reader's relationship clears its tier, decided in the SQL projection so a hidden value never enters the process, and `GET /api/v1/users` searches display names only. All three tiers now give three different answers, and a friendship being removed hides the fields again on the next read. **The friends graph is built** (SPEC-012): requests in both directions, acceptance arbitrated by a conditional `UPDATE` with the friendship insert in the same transaction, decline, withdrawal, removal and both listings — so `Friends` is now a tier that can be evaluated. A parallel test proves 20 simultaneous accepts of one request create exactly one friendship. What remains is the projection itself: reading another user's profile — `GET /users` and `GET /users/{userId}` — is still designed only |
 | V.2.1 | live vote-ordered queue | §5.2, §10.3, §9.2 | designed |
 | V.2.1 | a highly-voted track **plays** earlier | §10.6, §11.2, [[ADR-0017-playback-session]] | designed |
-| V.2.1 | public/private visibility | §6.2, §13.2 | designed |
-| V.2.1 | licence modes incl. location+time | §6.2, [[ADR-0014-location-time-licence]] | **designed** — geofence + event code |
+| V.2.1 | public/private visibility | §6.2, §13.2 | **implemented** -- an event is `Public` or `Private`; a private event answers `404` to anybody who is neither its owner nor an invitee, and appears in no list scope. An invitation is the gate and is read live, so withdrawing one takes effect on the invitee's next call (SPEC-017) |
+| V.2.1 | licence modes incl. location+time | §6.2, [[ADR-0014-location-time-licence]] | **partly implemented** -- all three modes are stored and the policy is enforced at the edges: a `LocationAndTimeRestricted` event must name its presence proof, and a geofence proof must carry a centre and a radius, or creation and `PUT .../licence` both answer `422`. The mode therefore cannot exist with nothing to check. **What is not built is the check itself:** the vote that supplies coordinates or an event code is the second unit of slice S6, which owns the only consumer |
 | V.2.1 | vote race conditions | §12.1 #1, §12.2 | designed |
 | V.2.2 | per-device control licence, delegation | §5.2, §10.5, §11.3 | designed |
 | V.2.2 | what a delegate actually controls | `PlaybackSession.controllerUserId` -- [[ADR-0017-playback-session]] | designed |

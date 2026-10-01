@@ -1,4 +1,3 @@
-using System.Globalization;
 using FluentValidation;
 using MediatR;
 using MusicRoom.Application.Abstractions.Persistence;
@@ -182,7 +181,7 @@ public static class PlaylistEndpoints
             return Results.NotFound();
         }
 
-        httpContext.Response.Headers.ETag = ETag(playlist.Version);
+        httpContext.Response.Headers.ETag = ConcurrencyHeaders.ETag(playlist.Version);
 
         return Results.Ok(new PlaylistResponse(
             playlist.PlaylistId,
@@ -202,7 +201,7 @@ public static class PlaylistEndpoints
     {
         // An absent If-Match is treated as a mismatch rather than allowed through: the contract lists 412 and
         // not 428, and "you forgot the precondition" and "your precondition failed" have the same fix — reload.
-        if (!TryReadIfMatch(httpContext, out uint expectedVersion))
+        if (!ConcurrencyHeaders.TryReadIfMatch(httpContext, out uint expectedVersion))
         {
             return Results.StatusCode(StatusCodes.Status412PreconditionFailed);
         }
@@ -258,28 +257,6 @@ public static class PlaylistEndpoints
         await sender.Send(new DeletePlaylistCommand(playlistId), cancellationToken)
             ? Results.NoContent()
             : Results.NotFound();
-
-    /// <summary>The `xmin` of a row, as a weak-free quoted `ETag`.</summary>
-    internal static string ETag(uint version) =>
-        $"\"{version.ToString(CultureInfo.InvariantCulture)}\"";
-
-    /// <summary>
-    /// Reads `If-Match` back into an `xmin`. A missing, malformed or wildcard header fails: a wildcard means
-    /// "whatever is there", which is exactly the last-write-wins behaviour this guard exists to prevent.
-    /// </summary>
-    internal static bool TryReadIfMatch(HttpContext httpContext, out uint expectedVersion)
-    {
-        expectedVersion = 0;
-
-        string? header = httpContext.Request.Headers.IfMatch.ToString();
-
-        return !string.IsNullOrWhiteSpace(header)
-            && uint.TryParse(
-                header.Trim().Trim('"'),
-                NumberStyles.None,
-                CultureInfo.InvariantCulture,
-                out expectedVersion);
-    }
 
     private static int Size(int pageSize) => Math.Min(Math.Max(pageSize, 1), MaximumPageSize);
 }

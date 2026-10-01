@@ -88,6 +88,7 @@ landed.
 | S2 | mandatory client headers and the audit log, refusal outcomes included — REST only; the hub filter waits for a hub |
 | S3 | **complete**: own profile with per-field visibility and music preferences, the friends graph, and reading another user's profile projected per field against the relationship |
 | S5 | **complete**: playlists with their three gates, an `xmin` concurrency token and collaborators; tracks with a sparse ordering key, a guarded reorder and the twenty-way parallel move that proves it; `PlaylistHub` at `/hubs/playlists`, authorised on join, audited by ADR-0019's filter, broadcasting after the commit |
+| S6 | **started**: the event aggregate with its three gates, the window, ADR-0014's licence policy stored and validated, invitations and attendance. The contended write path (suggestions, votes, event codes) and `EventHub` are the remaining two units |
 
 **No counts here on purpose.** `docs/specs/` is the authority for what is done, [[migrations-index]]
 for the schema history, and `make agent-check` for the test count — each drifted within a day of being
