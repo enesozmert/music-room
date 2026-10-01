@@ -45,5 +45,6 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0029-containerised-dev-and-secret-vault]] | Fully containerised development, and a secret vault for API keys | Accepted | landed, S1b |
 | [[ADR-0030-hub-rate-limits-and-origin]] | Hub call limits and handshake origin | Accepted | S5 |
 | [[ADR-0031-musicroom-as-openid-provider]] | The MusicRoom API becomes an OpenID Provider at S8 | Accepted | S8 |
+| [[ADR-0035-swagger-ui-for-the-openapi-document]] | Swagger UI over the existing OpenAPI document, Development only | Accepted | S3a |
 
 Related: [[MEMORY]] · [[system-overview]] · [[standards-router]]

@@ -186,6 +186,7 @@ got.
 | S1b | Secret vault | self-hosted Infisical under a `vault` compose profile, plus `InfisicalSecretProvider` behind the abstraction — issue O18, [[ADR-0029-containerised-dev-and-secret-vault]] | owner requirement | not started |
 | S2 | Audit + client context | required headers, middleware, audit behaviour, **SignalR hub filter**, audit table | V.6 | merged |
 | S3 | Profile | three visibility tiers, per-field server-side filtering, music preferences | V.1 | in progress |
+| S3a | OpenAPI UI | `Swashbuckle.AspNetCore.SwaggerUI` 10.2.3 over the document `AddOpenApi()` already serves, registered inside the Development branch only — [[ADR-0035-swagger-ui-for-the-openapi-document]] | owner requirement | not started |
 | S4 | Catalog | YouTube adapter, `TrackRef`, caching, quota discipline | III | not started |
 | S5 | Playlist Editor | REST + `PlaylistHub` + sparse ordering + concurrency token + parallel reorder tests | V.2.3 | not started |
 | S6 | Track Vote | REST + `EventHub` + unique-index vote arbitration + licence policy incl. geofence and event code + parallel vote tests | V.2.1 | not started |

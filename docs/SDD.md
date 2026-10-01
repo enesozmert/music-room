@@ -321,7 +321,8 @@ Rules: [[rest-api-design]]. Documentation: [[openapi-documentation]].
 | Privacy rule | a resource hidden from the caller returns `404`, never `403` |
 | Auth | bearer JWT |
 | Mandatory headers | `X-Client-Platform`, `X-Client-Device`, `X-Client-App-Version` on mutations |
-| Documentation | OpenAPI 3.1 generated from code, exported to `docs/api/openapi.json` |
+| Documentation | OpenAPI 3.1 generated from code, exported to `docs/api/openapi.json`. The document is served at `/openapi/v1.json` in every environment |
+| Documentation UI | **Swagger UI, Development only** -- `Swashbuckle.AspNetCore.SwaggerUI` renders the document above; the generator stays `AddOpenApi()` so one producer describes the API. Slice S3a -- [[ADR-0035-swagger-ui-for-the-openapi-document]] |
 
 The endpoint inventory is [[endpoint-inventory]] -- around 60 endpoints across Identity, Profile,
 Catalog, Track Vote, Playlist Editor, Control Delegation, audit and operations, plus the

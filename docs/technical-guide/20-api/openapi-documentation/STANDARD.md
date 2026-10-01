@@ -23,12 +23,19 @@ developers are the first consumers, so the document is graded material.
 ## Project policy
 
 - Generator: **`Microsoft.AspNetCore.OpenApi`**, the built-in one
-  (`brain/decisions/ADR-0021-backend-dependency-set.md`). Not Swashbuckle — the reference
-  repository uses it because the built-in generator did not exist in net6.
+  (`brain/decisions/ADR-0021-backend-dependency-set.md`). Not Swashbuckle's `SwaggerGen` — the
+  reference repository uses it because the built-in generator did not exist in net6. **One
+  generator describes the API.** Two would mean two documents for one surface, and the committed
+  `docs/api/openapi.json` would stop being the contract the moment they disagreed.
 - The OpenAPI 3.1 document is **generated from the code**, never hand-maintained. A hand-written
   spec drifts and drift is worse than no spec.
-- Interactive UI is served in Development. In other environments the raw document is served but
-  the UI is disabled unless explicitly enabled.
+- Interactive UI is served in Development, by **`Swashbuckle.AspNetCore.SwaggerUI`** pointed at
+  `/openapi/v1.json` — the UI middleware alone, never the metapackage that also brings
+  `SwaggerGen` (`brain/decisions/ADR-0035-swagger-ui-for-the-openapi-document.md`). In other
+  environments the raw document is served and the UI is not registered: an unauthenticated
+  catalogue of every endpoint is a map, and `API8` in the API checklist is about exactly this.
+- **The UI is a reader, not a source.** A wrong endpoint on the page is a wrong endpoint in the
+  document, which is a wrong attribute in the code. The fix is never in the UI configuration.
 - Every endpoint documents: summary, description, all parameters, request body schema,
   **every** response status it can return, and at least one realistic example.
 - The Problem Details error schema is declared once and referenced by every error response.
@@ -52,7 +59,7 @@ actions so the description comes from the source rather than a parallel document
 - [ ] Every endpoint has all response codes and one example
 - [ ] Security scheme declared and applied
 - [ ] `docs/api/openapi.json` updated in the same PR as the endpoint change
-- [ ] Interactive UI disabled outside Development
+- [ ] Interactive UI registered only inside the Development branch
 
 ## References
 
