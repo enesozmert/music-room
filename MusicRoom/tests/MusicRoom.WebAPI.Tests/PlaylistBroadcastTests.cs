@@ -190,19 +190,33 @@ public sealed class PlaylistBroadcastTests : IAsyncLifetime
         using HttpClient a = owner;
         await using HubConnection listener = connection;
 
-        string stale = await TrackRequests.ETagAsync(a, playlistId);
-        await TrackRequests.AddAsync(a, playlistId, "aaaaaaaaaaa", stale);
+        // Listen before the write that succeeds, and consume its message. Attaching the handler
+        // afterwards is a race: the successful add's broadcast can arrive once the handler is on, and
+        // then it is mistaken for the refused write's. That is how this test failed in CI with
+        // "Assert.Throws() Failure: No exception was thrown".
+        TaskCompletionSource<TrackEvent> accepted = Listen<TrackEvent>(listener, PlaylistHub.TrackAddedEvent);
 
-        TaskCompletionSource<TrackEvent> received = Listen<TrackEvent>(listener, PlaylistHub.TrackAddedEvent);
+        string stale = await TrackRequests.ETagAsync(a, playlistId);
+        Guid addedId = await TrackRequests.AddAsync(a, playlistId, "aaaaaaaaaaa", stale);
+
+        TrackEvent first = await accepted.Task.WaitAsync(Patience, TestContext.Current.CancellationToken);
+        Assert.Equal(addedId, first.PlaylistTrackId);
+
+        TaskCompletionSource<TrackEvent> next = Listen<TrackEvent>(listener, PlaylistHub.TrackAddedEvent);
 
         // Act — the same token again, which the first add has already invalidated.
         using HttpResponseMessage refused = await TrackRequests.PostTrackAsync(
             a, playlistId, new { youtubeVideoId = "bbbbbbbbbbb" }, stale);
         Assert.Equal(HttpStatusCode.PreconditionFailed, refused.StatusCode);
 
-        // Assert
-        await Assert.ThrowsAsync<TimeoutException>(
-            () => received.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken));
+        // Assert by fence, not by waiting. A write that must broadcast goes out after the refused one,
+        // and messages reach a connection in the order the server sent them: if the `412` had
+        // broadcast, its message arrives first and this assertion names the wrong track. Waiting for a
+        // timeout would prove the same thing only probably, and would cost two seconds to do it.
+        Guid fenceId = await TrackRequests.AddAsync(a, playlistId, "ccccccccccc");
+
+        TrackEvent seen = await next.Task.WaitAsync(Patience, TestContext.Current.CancellationToken);
+        Assert.Equal(fenceId, seen.PlaylistTrackId);
     }
 
     /// <summary>A client that left the group hears nothing more.</summary>
@@ -224,9 +238,14 @@ public sealed class PlaylistBroadcastTests : IAsyncLifetime
         // Act
         await TrackRequests.AddAsync(a, playlistId, "aaaaaaaaaaa");
 
-        // Assert
-        await Assert.ThrowsAsync<TimeoutException>(
-            () => received.Task.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken));
+        // Assert through a round trip, not a wait. A hub invocation's completion travels the same
+        // connection as a broadcast and in the same order, so once this returns, any message the
+        // server had already sent to this connection has arrived. Leaving twice is safe: the hub
+        // method is `Groups.RemoveFromGroupAsync` and nothing else.
+        await listener.InvokeAsync(
+            PlaylistHub.LeaveMethod, playlistId, TestContext.Current.CancellationToken);
+
+        Assert.False(received.Task.IsCompleted, "a client that left the group received a broadcast");
     }
 
     /// <summary>An owner with a playlist, already listening to it.</summary>

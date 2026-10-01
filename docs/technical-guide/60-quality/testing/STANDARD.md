@@ -43,6 +43,12 @@ indexes or concurrency tokens, which are exactly the things we need proven.
 - Arrange / Act / Assert, visibly separated. One behaviour per test.
 - No shared mutable state between tests. Tests run in any order.
 - No `Thread.Sleep`. Wait on a condition with a timeout.
+- **Never prove a negative by waiting.** "No message arrived" asserted with a timeout is slow and
+  only probably true, and it inverts into a false failure the moment a message the test did not
+  account for lands inside the window — see `L-042`. Use a **fence**: perform the action that must
+  produce the thing, after the action that must not, and assert the first thing observed is the
+  fence's. Where no fence exists, use a round trip over the same transport as a barrier: once it
+  returns, whatever was already sent has arrived.
 
 ### Mandatory coverage
 
