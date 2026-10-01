@@ -27,6 +27,7 @@ the same commands and the same guard.
 | `/brain-check` | audit the knowledge layer, no source code | prompt 15 |
 | `/status <thing>` | is it built? evidence-backed verdict, read-only | prompt 16 |
 | `/spec-status` | every spec that is not done, and what it waits on | section 2.9 |
+| `/progress` | count how far the backend has got, and refresh the board | `.agent/progress.sh` |
 
 **The prompt library stays canonical.** A command is a shortcut to a prompt, never a second copy
 of the rules. Change the prompt first, then the command.
