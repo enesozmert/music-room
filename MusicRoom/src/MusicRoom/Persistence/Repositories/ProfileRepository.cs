@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using MusicRoom.Application.Abstractions.Persistence;
 using MusicRoom.Application.Features.Profiles.Commands.UpdateProfile;
 using MusicRoom.Application.Features.Profiles.Queries.GetOwnProfile;
+using MusicRoom.Application.Features.Profiles.Queries.GetUserProfile;
+using MusicRoom.Application.Features.Profiles.Queries.SearchUsers;
 using MusicRoom.Domain.Common;
 using MusicRoom.Domain.Entities;
 using MusicRoom.Persistence.Contexts;
@@ -130,6 +132,61 @@ internal sealed class ProfileRepository : IProfileRepository
         }
     }
 
+    /// <inheritdoc />
+    public Task<VisibleProfile?> FindVisibleProfileAsync(
+        Guid userId,
+        ProfileRelationship relationship,
+        CancellationToken cancellationToken)
+    {
+        // The highest tier this reader clears. Public is 0 and Private is 2, so "may see" is "tier <= permitted".
+        ProfileFieldVisibility permitted = relationship switch
+        {
+            ProfileRelationship.Self => ProfileFieldVisibility.Private,
+            ProfileRelationship.Friend => ProfileFieldVisibility.Friends,
+            _ => ProfileFieldVisibility.Public,
+        };
+
+        // Projected in SQL, field by field: a value the reader may not see is replaced by null **before** it
+        // leaves the database, so it never exists in this process — OWASP API3, and the reason this is not a
+        // filter over OwnProfile.
+        return _context.Profiles
+            .AsNoTracking()
+            .Where(profile => profile.UserId == userId)
+            .Select(profile => new VisibleProfile(
+                userId,
+                _context.Users
+                    .Where(user => user.Id == userId)
+                    .Select(user => user.DisplayName)
+                    .First(),
+                profile.RealNameVisibility <= permitted ? profile.RealName : null,
+                profile.BioVisibility <= permitted ? profile.Bio : null,
+                profile.LocationVisibility <= permitted ? profile.Location : null,
+                profile.BirthDateVisibility <= permitted ? profile.BirthDate : null))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<UserSearchResult>> SearchByDisplayNameAsync(
+        string displayNamePrefix,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken) =>
+        await _context.Users
+            .AsNoTracking()
+            // A case-insensitive prefix match through ILIKE. `StartsWith(..., OrdinalIgnoreCase)` does not
+            // translate — "The LINQ expression ... could not be translated" — and doing the comparison in memory
+            // would mean reading every account to answer a search box.
+            //
+            // The pattern is escaped, so a caller cannot smuggle `%` or `_` in and turn a prefix search into a
+            // full scan or a wildcard probe.
+            .Where(user => EF.Functions.ILike(user.DisplayName, EscapeLikePattern(displayNamePrefix) + "%", "\\"))
+            .OrderBy(user => user.DisplayName)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(user => new UserSearchResult(user.Id, user.DisplayName))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
     /// <summary>Applies only the fields the caller sent; an absent field is untouched, which is what PATCH means.</summary>
     private static void Apply(Profile profile, ProfileChanges changes)
     {
@@ -157,6 +214,19 @@ internal sealed class ProfileRepository : IProfileRepository
             profile.BirthDateVisibility = changes.BirthDate.Visibility;
         }
     }
+
+    /// <summary>
+    /// Escapes the three characters <c>ILIKE</c> treats as syntax, so a search term is only ever a literal.
+    /// </summary>
+    /// <remarks>
+    /// Without this, a query of <c>%</c> matches every account and <c>_</c> matches any single character — a
+    /// wildcard probe with a search box in front of it.
+    /// </remarks>
+    private static string EscapeLikePattern(string value) =>
+        value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("%", "\\%", StringComparison.Ordinal)
+            .Replace("_", "\\_", StringComparison.Ordinal);
 
     private static List<string> Values(List<MusicPreference> preferences, MusicPreferenceKind kind) =>
         preferences

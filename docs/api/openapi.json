@@ -827,6 +827,106 @@
           }
         }
       }
+    },
+    "/api/v1/users": {
+      "get": {
+        "tags": [
+          "UserEndpoints"
+        ],
+        "summary": "Search accounts by display name",
+        "description": "Matches a case-insensitive prefix of the display name, paged with a capped size. The display name is the only field searched: matching a profile field would let a stranger confirm a friends-only value by probing for it. A blank query returns nothing rather than everybody.",
+        "operationId": "GetUsers",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": ""
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSearchResult"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/users/{userId}": {
+      "get": {
+        "tags": [
+          "UserEndpoints"
+        ],
+        "summary": "Read one account's profile",
+        "description": "Returns the profile projected per field against the caller's relationship to its owner: self, friend or stranger. A field the caller may not see is absent from the body and is never read from the database, so a caller cannot tell a hidden field from an empty one. An account that does not exist answers the same sparse shape as one whose owner hid everything, so asking does not confirm existence.",
+        "operationId": "GetUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisibleProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1367,6 +1467,25 @@
         },
         "description": "The profile update payload — `docs/api/ENDPOINTS.md` §2."
       },
+      "UserSearchResult": {
+        "required": [
+          "userId",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "The account id, which is what a friend request takes.",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "The handle. The only always-public field, so the only one a search may show."
+          }
+        },
+        "description": "One account in a search result — `GET /api/v1/users`."
+      },
       "VerificationRequest": {
         "required": [
           "email"
@@ -1379,6 +1498,58 @@
           }
         },
         "description": "The verification resend payload — `docs/api/ENDPOINTS.md` §1."
+      },
+      "VisibleProfile": {
+        "required": [
+          "userId",
+          "displayName",
+          "realName",
+          "bio",
+          "location",
+          "birthDate"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "The account this describes.",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Always present: the one always-public field (ADR-0034)."
+          },
+          "realName": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Present only when the reader's relationship clears the field's tier."
+          },
+          "bio": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Same."
+          },
+          "location": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Same."
+          },
+          "birthDate": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Same.",
+            "format": "date"
+          }
+        },
+        "description": "One account's profile as a **particular reader** may see it — `GET /api/v1/users/{userId}`."
       }
     }
   },
@@ -1403,6 +1574,9 @@
     },
     {
       "name": "FriendEndpoints"
+    },
+    {
+      "name": "UserEndpoints"
     }
   ]
 }

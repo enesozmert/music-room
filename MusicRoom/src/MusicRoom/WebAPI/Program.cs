@@ -76,6 +76,7 @@ public class Program
         app.MapAuthEndpoints();
         app.MapProfileEndpoints();
         app.MapFriendEndpoints();
+        app.MapUserEndpoints();
 
         await app.RunAsync();
     }
