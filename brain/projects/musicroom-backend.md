@@ -2,7 +2,7 @@
 kind: project-card
 id: musicroom-backend
 status: in-progress
-updated: 2026-09-28
+updated: 2026-10-01
 ---
 
 # Project Card — MusicRoom.Backend
@@ -75,10 +75,11 @@ Via [[standards-router]]: [[engineering-baseline]] · [[git-workflow]] · [[dotn
 [[youtube-integration]] · [[social-oauth]] · [[testing]] · [[logging-observability]] ·
 [[load-testing]] · [[ci-cd-containerization]]
 
-## What exists, as of 2026-09-28
+## What exists, as of 2026-10-01
 
-Eight specs are `done` in `docs/specs/`, each on its own branch and draft pull request. They are
-stacked and unmerged, so `main` lags: read `docs/specs/` for status, `git log` for what has landed.
+Every spec in `docs/specs/` is `done`, each on its own branch and draft pull request. They are stacked
+and unmerged, so `main` lags: read `docs/specs/` for the count and the status, `git log` for what has
+landed.
 
 | Slice | Built |
 |---|---|
@@ -86,7 +87,7 @@ stacked and unmerged, so `main` lags: read `docs/specs/` for status, `git log` f
 | S1 | registration, email verification and resend, login, JWT + refresh rotation with reuse detection, password reset, credential rate limits, **bearer validation and the session endpoints** |
 | S2 | mandatory client headers and the audit log, refusal outcomes included — REST only; the hub filter waits for a hub |
 | S3 | **complete**: own profile with per-field visibility and music preferences, the friends graph, and reading another user's profile projected per field against the relationship |
-| S5 | playlists with their three gates, an `xmin` concurrency token and collaborators. Tracks and `PlaylistHub` are the remaining two units |
+| S5 | playlists with their three gates, an `xmin` concurrency token and collaborators; tracks with a sparse ordering key, a guarded reorder and the twenty-way parallel move that proves it. `PlaylistHub` is the remaining unit |
 
 **No counts here on purpose.** `docs/specs/` is the authority for what is done, [[migrations-index]]
 for the schema history, and `make agent-check` for the test count — each drifted within a day of being

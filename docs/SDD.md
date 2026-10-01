@@ -304,7 +304,11 @@ rewrite the list. See §12.2.
 `playlists` holds one row per playlist with `owner_id`, `visibility`, `licence` and `deleted_at_utc`, and uses
 PostgreSQL's `xmin` as its concurrency token — no version column exists, which is what makes the `ETag` of §5
 free (SPEC-014). Deletion is soft, applied by a global query filter. `playlist_collaborators` holds one row per
-person named on a playlist with `can_edit`, unique per playlist and account.
+person named on a playlist with `can_edit`, unique per playlist and account. `playlist_tracks` holds one row per
+track with a `bigint` `position`, a sparse key with a nominal gap of 1000 so an insert between two tracks writes
+one row; the index on `(playlist_id, position)` is **not unique**, because a renumber rewrites a whole playlist
+in one batch and nothing needs the uniqueness — every track write first updates the playlist row, which is also
+what gives the track **list** the `ETag` a collection cannot carry itself (SPEC-015).
 
 `friend_requests` holds one row per ordered pair, unique on `(sender_id, recipient_id)`, with a `smallint`
 status — pending, accepted or declined. `friendships` holds **one row per friendship** with the pair in
@@ -548,7 +552,7 @@ designed here rather than discovered in review. Full notes: [[realtime-architect
 |---|---|
 | 1 | unique index `(EventId, TrackId, UserId)`; duplicate detected by the database, mapped to `409` |
 | 1 | vote counts recomputed inside the transaction or aggregated database-side — never read-modify-write |
-| 2 | sparse ordering keys plus an `xmin` concurrency token; on conflict, reload and reapply, else `409` |
+| 2 | sparse ordering keys plus an `xmin` concurrency token, **taken from the playlist row and updated inside the same transaction as the track write**, so the guarded `UPDATE` is both the `If-Match` check and the lock that serialises reorders; the losing writer gets `412` and reloads (SPEC-015) |
 | 3 | single-row state machine with a concurrency token; the losing writer must lose visibly |
 | 4 | `expectedNowPlayingId` in the request plus the session's concurrency token; a stale expectation returns current state rather than advancing again |
 
@@ -818,8 +822,8 @@ table to walk through at defence.
 | V.2.1 | vote race conditions | §12.1 #1, §12.2 | designed |
 | V.2.2 | per-device control licence, delegation | §5.2, §10.5, §11.3 | designed |
 | V.2.2 | what a delegate actually controls | `PlaybackSession.controllerUserId` -- [[ADR-0017-playback-session]] | designed |
-| V.2.3 | realtime multi-user playlist editing | §9.2, §10.4 | **partly implemented** -- the playlist aggregate exists with its three gates (`member`, `owner`, `licence`), a concurrency token that is PostgreSQL's own `xmin`, an `ETag` derived from it and an `If-Match` compared inside the `UPDATE` so a stale writer changes nothing and is told `412`. Collaborators carry `can_edit`, which separates reading from writing. Soft delete hides a playlist from every read. **Tracks and the hub are the next two units:** adding, reordering and removing tracks with the sparse ordering key, and `PlaylistHub` with ADR-0019's filter, are not built |
-| V.2.3 | reorder race conditions | §12.1 #2, §12.2 | **partly implemented** -- the mechanism is proven on the aggregate: `xmin` plus `If-Match` makes a concurrent metadata write fail with `412` rather than silently overwrite, and a test holds a stale token through another writer's update to show it. The reorder path itself, with the sparse ordering key, is the next unit |
+| V.2.3 | realtime multi-user playlist editing | §9.2, §10.4 | **partly implemented** -- the playlist aggregate exists with its three gates (`member`, `owner`, `licence`), a concurrency token that is PostgreSQL's own `xmin`, an `ETag` derived from it and an `If-Match` compared inside the `UPDATE` so a stale writer changes nothing and is told `412`. Collaborators carry `can_edit`, which separates reading from writing. Soft delete hides a playlist from every read. Tracks are built: a `bigint` sparse `position` with a gap of 1000, insert after a named neighbour or at the head or tail, a renumber when a gap runs out, a 500-track cap answered `409`, and the same video allowed twice. **`PlaylistHub` is the one remaining unit:** the broadcast after commit, with ADR-0019's filter, is not built, so editing is multi-user and correct but not yet live |
+| V.2.3 | reorder race conditions | §12.1 #2, §12.2 | **implemented** -- every track write updates the playlist row inside its own transaction, keyed on the `xmin` the caller read, so that one statement is both the precondition and the lock. Twenty parallel moves of one track with one token produce exactly one `200`, nineteen `412`, and a final order that is still a permutation of the original with distinct positions; twenty parallel adds with one token add one track. Every refusal is decided before the parent is touched, so a refused write leaves the caller's `ETag` valid |
 | V.2 | at least 2 of the 3 services | §5.2, [[ADR-0010-service-scope]] | **designed** — all three |
 | V.3 | backend is the single source of truth | §4.2, §8.1 | designed |
 | V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **partly implemented** -- `docs/api/openapi.json` is generated from the code and committed; it documents every route that exists — the two health endpoints, the identity surface including the three session routes, and the three `/api/v1/me` profile routes. Each mutating route documents the `400` its mandatory client headers can produce, and each authenticated route its `401`. The generated document is the count; this row does not repeat it |

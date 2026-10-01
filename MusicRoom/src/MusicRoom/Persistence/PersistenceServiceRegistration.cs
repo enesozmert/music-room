@@ -31,6 +31,7 @@ public static class PersistenceServiceRegistration
         services.AddScoped<IProfileRepository, ProfileRepository>();
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();
         services.AddScoped<IPlaylistRepository, PlaylistRepository>();
+        services.AddScoped<IPlaylistTrackRepository, PlaylistTrackRepository>();
         services.AddScoped<IAuditSink, AuditSink>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
