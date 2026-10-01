@@ -113,7 +113,7 @@ internal static class PlaylistTrackEndpoints
             return Results.NotFound();
         }
 
-        httpContext.Response.Headers.ETag = PlaylistEndpoints.ETag(tracks.Version);
+        httpContext.Response.Headers.ETag = ConcurrencyHeaders.ETag(tracks.Version);
 
         return Results.Ok(tracks.Tracks);
     }
@@ -125,7 +125,7 @@ internal static class PlaylistTrackEndpoints
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        if (!PlaylistEndpoints.TryReadIfMatch(httpContext, out uint expectedVersion))
+        if (!ConcurrencyHeaders.TryReadIfMatch(httpContext, out uint expectedVersion))
         {
             return Results.StatusCode(StatusCodes.Status412PreconditionFailed);
         }
@@ -162,7 +162,7 @@ internal static class PlaylistTrackEndpoints
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        if (!PlaylistEndpoints.TryReadIfMatch(httpContext, out uint expectedVersion))
+        if (!ConcurrencyHeaders.TryReadIfMatch(httpContext, out uint expectedVersion))
         {
             return Results.StatusCode(StatusCodes.Status412PreconditionFailed);
         }
@@ -195,7 +195,7 @@ internal static class PlaylistTrackEndpoints
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
-        if (!PlaylistEndpoints.TryReadIfMatch(httpContext, out uint expectedVersion))
+        if (!ConcurrencyHeaders.TryReadIfMatch(httpContext, out uint expectedVersion))
         {
             return Results.StatusCode(StatusCodes.Status412PreconditionFailed);
         }
