@@ -95,6 +95,10 @@ TESTS_DECLARED=$(grep -rhoE '\[(Fact|Theory)\]' MusicRoom/tests --include="*.cs"
 MIGRATIONS=$(ls MusicRoom/src/MusicRoom/Persistence/Migrations/*.cs 2>/dev/null | grep -vc 'Designer\|Snapshot')
 PROJECTS=$(find MusicRoom -name '*.csproj' -not -path '*/obj/*' 2>/dev/null | wc -l | tr -d ' ')
 
+# The branch deliberately stays out of the JSON. It is whatever the script happened to run on, so
+# recording it makes a local run and a CI run differ in a field that means nothing, and the
+# snapshot churns for no reason.
+
 # A requirement counts as built when it is done or implemented; partly is counted separately
 # rather than folded in at half, because half a row is not a number anyone can defend.
 REQ_BUILT=$(( REQ_DONE + REQ_IMPL ))
@@ -105,7 +109,6 @@ if [ "$WRITE" -eq 1 ]; then
 {
   "generated": "$TODAY",
   "commit": "$COMMIT",
-  "branch": "$BRANCH",
   "slices":       { "total": $SLICES_TOTAL, "merged": $SLICES_MERGED, "in_progress": $SLICES_PROGRESS, "blocked": $SLICES_BLOCKED, "not_started": $SLICES_IDLE },
   "requirements": { "total": $REQ_TOTAL, "built": $REQ_BUILT, "done": $REQ_DONE, "implemented": $REQ_IMPL, "partly": $REQ_PARTLY, "designed": $REQ_DESIGNED, "other": $REQ_OTHER },
   "adrs":         { "total": $ADR_TOTAL, "landed": $ADR_LANDED, "partly": $ADR_PARTLY, "waiting": $ADR_WAITING },
