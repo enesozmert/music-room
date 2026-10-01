@@ -75,6 +75,7 @@ public class Program
         app.MapHealthEndpoints();
         app.MapAuthEndpoints();
         app.MapProfileEndpoints();
+        app.MapFriendEndpoints();
 
         await app.RunAsync();
     }

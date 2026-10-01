@@ -539,6 +539,294 @@
           }
         }
       }
+    },
+    "/api/v1/me/friends": {
+      "get": {
+        "tags": [
+          "FriendEndpoints"
+        ],
+        "summary": "List your friends",
+        "description": "Lists the caller's friends, newest first, paged. A friendship is symmetric: both parties see each other here, and neither can see it without the other.",
+        "operationId": "GetMeFriends",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FriendResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/me/friends/{userId}": {
+      "delete": {
+        "tags": [
+          "FriendEndpoints"
+        ],
+        "summary": "Remove a friend",
+        "description": "Ends the friendship for both sides at once, and clears the request rows between the pair so they may befriend again. Answers 404 when there is no friendship to end.",
+        "operationId": "DeleteMeFriend",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/me/friend-requests": {
+      "get": {
+        "tags": [
+          "FriendEndpoints"
+        ],
+        "summary": "List your pending friend requests",
+        "description": "Lists pending requests in one direction: incoming are the ones addressed to the caller, outgoing the ones the caller sent. The direction is required, because the two screens that show these lists show one each.",
+        "operationId": "GetMeFriendRequests",
+        "parameters": [
+          {
+            "name": "direction",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "incoming"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FriendRequestResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "FriendEndpoints"
+        ],
+        "summary": "Ask somebody to be friends",
+        "description": "Creates a pending request. Answers 409 when the pair are already friends, when a request is already pending in either direction, or when the caller asks themselves; 404 when no such account exists. A crossing request is not auto-accepted: nobody becomes a friend without accepting.",
+        "operationId": "PostMeFriendRequest",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FriendRequestCreation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me/friend-requests/{requestId}": {
+      "patch": {
+        "tags": [
+          "FriendEndpoints"
+        ],
+        "summary": "Accept or decline a friend request",
+        "description": "Only the recipient may answer. Accepting creates the friendship in the same transaction that marks the request accepted, so twenty simultaneous accepts produce one friendship. An unknown request, one already answered and one addressed to somebody else all answer 404.",
+        "operationId": "PatchMeFriendRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FriendRequestDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "FriendEndpoints"
+        ],
+        "summary": "Withdraw a friend request you sent",
+        "description": "Only the sender may withdraw; a recipient declines instead, which is a different verb and a different row state. The row is deleted rather than marked, so the pair may try again.",
+        "operationId": "DeleteMeFriendRequest",
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -555,6 +843,89 @@
           }
         },
         "description": "The email verification payload — `docs/api/ENDPOINTS.md` §1."
+      },
+      "FriendRequestCreation": {
+        "required": [
+          "targetUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "targetUserId": {
+            "type": "string",
+            "description": "The account being asked.",
+            "format": "uuid"
+          }
+        },
+        "description": "The friend request payload — `docs/api/ENDPOINTS.md` §2."
+      },
+      "FriendRequestDecision": {
+        "required": [
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "`accepted` or `declined`."
+          }
+        },
+        "description": "The response payload for accepting or declining."
+      },
+      "FriendRequestResponse": {
+        "required": [
+          "requestId",
+          "userId",
+          "displayName",
+          "requestedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "requestId": {
+            "type": "string",
+            "description": "The id the respond and cancel routes take.",
+            "format": "uuid"
+          },
+          "userId": {
+            "type": "string",
+            "description": "The other party.",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Their handle."
+          },
+          "requestedAt": {
+            "type": "string",
+            "description": "When it was sent.",
+            "format": "date-time"
+          }
+        },
+        "description": "One pending request, as a client reads it."
+      },
+      "FriendResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "friendsSince"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Their account id.",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Their handle."
+          },
+          "friendsSince": {
+            "type": "string",
+            "description": "When the friendship began.",
+            "format": "date-time"
+          }
+        },
+        "description": "One friend, as a client reads them."
       },
       "HttpValidationProblemDetails": {
         "type": "object",
@@ -1029,6 +1400,9 @@
     },
     {
       "name": "ProfileEndpoints"
+    },
+    {
+      "name": "FriendEndpoints"
     }
   ]
 }

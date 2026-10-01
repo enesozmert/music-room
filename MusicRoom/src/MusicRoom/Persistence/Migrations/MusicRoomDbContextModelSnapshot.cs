@@ -148,6 +148,80 @@ namespace MusicRoom.Persistence.Migrations
                     b.ToTable("email_verification_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("MusicRoom.Domain.Entities.FriendRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("RecipientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_id");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sender_id");
+
+                    b.Property<short>("Status")
+                        .HasColumnType("smallint")
+                        .HasColumnName("status");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecipientId")
+                        .HasDatabaseName("ix_friend_requests_recipient_id");
+
+                    b.HasIndex("SenderId", "RecipientId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_friend_requests_sender_id_recipient_id");
+
+                    b.ToTable("friend_requests", (string)null);
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.Friendship", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<Guid>("UserAId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_a_id");
+
+                    b.Property<Guid>("UserBId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_b_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserBId")
+                        .HasDatabaseName("ix_friendships_user_b_id");
+
+                    b.HasIndex("UserAId", "UserBId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_friendships_user_a_id_user_b_id");
+
+                    b.ToTable("friendships", (string)null);
+                });
+
             modelBuilder.Entity("MusicRoom.Domain.Entities.MusicPreference", b =>
                 {
                     b.Property<Guid>("Id")
@@ -421,6 +495,36 @@ namespace MusicRoom.Persistence.Migrations
                     b.HasOne("MusicRoom.Domain.Entities.User", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.FriendRequest", b =>
+                {
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.Friendship", b =>
+                {
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserAId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MusicRoom.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserBId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
