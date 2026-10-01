@@ -207,8 +207,13 @@ migration exists.
 | `Visibility` | `Public`, `Private` | R1 V.2.1, V.2.3 |
 | `LicenceMode` | `Everyone`, `InvitedOnly`, `LocationAndTimeRestricted` | R1 V.2.1, V.2.3 |
 | `PresenceProof` | `Geofence`, `EventCode`, `Both` | policy carried by `LocationAndTimeRestricted` -- [[ADR-0014-location-time-licence]] |
-| `ProfileFieldVisibility` | `Public`, `Friends`, `Private` | R1 V.1 |
+| `ProfileFieldVisibility` | `Public`, `Friends`, `Private` | R1 V.1 — **implemented**, stored as `smallint` per field ([[ADR-0034-profile-storage-and-visibility]]) |
+| `FriendRequestStatus` | `Pending`, `Accepted`, `Declined` | R1 V.1 — **implemented**. There is no `Cancelled`: a withdrawn request is deleted |
+| `MusicPreferenceKind` | `Genre`, `Artist` | R1 V.1 — **implemented** |
 | `Platform` | `iOS`, `Android`, `Web`, `Other` | R1 V.6 |
+
+The reader's relationship to a profile — self, friend or stranger — is **derived per request** from the
+token and the friends graph, never stored, so it is not an enumeration this table owns.
 
 ### 6.3 Deliberate exclusions
 
@@ -574,18 +579,30 @@ V10 OAuth and OIDC, and V16 Security Logging and Error Handling.
 
 ### 13.2 Authorisation — two independent gates
 
-Both are mandatory, both server-side, both implemented as a pipeline behaviour rather than
-scattered conditionals:
+Both are mandatory and both server-side:
 
 1. **Ownership** — the caller owns the resource or is an authorised participant (R1 V.6).
 2. **Visibility and licence** — resolved from `Visibility` and `LicenceMode`, evaluated on every
    request and every hub join.
 
-Profile responses are filtered **per field** by the requester's relationship
-(self / friend / stranger). A full row is never returned for the client to filter.
+**Where each gate lives today**, which differs from the "one pipeline behaviour" this section originally
+assumed:
 
-Row Level Security is enabled in PostgreSQL with deny-by-default policies as defence in depth. It
-is never the only gate.
+| Gate | Mechanism | State |
+|---|---|---|
+| Ownership, own resources | the account comes from the validated token and no route accepts a caller id, so there is nothing to compare — `/me` routes, the session endpoints and the friends graph all work this way | **implemented** |
+| Ownership, somebody else's resource | a resource that is not the caller's answers `404` from the statement that failed to match it, not from a prior check — one `UPDATE` or `DELETE` keyed on the caller | **implemented** for sessions, friend requests and friendships |
+| Per-field visibility | resolved once per read into self / friend / stranger, then applied **inside the SQL projection**: a field the reader may not see is never read, so it cannot leak through a serialiser or a log (OWASP API3) — SPEC-013 | **implemented** |
+| Licence, including location and time | [[ADR-0014-location-time-licence]] | designed; arrives with the Track Vote slice |
+| Hub join | the same two gates on every join | designed; arrives with the first hub |
+
+A pipeline behaviour is still the right home for the *licence* gate, because it will apply to many
+commands uniformly. It was the wrong home for per-field visibility, which is a projection rather than a
+yes-or-no answer.
+
+Row Level Security as deny-by-default defence in depth is **designed and not implemented**: no migration
+creates a policy. Recorded as issue O19 in §17 — it is defence in depth, so its absence weakens nothing
+that the gates above already decide, and claiming it while it does not exist would be worse than owing it.
 
 ### 13.3 Abuse resistance
 
@@ -804,9 +821,9 @@ table to walk through at defence.
 | V.5 | client is a remote control | §4.1, §9.1 | designed |
 | V.5 | configurable backend address | §9.1, [[musicroom-mobile]] | designed |
 | V.5 | social authentication on mobile | §10.2 | designed |
-| V.6 | own data only, never another user's | §13.2 | **partly implemented** -- **the per-field visibility gate is enforced server-side** (SPEC-013): a reader receives only the fields their relationship clears, the projection happens in the query rather than in memory, and search cannot be used to probe a hidden value. The first `self` gate also exists: `GET /api/v1/auth/sessions` lists only the calling account's sessions, and `DELETE /api/v1/auth/sessions/{sessionId}` answers `404` for an id that is unknown, already ended **or another account's**, because a distinct answer would confirm it exists. The account comes from the validated token and never from the request. The ownership pipeline behaviour §13.2 describes arrives with the aggregates that need it, S3 onward |
+| V.6 | own data only, never another user's | §13.2 (see its table of where each gate lives) | **partly implemented** -- **the per-field visibility gate is enforced server-side** (SPEC-013): a reader receives only the fields their relationship clears, the projection happens in the query rather than in memory, and search cannot be used to probe a hidden value. The first `self` gate also exists: `GET /api/v1/auth/sessions` lists only the calling account's sessions, and `DELETE /api/v1/auth/sessions/{sessionId}` answers `404` for an id that is unknown, already ended **or another account's**, because a distinct answer would confirm it exists. The account comes from the validated token and never from the request. The ownership pipeline behaviour §13.2 describes arrives with the aggregates that need it, S3 onward |
 | V.6 | brute force and session theft protections | §13.1, §13.3 | **implemented** -- **brute force:** every credential endpoint carries a per-IP policy (one per endpoint, so a registration loop cannot spend the sign-in allowance) and a per-account counter with progressive backoff, answering `429` with `Retry-After` and an empty body; the numbers are in §13.3 and the trip is logged without naming the account. **Session theft:** refresh tokens are stored only as SHA-256 digests, rotate on every use through a `consumed_at_utc IS NULL AND revoked_at_utc IS NULL AND expires_at_utc > @now` conditional update, and presenting an already-rotated token revokes the whole family in the same transaction. Parallel tests prove both concurrency claims: 20 concurrent rotations of one token produce exactly one `200`, one spent row and one replacement. Remaining gap, recorded and not silent: limiter state is per process, so several instances would each hold their own -- O8 |
-| V.6 | document remaining threats | §13.6, [[threat-register]] | **designed** — register written, verification pending |
+| V.6 | document remaining threats | §13.6, [[threat-register]] | **partly implemented** -- the register carries 29 rows, and the Verified column is filled for every threat a shipped slice closed or bounded: T-01, T-19, T-25, T-26, T-27, T-28 and T-29 all name tests or code paths. The rows still empty belong to slices that do not exist yet. Issue O19, opened by this sync, is the one item §13.2 claimed and did not have |
 | V.6 | log platform, device, app version per action | §10.7, §13.4, [[ADR-0019-hub-action-auditing]] | **partly implemented** -- **REST is done:** middleware refuses any mutating request that omits `X-Client-Platform`, `X-Client-Device` or `X-Client-App-Version` with a bodiless `400`, and an `AuditBehaviour` writes exactly one `audit_records` row per handled command, carrying those three values plus the action, the target type, the trace id and the instant. The record is written **inside the command's transaction**, so an effect without a record cannot exist and a record without an effect cannot either; if the audit write fails the whole command fails (owner decision, 2026-09-27, fail closed). A command refused by validation leaves no record. `user_id` is null on every row until an endpoint authenticates its caller, because every mutating endpoint that exists is anonymous -- stated, not hidden, and it is now populated wherever the handler knows the account. Since SPEC-009 the row also says **what became of** the action — `completed`, `refused`, `throttled`, `expired` or `reusedetected` (§13.4) — so a failed login, a rejected token and a detected refresh-token family revocation are each visible as themselves. A throttled credential attempt is recorded too, which needed the limiter's refusal to stop being an exception. **The hub filter is still designed only:** no hub exists yet, so ADR-0019's filter arrives with the first one rather than being registered against nothing |
 | V.7 | measure and justify concurrent users | §14.4, [[ADR-0018-load-testing-tool]] | tool decided; measurement not started |
 | V.7 | declare server specification | §14.1, [[ADR-0015-hosting-and-deployment]], [[ADR-0016-supabase-plan-region]] | machine and region decided; measurement not started |
@@ -844,6 +861,7 @@ defence, not more.
 | O17 | real mail provider adapter | V.1 email verification actually reaching a mailbox | owner decision 2026-09-24: SPEC-003 ships a Development-only logging `IMailService`; the hosted-provider adapter is a separate spec at the end of S1. A logging implementation cannot satisfy V.1 at the defence |
 | O14 | music preferences have no consumer | nothing | V.1 requires storing and updating them, which is met. Note for defence: storage-only today |
 | O19 | RS256 key pair: generation, storage, JWKS exposure and rotation with an overlap window | the OpenID Provider surface at S8 | [[ADR-0031-musicroom-as-openid-provider]]. `EnvSecretProvider` holds the private key until the vault lands at S1b, after which it belongs there. Rotation needs an overlap so tokens signed by the outgoing key keep verifying |
+| O20 | PostgreSQL Row Level Security policies are not written | nothing — it is defence in depth | §13.2 claimed RLS was enabled; no migration creates a policy. Opened by the SPEC-013 SDD sync on 2026-09-29. Deny-by-default policies on the per-account tables would mean a query that forgot its `WHERE` returns nothing rather than everything. Cost: every read path needs a session variable carrying the caller, which the current single-connection-pool design does not set |
 | O16 | OpenTelemetry must earn its place | credibility of the V.7 bottleneck claim | [[ADR-0022-observability-stack]]: capture one trace during the Gatling run showing EF Core, HttpClient and total request time together |
 
 ### Closed
