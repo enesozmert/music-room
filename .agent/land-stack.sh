@@ -73,25 +73,31 @@ scheduled() { grep -qx "$1" "$TMP/order" 2>/dev/null; }
 
 : > "$TMP/order"
 
-# Topological order: a pull request is ready when its base is main, or is the head of one already
-# scheduled.
-while : ; do
-  progressed=0
-  while IFS=$'\t' read -r num head base draft; do
-    scheduled "$num" && continue
-    if [ "$base" = "main" ]; then
-      echo "$num" >> "$TMP/order"; progressed=1; continue
-    fi
-    parent="$(pr_by_head "$base")"
-    if [ -n "$parent" ] && scheduled "$parent"; then
-      echo "$num" >> "$TMP/order"; progressed=1
-    fi
-  done < "$TMP/prs.tsv"
-  [ "$progressed" -eq 0 ] && break
-done
+# Order by the spec number in the branch name.
+#
+# Two more obvious sources are both wrong here:
+#
+#   The base chain erases itself. Retargeting a stack to main before landing it is required -
+#   GitHub closes a child when its base branch is deleted - and afterwards every pull request
+#   claims base=main.
+#
+#   Commit ancestry breaks the moment a branch in the middle is rewritten. Renumbering an ADR on
+#   feat/spec-016 force-pushed it, and its tip stopped being an ancestor of spec-017's.
+#
+# One spec is one branch and the numbers are allocated in order (ADR-0025), so the number in the
+# name is the order. A branch with no spec number - a docs pass - sorts to the front: those are
+# small, they are written against the specs below them, and landing one early is harmless.
+while IFS=$'\t' read -r num head base draft; do
+  git rev-parse --verify -q "origin/$head" >/dev/null 2>&1 || continue
+  key=$(printf '%s' "$head" | sed -n 's/.*spec-0*\([0-9][0-9]*\).*/\1/p')
+  [ -n "$key" ] || key=0
+  printf '%04d\t%s\n' "$key" "$num" >> "$TMP/keyed"
+done < "$TMP/prs.tsv"
+
+sort -s -k1,1n "$TMP/keyed" 2>/dev/null | cut -f2 > "$TMP/order"
 
 while IFS=$'\t' read -r num head base draft; do
-  scheduled "$num" || echo "WARN: #$num (base $base) is not reachable from main; skipped" >&2
+  scheduled "$num" || echo "WARN: #$num has no branch on origin; skipped" >&2
 done < "$TMP/prs.tsv"
 
 if [ "$LIMIT" -gt 0 ]; then
