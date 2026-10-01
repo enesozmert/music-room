@@ -1,6 +1,6 @@
 ---
 kind: adr-index
-updated: 2026-09-23
+updated: 2026-09-28
 ---
 
 # Decision Log
@@ -46,5 +46,10 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0030-hub-rate-limits-and-origin]] | Hub call limits and handshake origin | Accepted | S5 |
 | [[ADR-0031-musicroom-as-openid-provider]] | The MusicRoom API becomes an OpenID Provider at S8 | Accepted | S8 |
 | [[ADR-0035-swagger-ui-for-the-openapi-document]] | Swagger UI over the existing OpenAPI document, Development only | Accepted | S3a |
+| [[ADR-0036-access-token-mechanics]] | JwtBearer issues and validates; the token carries `sid`; 30 seconds of clock skew | Accepted | landed |
+| [[ADR-0037-credential-rate-limiting]] | Per-IP middleware plus a per-account in-process counter; a refusal is a value | Accepted | landed |
+| [[ADR-0032-refresh-token-lifetime]] | Refresh-token families live 30 days, absolute | Accepted | landed |
+| [[ADR-0033-audit-write-posture]] | The audit record commits with its action, fails closed, behind `IUnitOfWork` | Accepted | landed |
+| [[ADR-0034-profile-storage-and-visibility]] | Typed profile columns with a tier each; preferences as private rows | Accepted | landed, S3 |
 
 Related: [[MEMORY]] · [[system-overview]] · [[standards-router]]

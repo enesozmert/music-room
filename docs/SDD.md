@@ -759,6 +759,14 @@ rejected and why — evaluators ask "why not X", and the answer must be on file.
 | [[ADR-0024-expiry-and-cleanup]] | Lazy expiry checks, one cleanup service | Accepted |
 | [[ADR-0025-agent-git-protocol]] | Git protocol for unattended agent runs | Accepted |
 | [[ADR-0026-environment-bring-up]] | Environment bring-up sequence | Accepted |
+| [[ADR-0027-agent-push-and-pr]] | Agents push a branch and open a draft pull request | Accepted |
+| [[ADR-0028-domain-owns-its-base-types]] | Domain owns its base types; Application owns its abstractions | Accepted |
+| [[ADR-0029-containerised-dev-and-secret-vault]] | Containerised development, self-hosted secret vault | Accepted |
+| [[ADR-0036-access-token-mechanics]] | JwtBearer, a `sid` claim, 30 seconds of clock skew | Accepted |
+| [[ADR-0037-credential-rate-limiting]] | Per-IP middleware plus a per-account in-process counter | Accepted |
+| [[ADR-0032-refresh-token-lifetime]] | 30-day absolute refresh-token families | Accepted |
+| [[ADR-0033-audit-write-posture]] | The audit record commits with its action, and fails closed | Accepted |
+| [[ADR-0034-profile-storage-and-visibility]] | Typed profile columns with a tier each | Accepted |
 
 An accepted ADR is never edited. It is superseded by a new one.
 
