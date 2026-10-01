@@ -1,16 +1,20 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MusicRoom.Application;
 using MusicRoom.Application.Abstractions.Auditing;
+using MusicRoom.Application.Abstractions.Realtime;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Infrastructure;
 using MusicRoom.Infrastructure.Security;
 using MusicRoom.Persistence;
 using MusicRoom.WebAPI.Endpoints;
+using MusicRoom.WebAPI.Hubs;
 using MusicRoom.WebAPI.HealthChecks;
 using MusicRoom.WebAPI.Middleware;
 using MusicRoom.WebAPI.RateLimiting;
+using MusicRoom.WebAPI.Realtime;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
@@ -53,6 +57,7 @@ public class Program
         // The audit behaviour reads the client context through this abstraction; the implementation is a
         // WebAPI type because HttpContext is — SPEC-008.
         CallerServices.Add(builder.Services, builder.Configuration);
+        RealtimeServices.Add(builder.Services);
         Observability.AddTracing(builder.Services, builder.Configuration);
         HealthRegistration.Add(builder.Services, connectionString);
 
@@ -78,6 +83,10 @@ public class Program
         app.MapFriendEndpoints();
         app.MapUserEndpoints();
         app.MapPlaylistEndpoints();
+
+        // The hub is mapped after the endpoints and behind the same authentication. Its own authorisation is
+        // the [Authorize] on the hub plus the join gate inside it — SPEC-016.
+        RealtimeServices.Map(app);
 
         await app.RunAsync();
     }
@@ -206,9 +215,85 @@ internal static class CallerServices
                 // No metadata endpoint to reach and no HTTPS requirement on the handler itself: the token is
                 // symmetric and TLS is the deployment's job, not this handler's.
                 options.RequireHttpsMetadata = false;
+
+                // A WebSocket handshake cannot carry an Authorization header, so SignalR documents the
+                // `access_token` query parameter. It is read **only** on the hub path: giving every REST route
+                // a second way to present a token would widen the attack surface for one transport's benefit,
+                // and a token in a URL is a token that can end up in somebody's history. Serilog's request
+                // logging records the path and not the query string, so it does not reach the log either —
+                // SPEC-016 decision 4.
+                options.Events = new JwtBearerEvents
+                {
+                    OnMessageReceived = messageReceived =>
+                    {
+                        if (messageReceived.Request.Path.StartsWithSegments(PlaylistHub.Path))
+                        {
+                            string? token = messageReceived.Request.Query["access_token"];
+
+                            if (!string.IsNullOrWhiteSpace(token))
+                            {
+                                messageReceived.Token = token;
+                            }
+                        }
+
+                        return Task.CompletedTask;
+                    },
+                };
             });
 
         services.AddAuthorization();
+    }
+}
+
+/// <summary>
+/// SignalR, the hub filter, and the broadcaster the application layer sends through — SPEC-016.
+/// </summary>
+/// <remarks>
+/// Its own class rather than more lines in <c>Main</c>, which CA1506 caps at 41 coupled types — the same
+/// reason <c>CallerServices</c> exists.
+/// </remarks>
+internal static class RealtimeServices
+{
+    /// <summary>
+    /// How long a connection may be silent before each side acts. Written out because
+    /// `signalr-realtime` forbids relying on defaults matching what a mobile client expects: the server
+    /// pings at 15 seconds and gives a client 60 to be heard from, which tolerates a train tunnel without
+    /// holding a dead connection open for minutes.
+    /// </summary>
+    internal static readonly TimeSpan KeepAlive = TimeSpan.FromSeconds(15);
+
+    /// <summary>How long the server waits for a client before dropping it.</summary>
+    internal static readonly TimeSpan ClientTimeout = TimeSpan.FromSeconds(60);
+
+    /// <summary>Maps the hub.</summary>
+    /// <param name="endpoints">The route builder.</param>
+    /// <remarks>
+    /// Here rather than in <c>Main</c>, which CA1506 caps at 41 coupled types and which this one generic
+    /// argument pushed to 42.
+    /// </remarks>
+    internal static void Map(IEndpointRouteBuilder endpoints) =>
+        endpoints.MapHub<PlaylistHub>(PlaylistHub.Path);
+
+    /// <summary>Registers the hub, its filter, the per-invocation caller and the broadcaster.</summary>
+    /// <param name="services">The container being built.</param>
+    internal static void Add(IServiceCollection services)
+    {
+        // Scoped: SignalR creates a scope per invocation, so one instance holds one call's caller. The two
+        // accessors read it when there is no HttpContext.
+        services.AddScoped<HubCaller>();
+
+        services.AddSignalR(options =>
+        {
+            options.KeepAliveInterval = KeepAlive;
+            options.ClientTimeoutInterval = ClientTimeout;
+
+            // Centrally registered, exactly as the audit behaviour is: a new hub method is audited because
+            // the filter is on the hub, not because somebody remembered — ADR-0019.
+            options.AddFilter<PlaylistHubFilter>();
+        });
+
+        services.AddSingleton<PlaylistHubFilter>();
+        services.AddScoped<IPlaylistBroadcaster, PlaylistBroadcaster>();
     }
 }
 

@@ -87,7 +87,7 @@ landed.
 | S1 | registration, email verification and resend, login, JWT + refresh rotation with reuse detection, password reset, credential rate limits, **bearer validation and the session endpoints** |
 | S2 | mandatory client headers and the audit log, refusal outcomes included — REST only; the hub filter waits for a hub |
 | S3 | **complete**: own profile with per-field visibility and music preferences, the friends graph, and reading another user's profile projected per field against the relationship |
-| S5 | playlists with their three gates, an `xmin` concurrency token and collaborators; tracks with a sparse ordering key, a guarded reorder and the twenty-way parallel move that proves it. `PlaylistHub` is the remaining unit |
+| S5 | **complete**: playlists with their three gates, an `xmin` concurrency token and collaborators; tracks with a sparse ordering key, a guarded reorder and the twenty-way parallel move that proves it; `PlaylistHub` at `/hubs/playlists`, authorised on join, audited by ADR-0019's filter, broadcasting after the commit |
 
 **No counts here on purpose.** `docs/specs/` is the authority for what is done, [[migrations-index]]
 for the schema history, and `make agent-check` for the test count — each drifted within a day of being

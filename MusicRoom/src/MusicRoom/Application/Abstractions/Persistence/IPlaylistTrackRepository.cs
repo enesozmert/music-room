@@ -90,10 +90,15 @@ public sealed record TrackPlacement(
 /// neither is `422`, refused before this type is built.</param>
 public sealed record TrackMove(Guid PlaylistTrackId, Guid? AfterTrackId, Guid? BeforeTrackId);
 
-/// <summary>What a guarded track write did, and the row it created.</summary>
+/// <summary>What a guarded track write did, the row it created, and the version it left behind.</summary>
 /// <param name="Outcome">The outcome.</param>
 /// <param name="PlaylistTrackId">The new track, when one was added.</param>
-public sealed record TrackWriteResult(TrackWriteOutcome Outcome, Guid? PlaylistTrackId)
+/// <param name="Version">
+/// The playlist's `xmin` after the write, read inside the same transaction. It is what the broadcast carries
+/// so a listener can tell whether it missed a message — SPEC-016 decision 2. Zero on a refusal: nothing
+/// changed, so there is no new version to report.
+/// </param>
+public sealed record TrackWriteResult(TrackWriteOutcome Outcome, Guid? PlaylistTrackId, uint Version = 0)
 {
     /// <summary>A stale caller: somebody changed the playlist or its tracks first.</summary>
     public static TrackWriteResult Stale { get; } = new(TrackWriteOutcome.VersionMismatch, null);

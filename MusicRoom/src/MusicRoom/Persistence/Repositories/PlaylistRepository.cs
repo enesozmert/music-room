@@ -75,6 +75,15 @@ internal sealed class PlaylistRepository : IPlaylistRepository
     }
 
     /// <inheritdoc />
+    public async Task<uint> FindVersionAsync(Guid playlistId, CancellationToken cancellationToken) =>
+        await _context.Playlists
+            .AsNoTracking()
+            .Where(playlist => playlist.Id == playlistId)
+            .Select(playlist => playlist.Version)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
     public async Task<PlaylistDetail?> FindAsync(
         Guid playlistId,
         Guid userId,

@@ -68,6 +68,11 @@
     <!-- ADR-0012 rejects the in-memory provider: it does not enforce a unique index, which is what
          the ux_users_email concurrency test has to prove. A real engine in a container does. -->
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />
+    <!-- Named by no ADR. Approved at the SPEC-016 gate on the same grounds as the three earlier
+         amendments: Microsoft-owned, **test projects only**, and the only way a test can be a real
+         SignalR client rather than a mock of one. SignalR itself is in the shared framework and needs
+         no package. -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.12" />
   </ItemGroup>
 
 </Project>

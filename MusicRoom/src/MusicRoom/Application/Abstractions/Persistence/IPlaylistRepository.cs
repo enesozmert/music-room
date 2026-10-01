@@ -31,6 +31,17 @@ public interface IPlaylistRepository
     /// </returns>
     Task<PlaylistAccess> FindAccessAsync(Guid playlistId, Guid userId, CancellationToken cancellationToken);
 
+    /// <summary>The playlist's current `xmin`, or zero when there is no such playlist.</summary>
+    /// <param name="playlistId">The playlist.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The version a broadcast carries — SPEC-016 decision 2.</returns>
+    /// <remarks>
+    /// A collaborator change does not touch the playlist row, so its broadcast reports the version the
+    /// playlist already has. A listener that compares it against what it holds learns that the track list is
+    /// unchanged, which is true.
+    /// </remarks>
+    Task<uint> FindVersionAsync(Guid playlistId, CancellationToken cancellationToken);
+
     /// <summary>Reads one playlist, if the caller may see it.</summary>
     /// <param name="playlistId">The playlist.</param>
     /// <param name="userId">The caller.</param>

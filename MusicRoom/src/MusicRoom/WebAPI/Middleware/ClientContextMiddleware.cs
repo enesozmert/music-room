@@ -10,6 +10,11 @@ namespace MusicRoom.WebAPI.Middleware;
 /// them is refused rather than defaulted: a silent default would void the requirement while appearing to
 /// satisfy it. A read is untouched, and so are the health probes — a probe is not a client action.
 /// <para>
+/// A SignalR handshake is refused by the same rule and with the same `400`, reading the three values from the
+/// query string because a WebSocket handshake cannot set headers — ADR-0019, SPEC-016. The requests that
+/// follow it are not re-checked: the connection already proved it had them.
+/// </para>
+/// <para>
 /// It runs after the rate limiter, so a request the limiter would refuse never reaches this check.
 /// </para>
 /// </remarks>
@@ -29,6 +34,14 @@ public sealed class ClientContextMiddleware
 
     /// <summary>The width of each value, matching the <c>audit_records</c> columns.</summary>
     public const int MaximumValueLength = 64;
+
+    /// <summary>
+    /// Where the SignalR hubs live. One segment, so every hub under it is covered.
+    /// </summary>
+    public const string HubPaths = "/hubs";
+
+    /// <summary>The last segment of a SignalR handshake request.</summary>
+    public const string NegotiateSegment = "/negotiate";
 
     private static readonly string[] _mutatingMethods = ["POST", "PUT", "PATCH", "DELETE"];
 
@@ -51,9 +64,13 @@ public sealed class ClientContextMiddleware
             return;
         }
 
-        string? platform = Read(httpContext, PlatformHeader);
-        string? device = Read(httpContext, DeviceHeader);
-        string? appVersion = Read(httpContext, AppVersionHeader);
+        // On the hub path the values arrive in the query string, because a WebSocket handshake cannot set
+        // headers. Everywhere else they are headers and only headers — SPEC-016 decision 3.
+        bool fromQuery = IsHubHandshake(httpContext);
+
+        string? platform = Read(httpContext, PlatformHeader, fromQuery ? "platform" : null);
+        string? device = Read(httpContext, DeviceHeader, fromQuery ? "device" : null);
+        string? appVersion = Read(httpContext, AppVersionHeader, fromQuery ? "appVersion" : null);
 
         if (platform is null || device is null || appVersion is null)
         {
@@ -87,17 +104,49 @@ public sealed class ClientContextMiddleware
             ? userId
             : null;
 
+    /// <summary>
+    /// Whether this request must carry the three headers.
+    /// </summary>
+    /// <remarks>
+    /// A read is exempt, and so are the health probes — a probe is not a client action. The hub is exempt
+    /// too, and not because it is excused: a SignalR negotiate is a `POST` that carries no client headers by
+    /// design, because a WebSocket handshake cannot set them. The hub reads the same three values off the
+    /// handshake's query string and refuses a connection without them, so the requirement is enforced there
+    /// instead of here — ADR-0019, SPEC-016 decision 3.
+    /// </remarks>
     private static bool RequiresClientContext(HttpContext httpContext) =>
-        _mutatingMethods.Contains(httpContext.Request.Method, StringComparer.OrdinalIgnoreCase)
-        && !httpContext.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase);
+        IsHubHandshake(httpContext)
+        || (_mutatingMethods.Contains(httpContext.Request.Method, StringComparer.OrdinalIgnoreCase)
+            && !httpContext.Request.Path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase)
+            && !httpContext.Request.Path.StartsWithSegments(HubPaths, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// Returns the header value, or null when it is absent, blank or longer than the column that stores it.
+    /// Whether this is the `POST .../negotiate` that opens a hub connection.
+    /// </summary>
+    /// <remarks>
+    /// The handshake, and only the handshake: the polling and sending requests that follow carry the same
+    /// query string, and checking each of them would buy nothing but work per message.
+    /// </remarks>
+    private static bool IsHubHandshake(HttpContext httpContext) =>
+        httpContext.Request.Path.StartsWithSegments(HubPaths, StringComparison.OrdinalIgnoreCase)
+        && httpContext.Request.Path.Value?.EndsWith(NegotiateSegment, StringComparison.OrdinalIgnoreCase)
+            == true;
+
+    /// <summary>
+    /// Returns the value, or null when it is absent, blank or longer than the column that stores it.
     /// An overlong value is refused rather than truncated: a truncated audit record is a wrong one.
     /// </summary>
-    private static string? Read(HttpContext httpContext, string header)
+    /// <param name="httpContext">The request being read.</param>
+    /// <param name="header">The header to read.</param>
+    /// <param name="queryKey">A query parameter to fall back to, for a hub handshake, or null.</param>
+    private static string? Read(HttpContext httpContext, string header, string? queryKey)
     {
         string? value = httpContext.Request.Headers[header].ToString();
+
+        if (string.IsNullOrWhiteSpace(value) && queryKey is not null)
+        {
+            value = httpContext.Request.Query[queryKey].ToString();
+        }
 
         return string.IsNullOrWhiteSpace(value) || value.Length > MaximumValueLength
             ? null
