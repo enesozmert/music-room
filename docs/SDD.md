@@ -10,7 +10,7 @@ updated: 2026-09-23
 
 Consolidated design view of the system, organised by the viewpoints of IEEE 1016.
 
-**Status: partly implemented.** Slices S0 to S3 are built — the identity surface, the credential rate limits, the audit log and the own-profile surface — and all of it is merged to `main`; §16 says which rows that covers and which are still design only. Every
+**Status: partly implemented.** S0 through S2 are done and S3 has started: identity, credential rate limits, the audit log, bearer authentication and own-profile editing all exist. **§16 is the authority for what is built** — it says which rows that covers and which are still design only; `docs/progress/PROGRESS.json` carries the counted figures. Every
 section below describes what is decided, and marks what is not with
 `UNKNOWN - requires decision`. A guess is never substituted for a decision.
 
@@ -301,7 +301,7 @@ rewrite the list. See §12.2.
 missing profile. `music_preferences` holds one row per named genre or artist, unique per account, kind and
 value. `display_name` stays on `users`: it is always public (SPEC-011).
 
-Concrete table and column definitions live in the migrations and their `IEntityTypeConfiguration` files, which are authoritative — four migrations so far, `users` through `audit_records` ([[migrations-index]]). For a table no migration has created yet it is still `UNKNOWN - requires decision`.
+Concrete table and column definitions live in the migrations and their `IEntityTypeConfiguration` files, which are authoritative — [[migrations-index]] is the list, and this section does not repeat it. For a table no migration has created yet it is still `UNKNOWN - requires decision`.
 
 ---
 
@@ -786,7 +786,7 @@ table to walk through at defence.
 | V.2.3 | reorder race conditions | §12.1 #2, §12.2 | designed |
 | V.2 | at least 2 of the 3 services | §5.2, [[ADR-0010-service-scope]] | **designed** — all three |
 | V.3 | backend is the single source of truth | §4.2, §8.1 | designed |
-| V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **partly implemented** -- `docs/api/openapi.json` is generated from the code and committed; it documents nine paths — the two health endpoints and the seven identity endpoints that exist: `POST /api/v1/auth/registrations`, `/auth/email-verifications`, `/auth/verification-requests`, `/auth/sessions`, `/auth/tokens`, `/auth/password-reset-requests` and `/auth/password-resets`. Each mutating route documents the `400` its mandatory client headers can produce |
+| V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **partly implemented** -- `docs/api/openapi.json` is generated from the code and committed; it documents every route that exists — the two health endpoints, the identity surface including the three session routes, and the three `/api/v1/me` profile routes. Each mutating route documents the `400` its mandatory client headers can produce, and each authenticated route its `401`. The generated document is the count; this row does not repeat it |
 | V.5 | client is a remote control | §4.1, §9.1 | designed |
 | V.5 | configurable backend address | §9.1, [[musicroom-mobile]] | designed |
 | V.5 | social authentication on mobile | §10.2 | designed |
@@ -797,7 +797,7 @@ table to walk through at defence.
 | V.7 | measure and justify concurrent users | §14.4, [[ADR-0018-load-testing-tool]] | tool decided; measurement not started |
 | V.7 | declare server specification | §14.1, [[ADR-0015-hosting-and-deployment]], [[ADR-0016-supabase-plan-region]] | machine and region decided; measurement not started |
 | V.6 | OWASP conformance of all code | [[asvs-conformance]], §13 | target committed, evidence pending |
-| V.8 | per-layer tests | [[testing]], [[ADR-0012-test-stack]] | **partly implemented** -- 180 tests across four projects: validation and pipeline behaviours (`MusicRoom.Application.Tests`), infrastructure (`MusicRoom.Infrastructure.Tests`), persistence (`MusicRoom.Persistence.Tests`, which holds the built model to the schema naming conventions without needing an engine) and API integration (`MusicRoom.WebAPI.Tests`, Testcontainers-backed against a real PostgreSQL). Includes the four concurrency tests AGENTS.md requires, each asserting final database state: 20 parallel registrations of one address create exactly one row; 20 parallel verifications of one token produce exactly one `204` and one `consumed_at_utc`; 20 parallel rotations of one refresh token produce exactly one `200`, one spent row and one replacement; and 20 parallel resets of one token produce exactly one `204` and no live refresh token. Domain and realtime layers arrive with the slices that create them |
+| V.8 | per-layer tests | [[testing]], [[ADR-0012-test-stack]] | **partly implemented** -- tests in four projects, the count being whatever `make agent-check` prints rather than a number that rots here: validation and pipeline behaviours (`MusicRoom.Application.Tests`), infrastructure (`MusicRoom.Infrastructure.Tests`), persistence (`MusicRoom.Persistence.Tests`, which holds the built model to the schema naming conventions without needing an engine) and API integration (`MusicRoom.WebAPI.Tests`, Testcontainers-backed against a real PostgreSQL). Includes the four concurrency tests AGENTS.md requires, each asserting final database state: 20 parallel registrations of one address create exactly one row; 20 parallel verifications of one token produce exactly one `204` and one `consumed_at_utc`; 20 parallel rotations of one refresh token produce exactly one `200`, one spent row and one replacement; and 20 parallel resets of one token produce exactly one `204` and no live refresh token. Domain and realtime layers arrive with the slices that create them |
 | V.8 | continuous integration | [[ci-cd-containerization]] | **done** -- `.github/workflows/backend-dev.yml` and `backend-prod.yml`: restore, format, build -warnaserror, test, vulnerable-package scan, OpenAPI drift check; prod also builds the image. No deployment, by [[ADR-0015-hosting-and-deployment]] |
 | V.8 | credentials in a git-ignored `.env` | §14.3, `.env.example` | **done** |
 | V.8 | enforced code quality | [[dotnet-csharp]], `.editorconfig`, `MusicRoom/SonarLint.xml` | **done** -- proven live in S0: a 47-line method fails the build with `S138 ... greater than the 40 lines authorized`, and six parameters fail with `S107`. The thresholds moved to `SonarLint.xml`; in `.editorconfig` they were silently ignored |

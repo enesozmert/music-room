@@ -71,13 +71,15 @@ agent reads is `AGENTS.md`.
 
 ## Current state — 2026-09-28
 
-- **Slices S0 to S2 are built**, as eight `done` specs on stacked draft pull requests: solution,
-  compose, CI and health endpoints; the whole identity surface — registration, email verification and
-  resend, login, JWT plus refresh rotation with reuse detection, password reset; credential rate
-  limits; and the audit log with its mandatory client headers. 128 tests pass under `make agent-check`.
-  The pull requests are unmerged, so `main` lags — `docs/specs/` has the statuses.
-- Next: the audit log's refusal outcomes (closing T-27), then slice S3. Slice S1a is blocked on O17,
-  a mail provider account that does not exist yet.
+- **Built so far:** the walking skeleton; the whole identity surface — registration, email verification
+  and resend, login, JWT plus refresh rotation with reuse detection, password reset, credential rate
+  limits, bearer validation and the session endpoints; the audit log with its mandatory client headers
+  and its refusal outcomes; and own-profile editing with per-field visibility plus music preferences.
+  Work lands as one draft pull request per spec and they are stacked and unmerged, so `main` lags —
+  **`docs/specs/` has the statuses and `make agent-check` has the test count; this page counts neither.**
+- Next: the friends graph, which is what makes the `Friends` visibility tier mean something, then
+  reading another user's profile with per-field projection. Slice S1a is still blocked on O17, a mail
+  provider account that does not exist yet.
 - **All 29 architectural decisions are closed**, and four decisions taken during S1 and S2 are still
   waiting for an ADR — listed in [[musicroom-backend]] "Open items". Scope: all three services.
 - **The API contract is written** — [[endpoint-inventory]] — and `docs/api/openapi.json` is generated

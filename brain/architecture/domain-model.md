@@ -5,7 +5,10 @@ updated: 2026-09-28
 
 # Domain Model (target)
 
-Sketch, not a schema. For the aggregates that have shipped — `User`, `EmailVerificationToken`, `RefreshToken`, `PasswordResetToken`, `AuditRecord` — the migrations and their `IEntityTypeConfiguration` files are authoritative on field-level detail, not this note ([[migrations-index]]). For the rest it is still `UNKNOWN - requires decision` until the migration that creates them.
+Sketch, not a schema. For any aggregate that has shipped, the migrations and their
+`IEntityTypeConfiguration` files are authoritative on field-level detail, not this note — and
+[[migrations-index]] is the list, so this note does not repeat it. For an aggregate no migration has
+created yet it is still `UNKNOWN - requires decision`.
 
 ## Aggregates
 

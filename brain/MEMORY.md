@@ -16,13 +16,13 @@ MEMORY -> Project Registry -> Project Card -> Architecture / ADR / Standard -> S
 
 `music-room` is an École 42 group project: a collaborative music platform
 (Music Track Vote, Music Control Delegation, Music Playlist Editor).
-Backend is the current work scope. Slices **S0 to S3 are merged to `main`**: the solution, the
-identity surface (registration, email verification and resend, login, refresh rotation, password
-reset), bearer validation and session listing, the credential rate limits, the audit log with
-refusal outcomes, and the own-profile surface with music preferences. Eleven completed specs, all
-landed — the stack of draft pull requests that used to carry them was merged on 2026-09-28.
-`MusicRoomApp/` is still empty by design — the client workstream starts after S9
-([[delivery-plan]]).
+Backend is the current work scope and is **well past the skeleton**: identity, credential rate
+limits, the audit log, bearer authentication and the first profile endpoints all exist under
+`MusicRoom/`. **Do not trust a count written here.** `docs/specs/` holds one file per unit of work
+with its status, [[delivery-plan]] holds the slice order and each slice's `State`,
+[[migrations-index]] holds the schema history, and `docs/progress/PROGRESS.json` holds the counts,
+recounted by `.agent/progress.sh` on every merge that could move them; each is the authority for
+its own question. `MusicRoomApp/` is still empty by design — the client workstream starts after S9.
 
 ## Router
 

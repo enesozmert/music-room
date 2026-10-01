@@ -83,22 +83,29 @@ stacked and unmerged, so `main` lags: read `docs/specs/` for status, `git log` f
 | Slice | Built |
 |---|---|
 | S0 | solution, `Directory.Packages.props`, compose with a local PostgreSQL, `Makefile`, CI, `/health`, `/health/ready`, generated OpenAPI |
-| S1 | registration, email verification, verification resend, login, JWT + refresh rotation with reuse detection, password reset, credential rate limits |
-| S2 | mandatory client headers and the audit log — REST only; the hub filter waits for a hub |
+| S1 | registration, email verification and resend, login, JWT + refresh rotation with reuse detection, password reset, credential rate limits, **bearer validation and the session endpoints** |
+| S2 | mandatory client headers and the audit log, refusal outcomes included — REST only; the hub filter waits for a hub |
+| S3 | **own profile with per-field visibility, and music preferences.** Reading another user's profile waits for the friends graph |
 
-Four migrations exist: `InitialIdentity`, `RefreshTokens`, `PasswordResetTokens`, `AuditRecords`
-([[migrations-index]]). 128 tests pass under `make agent-check`.
+**No counts here on purpose.** `docs/specs/` is the authority for what is done, [[migrations-index]]
+for the schema history, and `make agent-check` for the test count — each drifted within a day of being
+written down twice.
 
 ## Open items
 
 - Remaining open: remote deployment target (O11), SignalR backplane (O8, deliberately deferred),
   fluent assertion library (O12), silent-controller recovery (O13), music preferences consumer (O14),
   OpenTelemetry evidence (O16), real mail provider (O17 — blocks slice S1a), self-hosted vault (O18).
-- **Four decisions are recorded only in specs and code, and specs are disposable
-  ([[specs]] "Retention"). They need an ADR from the repository owner:**
-  the `Microsoft.AspNetCore.Authentication.JwtBearer` package and the in-process credential backoff,
-  both amendments to [[ADR-0021-backend-dependency-set]]; the 30-day absolute refresh-token lifetime;
-  one repository method writing two aggregates in one transaction, then superseded by `IUnitOfWork`
-  when the audit record joined the same transaction; and the fail-closed audit posture (T-29).
-  No agent writes an ADR.
+- **Seven decisions are recorded only in specs and code, and specs are disposable
+  ([[specs]] "Retention"). They need an ADR from the repository owner. No agent writes an ADR:**
+  1. the `Microsoft.AspNetCore.Authentication.JwtBearer` package — amends [[ADR-0021-backend-dependency-set]];
+  2. the in-process credential backoff — amends the same ADR's "state is held in process";
+  3. the 30-day absolute refresh-token lifetime (now also stated in [[sdd]] §13.1);
+  4. one repository method writing two aggregates in one transaction, superseded by `IUnitOfWork` when
+     the audit record joined that transaction;
+  5. the fail-closed audit posture (T-29);
+  6. a credential refusal as a returned value rather than an exception, which amends 5;
+  7. the `sid` claim, which amends [[sdd]] §13.1's "`sub`, `iat`, `exp`, `jti` and nothing else", and the
+     profile storage shape — typed columns with a visibility column each, `displayName` untiered, and
+     always-private normalised preferences.
 - Owner: one backend developer. The React Native client is a parallel workstream owned by the second team member ([[musicroom-mobile]]).

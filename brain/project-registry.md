@@ -9,7 +9,7 @@ Every component in this workspace. One row per component. Cards hold the detail.
 
 | Component | Type | Status | Stack | Card |
 |---|---|---|---|---|
-| MusicRoom.Backend | backend / REST + realtime API | slices S0 to S2 built: solution, compose, CI, health endpoints, the identity surface (registration, verification, login, refresh rotation, password reset), credential rate limits and the audit log. Realtime, events, playlists and delegation are designed only; all 3 services in scope | .NET 10, ASP.NET Core, EF Core, SignalR | [[musicroom-backend]] |
+| MusicRoom.Backend | backend / REST + realtime API | identity, credential rate limits, the audit log, bearer authentication and own-profile endpoints are built; realtime, events, playlists and delegation are designed only. All 3 services in scope. Status per unit: `docs/specs/` | .NET 10, ASP.NET Core, EF Core, SignalR | [[musicroom-backend]] |
 | MusicRoom.Mobile | mobile client at `MusicRoomApp/` | parallel workstream, separate owner | React Native | [[musicroom-mobile]] |
 | nArchitecture | reference material — **read only, never edited** | external, frozen | .NET 6 Clean Architecture | [[reference-narchitecture]] |
 | docs/subject | authoritative requirements | fixed, v6 | PDF | [[subject-requirements]] |
