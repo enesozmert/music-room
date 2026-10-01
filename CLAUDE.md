@@ -27,6 +27,9 @@ canonical; a command is a shortcut, never a second copy of the rules.
 A command added to `.claude/commands/` after a session started is not visible to that session.
 Restart it.
 
+The same nine are generated into `.agents/skills/` for the Antigravity CLI — `make agy-skills`.
+See `.agents/README.md`.
+
 `.claude/hooks/write-boundary.sh` blocks the three writes that have no legitimate exception:
 anything under `reference/`, `.env`, and any `.pdf`. See `.claude/README.md`.
 

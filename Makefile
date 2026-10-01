@@ -70,6 +70,9 @@ agent-run: ## drive unattended agent cycles — permissions scoped, output live 
 	  else empty end'" \
 	./.agent/run.sh $(CYCLES)
 
+agy-skills: ## regenerate .agents/skills/ from .claude/commands/ (Antigravity CLI)
+	@./.agent/sync-agy-skills.sh
+
 progress: ## count how far the backend has got (WRITE=1 also writes the snapshot)
 	@./.agent/progress.sh $(if $(WRITE),--write,)
 
