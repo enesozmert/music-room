@@ -602,7 +602,18 @@ If .agent/STOP exists, stop the loop immediately.
 }
 ```
 
-## 3.2 Gemini CLI
+## 3.2 Antigravity CLI (`agy`)
+
+- Reads `AGENTS.md` by itself. No rule file has to repeat the contract.
+- Slash commands are **skills**, not a commands directory: `{workspace}/.agents/skills/<name>/SKILL.md`,
+  with `name` and `description` in the frontmatter. `.agents/skills/` is generated from
+  `.claude/commands/` by `make agy-skills`, so both tools serve the same nine prompts from one
+  source.
+- A skill added while a session is open is invisible to that session. Restart it.
+- `~/.gemini/config/skills/` works too and is the wrong place for a team: it is not committed and
+  drifts from the repository silently.
+
+## 3.3 Gemini CLI
 
 - `GEMINI.md` is read automatically; it points to `AGENTS.md`.
 - Gemini's large context window invites breadth-first reading. Resist it — the Brain exists so
@@ -610,7 +621,7 @@ If .agent/STOP exists, stop the loop immediately.
 - Non-interactive runs take the prompt on stdin, which is what the Part 4 driver uses.
 - No native loop. Use the Part 4 driver script.
 
-## 3.3 Cursor, Copilot, Aider, Codex
+## 3.4 Cursor, Copilot, Aider, Codex
 
 - Cursor: mirror the non-negotiables into `.cursor/rules/` as a short always-on rule that says
   "read `AGENTS.md`". Do not duplicate the content.
@@ -619,7 +630,7 @@ If .agent/STOP exists, stop the loop immediately.
   which suits Part 2 stage 3.
 - Any tool without file-scoping: use prompt 2 and check the diff yourself before accepting.
 
-## 3.4 Any agent, from CI
+## 3.5 Any agent, from CI
 
 Keep CI agents **read-only**. A pipeline that edits code turns a red build into a moving target.
 Good uses: prompt 12 review output as a PR comment, prompt 15 Brain health check on a schedule.
