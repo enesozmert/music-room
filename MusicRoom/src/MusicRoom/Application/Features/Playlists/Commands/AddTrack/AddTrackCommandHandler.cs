@@ -15,7 +15,7 @@ internal sealed class AddTrackCommandHandler : IRequestHandler<AddTrackCommand, 
     private readonly IPlaylistTrackRepository _tracks;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditContext _audit;
-    private readonly IPlaylistBroadcastQueue _broadcasts;
+    private readonly IBroadcastQueue _broadcasts;
 
     /// <summary>Takes the playlist gate, the track write path, the caller and the audit context.</summary>
     /// <param name="playlists">Where the `licence` gate is decided.</param>
@@ -31,7 +31,7 @@ internal sealed class AddTrackCommandHandler : IRequestHandler<AddTrackCommand, 
         IPlaylistTrackRepository tracks,
         ICurrentUserAccessor currentUser,
         IAuditContext audit,
-        IPlaylistBroadcastQueue broadcasts)
+        IBroadcastQueue broadcasts)
     {
         _playlists = playlists;
         _tracks = tracks;

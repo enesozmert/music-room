@@ -1,6 +1,7 @@
 using MediatR;
 using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Persistence;
+using MusicRoom.Application.Abstractions.Realtime;
 using MusicRoom.Application.Abstractions.Security;
 
 namespace MusicRoom.Application.Features.Events.Commands.RemoveSuggestion;
@@ -13,22 +14,26 @@ internal sealed class RemoveSuggestionCommandHandler : IRequestHandler<RemoveSug
     private readonly IEventQueueRepository _queue;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditContext _audit;
+    private readonly IBroadcastQueue _broadcasts;
 
     /// <summary>Takes the queue, the caller and the audit context.</summary>
     /// <param name="queue">Where suggestions live.</param>
     /// <param name="currentUser">Who is removing it, from the validated token.</param>
     /// <param name="audit">Where this handler states what became of the request — ADR-0033.</param>
+    /// <param name="broadcasts">What the other listeners are told, once this has committed — ADR-0035.</param>
     /// <remarks>
     /// Public on an internal type: MediatR activates the handler through a public constructor only.
     /// </remarks>
     public RemoveSuggestionCommandHandler(
         IEventQueueRepository queue,
         ICurrentUserAccessor currentUser,
-        IAuditContext audit)
+        IAuditContext audit,
+        IBroadcastQueue broadcasts)
     {
         _queue = queue;
         _currentUser = currentUser;
         _audit = audit;
+        _broadcasts = broadcasts;
     }
 
     /// <summary>Removes it, or reports that there was nothing this caller could remove.</summary>
@@ -56,7 +61,14 @@ internal sealed class RemoveSuggestionCommandHandler : IRequestHandler<RemoveSug
         if (!removed)
         {
             _audit.SetOutcome(AuditOutcome.Refused);
+
+            return removed;
         }
+
+        // The queue's membership changed, so its order did. The votes went with the row, which is why no
+        // `VoteChanged` follows.
+        _broadcasts.Enqueue(
+            new QueueReordered(request.EventId, DateTime.UtcNow, request.SuggestionId));
 
         return removed;
     }

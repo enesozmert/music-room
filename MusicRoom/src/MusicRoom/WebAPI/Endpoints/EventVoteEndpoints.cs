@@ -95,11 +95,11 @@ internal static class EventVoteEndpoints
         ISender sender,
         CancellationToken cancellationToken)
     {
-        VoteWriteOutcome outcome = await sender.Send(
+        VoteWriteResult result = await sender.Send(
             new CastVoteCommand(eventId, suggestionId, request?.Presence?.ToSubmission()),
             cancellationToken);
 
-        return outcome switch
+        return result.Outcome switch
         {
             VoteWriteOutcome.Recorded => Results.Created(
                 $"/api/v1/events/{eventId}/tracks/{suggestionId}/vote",

@@ -78,8 +78,7 @@ agent reads is `AGENTS.md`.
   Work lands as one draft pull request per spec and they are stacked and unmerged, so `main` lags —
   **`docs/specs/` has the statuses and `make agent-check` has the test count; this page counts neither.**
 - Next: playlist tracks with the sparse ordering key, then `PlaylistHub` and ADR-0019's hub filter. Slices
-  S1a, S4 and S8 are blocked on credentials that do not exist yet — a mail provider account (O17), a YouTube
-  key and a Supabase project, and the Google and Facebook OIDC clients.
+  S1a, S4 and S8 were blocked, but the mail provider, YouTube, and Supabase credentials have been received. Facebook/Google OIDC credentials for S8 are partially pending.
 - **All 29 architectural decisions are closed**, and four decisions taken during S1 and S2 are still
   waiting for an ADR — listed in [[musicroom-backend]] "Open items". Scope: all three services.
 - **The API contract is written** — [[endpoint-inventory]] — and `docs/api/openapi.json` is generated

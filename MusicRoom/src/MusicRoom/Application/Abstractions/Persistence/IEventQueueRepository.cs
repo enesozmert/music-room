@@ -42,11 +42,12 @@ public interface IEventQueueRepository
     /// <param name="nowUtc">The instant the row is stamped with.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>
-    /// <see cref="VoteWriteOutcome.Recorded"/> the first time and <see cref="VoteWriteOutcome.Unchanged"/>
-    /// when the vote was already there — including when a concurrent request wrote it, which the unique index
-    /// detects. Both are success: a vote is an idempotent fact.
+    /// The outcome and the suggestion's count after the write. <see cref="VoteWriteOutcome.Recorded"/> the
+    /// first time and <see cref="VoteWriteOutcome.Unchanged"/> when the vote was already there — including
+    /// when a concurrent request wrote it, which the unique index detects. Both are success: a vote is an
+    /// idempotent fact.
     /// </returns>
-    Task<VoteWriteOutcome> TryCastVoteAsync(
+    Task<VoteWriteResult> TryCastVoteAsync(
         Guid eventId,
         Guid suggestionId,
         Guid userId,
@@ -58,8 +59,8 @@ public interface IEventQueueRepository
     /// <param name="suggestionId">The suggestion.</param>
     /// <param name="userId">The voter.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
-    /// <returns>True when a row was removed.</returns>
-    Task<bool> TryWithdrawVoteAsync(
+    /// <returns>Whether a row was removed, and the suggestion's count afterwards.</returns>
+    Task<VoteWriteResult> TryWithdrawVoteAsync(
         Guid eventId,
         Guid suggestionId,
         Guid userId,
@@ -121,6 +122,24 @@ public enum SuggestionWriteOutcome
 
     /// <summary>The event already holds this video — the endpoint answers `409`.</summary>
     Duplicate = 2,
+}
+
+/// <summary>
+/// What a vote write did, and what the suggestion's count is now.
+/// </summary>
+/// <param name="Outcome">The outcome.</param>
+/// <param name="Votes">
+/// The suggestion's count after the write, counted from the vote rows in the same transaction. It is what the
+/// `VoteChanged` broadcast carries, and the only honest source: counting afterwards in the handler would race
+/// with the next voter — ADR-0036.
+/// </param>
+public sealed record VoteWriteResult(VoteWriteOutcome Outcome, int Votes)
+{
+    /// <summary>No such suggestion in this event.</summary>
+    public static VoteWriteResult NotFound { get; } = new(VoteWriteOutcome.NotFound, 0);
+
+    /// <summary>The licence requires presence and the caller did not prove it.</summary>
+    public static VoteWriteResult PresenceNotProved { get; } = new(VoteWriteOutcome.PresenceNotProved, 0);
 }
 
 /// <summary>What a vote write did.</summary>

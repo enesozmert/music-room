@@ -35,13 +35,17 @@ internal static class HubClients
     /// <param name="factory">The test host.</param>
     /// <param name="accessToken">The signed JWT, or null to connect anonymously.</param>
     /// <param name="withClientContext">False to omit platform, device and appVersion — ADR-0019's refusal.</param>
+    /// <param name="path">Which hub to connect to. Defaults to the playlist hub.</param>
     /// <returns>A connection that has not been started.</returns>
     internal static HubConnection Build(
         WebApplicationFactory<Program> factory,
         string? accessToken,
-        bool withClientContext = true)
+        bool withClientContext = true,
+        string? path = null)
     {
         ArgumentNullException.ThrowIfNull(factory);
+
+        string hubPath = path ?? PlaylistHub.Path;
 
         List<string> query = [];
 
@@ -60,7 +64,7 @@ internal static class HubClients
 
         Uri url = new(
             factory.Server.BaseAddress,
-            query.Count == 0 ? PlaylistHub.Path : $"{PlaylistHub.Path}?{string.Join('&', query)}");
+            query.Count == 0 ? hubPath : $"{hubPath}?{string.Join('&', query)}");
 
         return new HubConnectionBuilder()
             .WithUrl(url, options =>

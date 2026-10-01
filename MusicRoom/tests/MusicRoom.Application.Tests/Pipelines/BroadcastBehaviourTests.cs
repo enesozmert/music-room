@@ -19,7 +19,7 @@ public sealed class BroadcastBehaviourTests
     public async Task Handle_WhenTheInnerPipelineReturns_SendsWhatWasQueuedAsync()
     {
         // Arrange
-        PlaylistBroadcastQueue queue = new();
+        BroadcastQueue queue = new();
         RecordingBroadcaster broadcaster = new();
         BroadcastBehaviour<string, string> behaviour = new(queue, broadcaster);
 
@@ -41,9 +41,9 @@ public sealed class BroadcastBehaviourTests
 
         // Assert
         Assert.Equal("handled", response);
-        PlaylistBroadcast sent = Assert.Single(broadcaster.Sent);
-        Assert.Equal(playlistId, sent.PlaylistId);
-        Assert.Equal(42u, sent.Version);
+        IRealtimeBroadcast sent = Assert.Single(broadcaster.Sent);
+        Assert.Equal(playlistId, sent.AggregateId);
+        Assert.Equal(42u, Assert.IsType<TrackMoved>(sent).Version);
     }
 
     /// <summary>
@@ -54,7 +54,7 @@ public sealed class BroadcastBehaviourTests
     public async Task Handle_WhenTheInnerPipelineThrows_SendsNothingAsync()
     {
         // Arrange
-        PlaylistBroadcastQueue queue = new();
+        BroadcastQueue queue = new();
         RecordingBroadcaster broadcaster = new();
         BroadcastBehaviour<string, string> behaviour = new(queue, broadcaster);
 
@@ -79,7 +79,7 @@ public sealed class BroadcastBehaviourTests
     public async Task Handle_WithAnEmptyQueue_SendsNothingAsync()
     {
         // Arrange
-        PlaylistBroadcastQueue queue = new();
+        BroadcastQueue queue = new();
         RecordingBroadcaster broadcaster = new();
         BroadcastBehaviour<string, string> behaviour = new(queue, broadcaster);
 
@@ -98,12 +98,12 @@ public sealed class BroadcastBehaviourTests
     public void Drain_Twice_YieldsTheFactsOnce()
     {
         // Arrange
-        PlaylistBroadcastQueue queue = new();
+        BroadcastQueue queue = new();
         queue.Enqueue(new TrackRemoved(Guid.NewGuid(), Version: 7, Guid.NewGuid()));
 
         // Act
-        IReadOnlyList<PlaylistBroadcast> first = queue.Drain();
-        IReadOnlyList<PlaylistBroadcast> second = queue.Drain();
+        IReadOnlyList<IRealtimeBroadcast> first = queue.Drain();
+        IReadOnlyList<IRealtimeBroadcast> second = queue.Drain();
 
         // Assert
         Assert.Single(first);
@@ -111,11 +111,11 @@ public sealed class BroadcastBehaviourTests
     }
 
     /// <summary>Records what it was asked to send, and never throws — the port's contract.</summary>
-    private sealed class RecordingBroadcaster : IPlaylistBroadcaster
+    private sealed class RecordingBroadcaster : IRealtimeBroadcaster
     {
-        internal List<PlaylistBroadcast> Sent { get; } = [];
+        internal List<IRealtimeBroadcast> Sent { get; } = [];
 
-        public Task SendAsync(PlaylistBroadcast broadcast, CancellationToken cancellationToken)
+        public Task SendAsync(IRealtimeBroadcast broadcast, CancellationToken cancellationToken)
         {
             Sent.Add(broadcast);
 

@@ -85,7 +85,7 @@ internal sealed class EventQueueRepository : IEventQueueRepository
     }
 
     /// <inheritdoc />
-    public async Task<VoteWriteOutcome> TryCastVoteAsync(
+    public async Task<VoteWriteResult> TryCastVoteAsync(
         Guid eventId,
         Guid suggestionId,
         Guid userId,
@@ -94,7 +94,7 @@ internal sealed class EventQueueRepository : IEventQueueRepository
     {
         if (!await SuggestionExistsAsync(eventId, suggestionId, cancellationToken).ConfigureAwait(false))
         {
-            return VoteWriteOutcome.NotFound;
+            return VoteWriteResult.NotFound;
         }
 
         EventVote vote = new()
@@ -113,7 +113,9 @@ internal sealed class EventQueueRepository : IEventQueueRepository
         {
             await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-            return VoteWriteOutcome.Recorded;
+            return new VoteWriteResult(
+                VoteWriteOutcome.Recorded,
+                await CountVotesAsync(suggestionId, cancellationToken).ConfigureAwait(false));
         }
         catch (DbUpdateException exception)
             when (IsDuplicate(exception, "ux_event_votes_event_id_suggestion_id_user_id"))
@@ -122,12 +124,14 @@ internal sealed class EventQueueRepository : IEventQueueRepository
 
             // Already voted, or a concurrent request got there first. Both are success: a vote is an idempotent
             // fact, and the endpoint answers `200` rather than `409` — SPEC-018 decision 1.
-            return VoteWriteOutcome.Unchanged;
+            return new VoteWriteResult(
+                VoteWriteOutcome.Unchanged,
+                await CountVotesAsync(suggestionId, cancellationToken).ConfigureAwait(false));
         }
     }
 
     /// <inheritdoc />
-    public async Task<bool> TryWithdrawVoteAsync(
+    public async Task<VoteWriteResult> TryWithdrawVoteAsync(
         Guid eventId,
         Guid suggestionId,
         Guid userId,
@@ -140,7 +144,11 @@ internal sealed class EventQueueRepository : IEventQueueRepository
             .ExecuteDeleteAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return removed > 0;
+        return removed == 0
+            ? VoteWriteResult.NotFound
+            : new VoteWriteResult(
+                VoteWriteOutcome.Recorded,
+                await CountVotesAsync(suggestionId, cancellationToken).ConfigureAwait(false));
     }
 
     /// <inheritdoc />
@@ -192,6 +200,19 @@ internal sealed class EventQueueRepository : IEventQueueRepository
             .AnyAsync(
                 suggestion => suggestion.Id == suggestionId && suggestion.EventId == eventId,
                 cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <summary>
+    /// The suggestion's votes, counted from the rows.
+    /// </summary>
+    /// <remarks>
+    /// Read after the write and inside the same transaction, which is the only moment the number is both
+    /// current and the caller's own. It is what the `VoteChanged` broadcast carries — ADR-0036.
+    /// </remarks>
+    private async Task<int> CountVotesAsync(Guid suggestionId, CancellationToken cancellationToken) =>
+        await _context.EventVotes
+            .AsNoTracking()
+            .CountAsync(vote => vote.SuggestionId == suggestionId, cancellationToken)
             .ConfigureAwait(false);
 
     private static bool IsDuplicate(DbUpdateException exception, string uniqueIndexName) =>

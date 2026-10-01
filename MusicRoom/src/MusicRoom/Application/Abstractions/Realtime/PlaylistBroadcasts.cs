@@ -1,36 +1,24 @@
 namespace MusicRoom.Application.Abstractions.Realtime;
 
 /// <summary>
-/// Where a playlist's live events go — SDD §9.2, ADR-0035.
-/// </summary>
-/// <remarks>
-/// Declared here and implemented in <c>WebAPI</c>, which is where SignalR lives. This layer knows that
-/// something must be told, and nothing about hubs, groups or connections.
-/// <para>
-/// An implementation **must not throw.** The database is the arbiter: by the time this is called the action
-/// has committed, and a notification that could not be delivered must not turn a completed action into a
-/// `500`. An implementation logs its own failure and returns — ADR-0035.
-/// </para>
-/// </remarks>
-public interface IPlaylistBroadcaster
-{
-    /// <summary>Sends one fact to everybody listening to the playlist it names.</summary>
-    /// <param name="broadcast">What happened, and the version it happened at.</param>
-    /// <param name="cancellationToken">The request's cancellation token.</param>
-    /// <returns>A task that completes when the send has been attempted.</returns>
-    Task SendAsync(PlaylistBroadcast broadcast, CancellationToken cancellationToken);
-}
-
-/// <summary>
 /// One fact about one playlist, at one version.
 /// </summary>
+/// <remarks>
+/// A playlist has a parent row and every track write touches it, so the literal version rule of
+/// `signalr-realtime` holds here: the token in the payload is the one the REST `ETag` carries, and a client
+/// that sees an unexpected one knows it missed a message — ADR-0035.
+/// </remarks>
 /// <param name="PlaylistId">The playlist the listeners are grouped by.</param>
 /// <param name="Version">
 /// The playlist's `xmin` after the change — the same token the REST `ETag` carries. A client that receives
 /// a version it did not expect knows it missed a message and resynchronises over REST, which is why every
 /// payload carries one (`signalr-realtime`).
 /// </param>
-public abstract record PlaylistBroadcast(Guid PlaylistId, uint Version);
+public abstract record PlaylistBroadcast(Guid PlaylistId, uint Version) : IRealtimeBroadcast
+{
+    /// <inheritdoc />
+    public Guid AggregateId => PlaylistId;
+}
 
 /// <summary>A track was added — `TrackAdded`.</summary>
 /// <param name="PlaylistId">The playlist.</param>

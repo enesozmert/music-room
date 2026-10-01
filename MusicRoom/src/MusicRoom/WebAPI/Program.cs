@@ -218,7 +218,7 @@ internal static class CallerServices
                 options.RequireHttpsMetadata = false;
 
                 // A WebSocket handshake cannot carry an Authorization header, so SignalR documents the
-                // `access_token` query parameter. It is read **only** on the hub path: giving every REST route
+                // `access_token` query parameter. It is read **only** under /hubs: giving every REST route
                 // a second way to present a token would widen the attack surface for one transport's benefit,
                 // and a token in a URL is a token that can end up in somebody's history. Serilog's request
                 // logging records the path and not the query string, so it does not reach the log either —
@@ -227,7 +227,8 @@ internal static class CallerServices
                 {
                     OnMessageReceived = messageReceived =>
                     {
-                        if (messageReceived.Request.Path.StartsWithSegments(PlaylistHub.Path))
+                        if (messageReceived.Request.Path.StartsWithSegments(
+                            ClientContextMiddleware.HubPaths))
                         {
                             string? token = messageReceived.Request.Query["access_token"];
 
@@ -247,7 +248,7 @@ internal static class CallerServices
 }
 
 /// <summary>
-/// SignalR, the hub filter, and the broadcaster the application layer sends through — SPEC-016.
+/// SignalR, the hub filter, and the broadcaster the application layer sends through — SPEC-016, SPEC-019.
 /// </summary>
 /// <remarks>
 /// Its own class rather than more lines in <c>Main</c>, which CA1506 caps at 41 coupled types — the same
@@ -266,14 +267,17 @@ internal static class RealtimeServices
     /// <summary>How long the server waits for a client before dropping it.</summary>
     internal static readonly TimeSpan ClientTimeout = TimeSpan.FromSeconds(60);
 
-    /// <summary>Maps the hub.</summary>
+    /// <summary>Maps both hubs.</summary>
     /// <param name="endpoints">The route builder.</param>
     /// <remarks>
-    /// Here rather than in <c>Main</c>, which CA1506 caps at 41 coupled types and which this one generic
-    /// argument pushed to 42.
+    /// Here rather than in <c>Main</c>, which CA1506 caps at 41 coupled types and which these generic
+    /// arguments pushed past it.
     /// </remarks>
-    internal static void Map(IEndpointRouteBuilder endpoints) =>
+    internal static void Map(IEndpointRouteBuilder endpoints)
+    {
         endpoints.MapHub<PlaylistHub>(PlaylistHub.Path);
+        endpoints.MapHub<EventHub>(EventHub.Path);
+    }
 
     /// <summary>Registers the hub, its filter, the per-invocation caller and the broadcaster.</summary>
     /// <param name="services">The container being built.</param>
@@ -288,13 +292,13 @@ internal static class RealtimeServices
             options.KeepAliveInterval = KeepAlive;
             options.ClientTimeoutInterval = ClientTimeout;
 
-            // Centrally registered, exactly as the audit behaviour is: a new hub method is audited because
-            // the filter is on the hub, not because somebody remembered — ADR-0019.
-            options.AddFilter<PlaylistHubFilter>();
+            // Centrally registered, exactly as the audit behaviour is, and one filter for both hubs: a new hub
+            // method is audited because the filter is on the hub, not because somebody remembered — ADR-0019.
+            options.AddFilter<HubAuditFilter>();
         });
 
-        services.AddSingleton<PlaylistHubFilter>();
-        services.AddScoped<IPlaylistBroadcaster, PlaylistBroadcaster>();
+        services.AddSingleton<HubAuditFilter>();
+        services.AddScoped<IRealtimeBroadcaster, RealtimeBroadcaster>();
     }
 }
 

@@ -8,12 +8,6 @@ updated: 2026-09-28
 Format: one file per decision. Status is `Accepted`, `Proposed`, `Superseded` or `Open`.
 An `Open` entry is a decision we know we owe, with no answer yet — it is not a placeholder to delete.
 
-`Lands in` is the slice that puts code behind the decision — `landed` when that code is on `main`,
-`landed, <slice>` when part of it is and the rest is named, a slice id when none of it is yet.
-`.agent/progress.sh` reads this column, so it is data and not a note.
-
-| ADR | Decision | Status | Lands in |
-|---|---|---|---|
 | [[ADR-0001-backend-dotnet-narchitecture]] | .NET 10 backend, Clean Architecture + CQRS | Accepted | landed |
 | [[ADR-0002-mobile-react-native]] | React Native client, deferred | Accepted | client |
 | [[ADR-0003-music-provider-youtube]] | YouTube as the music provider | Accepted | S4 |
@@ -52,5 +46,6 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0033-audit-write-posture]] | The audit record commits with its action, fails closed, behind `IUnitOfWork` | Accepted | landed |
 | [[ADR-0034-profile-storage-and-visibility]] | Typed profile columns with a tier each; preferences as private rows | Accepted | landed, S3 |
 | [[ADR-0038-realtime-broadcast-posture]] | A handler queues a broadcast; a behaviour sends it after the commit | Accepted | landed |
+| [[ADR-0039-queue-broadcast-payloads]] | An `EventHub` payload carries the authoritative value, not a row version | Accepted | landed |
 
 Related: [[MEMORY]] · [[system-overview]] · [[standards-router]]
