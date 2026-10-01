@@ -22,6 +22,9 @@ What to carry into the page:
   each waiting decision is waiting on
 - the open rows of `docs/SDD.md` §17, with what each one blocks
 - the commit and the date the snapshot names, in the page's provenance line
+- the **last-refreshed stamp** in the page's top right corner: run `date -u "+%Y-%m-%d %H:%M UTC"`
+  and write what it returns. Never the machine's local time, and never a time carried over from
+  the version already published
 
 Rules:
 
@@ -32,6 +35,13 @@ Rules:
   which the script writes.
 - If `PROGRESS.json` disagrees with what a document claims in prose, name the mismatch in your
   reply. That is what `/brain-check` and `/sdd-sync` are for.
+
+**The board counts `main`, and `main` can be a long way behind what is built.** Work arrives as
+one branch and one pull request per spec, and a stack of them sits unmerged for days: on
+2026-10-01 `main` held 11 specs and 15 endpoints while the tip of the stack held 17 and 47. So
+check `gh pr list` as well, and say in your reply how much is built but not landed. The number on
+the page is not wrong — it is answering "what has landed", which is a different question from
+"what have we written". `make land` is what closes the gap.
 
 Source: `.agent/progress.sh`, which reads two columns that are kept true by hand — the slice
 `State` and the ADR `Lands in`. Everything else it counts.

@@ -22,7 +22,10 @@ This file holds only what is specific to Claude Code.
 canonical; a command is a shortcut, never a second copy of the rules.
 
 `/bootstrap` · `/plan <task>` · `/adr <decision>` · `/sdd-sync <change>` · `/review-diff` ·
-`/brain-check` · `/status <thing>` · `/spec-status`
+`/brain-check` · `/status <thing>` · `/spec-status` · `/progress`
+
+A command added to `.claude/commands/` after a session started is not visible to that session.
+Restart it.
 
 `.claude/hooks/write-boundary.sh` blocks the three writes that have no legitimate exception:
 anything under `reference/`, `.env`, and any `.pdf`. See `.claude/README.md`.
