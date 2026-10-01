@@ -61,6 +61,19 @@ the project subject forbids committing third-party source.
 5. **Decisions belong to the humans.** You may draft an ADR; you may not choose the architecture.
    The subject grades whether the team can defend its own choices.
 6. **English in artifacts.** Identifiers, comments, commit messages, API fields, logs, docs.
+7. **An ADR number is claimed on `origin/main`, not in your branch.** Before you write one, run
+
+   ```
+   git ls-tree --name-only origin/main brain/decisions/
+   ```
+
+   and take the first number after the highest one you see. Two branches that each pick "the next
+   number" pick the same one, and the filenames differ, so git merges both without a word: the
+   repository ends up with two files carrying one `id`, and whichever index edit lands second
+   silently drops the other decision's row. It happened three times between 2026-09-27 and
+   2026-10-01 — ADR-0030, ADR-0031, ADR-0035 and ADR-0036 each had to be renumbered after the
+   fact, which means renaming a file, two frontmatter lines and every reference across up to
+   sixteen documents. Checking costs one command.
 
 ## 5. Definition of done for any change
 

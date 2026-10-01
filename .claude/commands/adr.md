@@ -5,7 +5,17 @@ argument-hint: <the decision, and the alternatives I rejected>
 
 I have decided: **$ARGUMENTS**
 
-Draft an ADR under `brain/decisions/` using the numbering and frontmatter of the existing files
+Claim the number from `origin/main`, never from this branch:
+
+```
+git ls-tree --name-only origin/main brain/decisions/
+```
+
+Take the first free number after the highest that prints. Two branches that each read their own
+copy of the index pick the same number, and git merges both because the filenames differ — three
+ADRs had to be renumbered after the fact for exactly that reason.
+
+Draft an ADR under `brain/decisions/` using that number and the frontmatter of the existing files
 (`kind: adr`, `id`, `status`, `date`). Follow the shape of `ADR-0017-playback-session.md`:
 Context, Decision, Consequences, Alternatives rejected.
 

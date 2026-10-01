@@ -170,7 +170,11 @@ Kararı sen verirsin. Ajan kaydeder.
 
 brain/decisions/ADR-XXXX-<slug>.md dosyasını mevcut ADR'lerin şeklinde oluştur:
 Context, Decision, Consequences, Alternatives rejected.
-Numarayı brain/decisions/decisions-index.md içindeki en yüksekten devam ettir.
+Numarayı origin/main'den al, bu daldan değil:
+  git ls-tree --name-only origin/main brain/decisions/
+O komutun yazdırdığı en yüksek numaradan sonraki ilk boş numarayı kullan. Bu daldaki index
+otorite değil — her biri kendi kopyasını okuyan iki dal aynı numarayı seçer, ve dosya adları
+farklı olduğu için git ikisini de sessizce birleştirir.
 
 Sonra yay:
 - decisions-index.md satırını ekle

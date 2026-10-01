@@ -174,7 +174,12 @@ We decided: <decision>.
 
 Create brain/decisions/ADR-XXXX-<slug>.md in the shape of the existing ADRs:
 Context, Decision, Consequences, Alternatives rejected.
-Use the next free number from brain/decisions/decisions-index.md.
+
+Claim the number from origin/main, not from this branch:
+  git ls-tree --name-only origin/main brain/decisions/
+Take the first free number after the highest one that command prints. The index in this branch is
+not the authority — two branches that each read their own copy pick the same number, and git merges
+both because the filenames differ.
 
 Then propagate:
 - add the row to decisions-index.md
