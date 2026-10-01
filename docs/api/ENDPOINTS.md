@@ -213,21 +213,32 @@ Subject V.2.1. The contended write path. Rules: [[realtime-architecture]],
 | PATCH | `/events/{eventId}` | `name`, `startsAtUtc`, `endsAtUtc` | `200` | `404`, `412`, `422` | `owner` |
 | DELETE | `/events/{eventId}` | — | `204` soft delete | `404` | `owner` |
 | PUT | `/events/{eventId}/licence` | `visibility`, `licence`, `presenceProof?`, `geofence?` | `200` | `404`, `422` | `owner` |
-| POST | `/events/{eventId}/event-codes` | `ttlSeconds` | `201` short-lived code | `404`, `429` | `owner` |
+| POST | `/events/{eventId}/event-codes` | `ttlSeconds` (60–3600) | `201` short-lived code | `404`, `422`, `429` | `owner` |
 | GET | `/events/{eventId}/invitations` | paged | `200` | `404` | `owner` |
 | POST | `/events/{eventId}/invitations` | `userId` | `201` | `404`, `409` | `owner` |
 | DELETE | `/events/{eventId}/invitations/{userId}` | — | `204` | `404` | `owner` |
 | POST | `/events/{eventId}/attendances` | — | `201` | `404`, `409` | `auth` if public, `member` if private |
 | DELETE | `/events/{eventId}/attendances/current` | — | `204` | `404` | `self` |
-| GET | `/events/{eventId}/queue` | paged, vote-ordered | `200` | `404` | `member` |
+| GET | `/events/{eventId}/queue` | query: `page`, `pageSize` | `200` vote-ordered | `404` | `member` |
 | POST | `/events/{eventId}/tracks` | `youtubeVideoId` | `201` suggestion | `404`, `409` duplicate, `422` | `licence` |
 | DELETE | `/events/{eventId}/tracks/{suggestionId}` | — | `204` | `404` | `owner` or suggester |
-| PUT | `/events/{eventId}/tracks/{suggestionId}/vote` | optional `presence` | `200`/`201` | `404`, `409`, `422`, `429` | `licence` |
+| PUT | `/events/{eventId}/tracks/{suggestionId}/vote` | optional `presence` | `200`/`201` | `404`, `422`, `429` | `licence` |
 | DELETE | `/events/{eventId}/tracks/{suggestionId}/vote` | — | `204` | `404` | `self` |
 | PATCH | `/events/{eventId}/now-playing` | `suggestionId` | `200` | `404`, `409` | `owner` or delegate |
 
 ### Design notes
 
+- **The contended path is implemented** (SPEC-018): suggestions, votes, the vote-ordered queue, venue codes
+  and the presence checks. Event `now-playing` waits for the `PlaybackSession` of slice S7, and `EventHub` is
+  the third unit of S6.
+- **The queue's order is counted from the vote rows on every read.** No column holds a vote count: a stored
+  count is a second copy of a fact two writers can disagree about, and incrementing one is the lost update
+  subject V.2.1 grades. Ties break on when the track was suggested, so the order is total and stable.
+- **A failed presence proof is one `422` with one message.** Naming which part failed — an unknown code, an
+  expired one, one already spent, or a coordinate too far away — would tell a caller whether a code exists and
+  how close they got. A vote with no proof on a restricted event gets the same answer.
+- **A venue code is single-use per account**, so one code read out to a room works once for each person in it.
+  It lives 60 to 3600 seconds, is stored only as a SHA-256 digest, and issuing it is rate limited per account.
 - **The aggregate, its licence policy, invitations and attendance are implemented** (SPEC-017). The
   contended write path — suggestions, votes, the queue, `now-playing` — and event codes are the second unit of
   slice S6; `EventHub` is the third.
@@ -242,8 +253,10 @@ Subject V.2.1. The contended write path. Rules: [[realtime-architecture]],
 - **Voting is `PUT`, not `POST`.** A vote is an idempotent fact: "this user votes for this track".
   A double submit from a flaky mobile network is then harmless — `201` the first time, `200`
   after. `POST` would create a second row and make the race worse.
-- The vote's uniqueness is enforced by `ux_votes_event_id_track_id_user_id`, and the duplicate is
-  detected **by the database**, never by a read-then-write check ([[ef-core-persistence]]).
+- The vote's uniqueness is enforced by `ux_event_votes_event_id_suggestion_id_user_id` — a vote is for a
+  *suggestion*, which is what the row names — and the duplicate is detected **by the database**, never by a
+  read-then-write check ([[ef-core-persistence]]). A duplicate is `200`, not `409`: the fact the caller asked
+  for is already true.
 - The vote count is recomputed from the source rows inside the transaction. Nothing increments a
   counter held in memory.
 - `presence` carries `{ coordinates?, eventCode? }` and is required only when the licence is

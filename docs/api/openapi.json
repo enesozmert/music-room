@@ -2050,6 +2050,336 @@
           }
         }
       }
+    },
+    "/api/v1/events/{eventId}/queue": {
+      "get": {
+        "tags": [
+          "EventQueueEndpoints"
+        ],
+        "summary": "Read the vote-ordered queue",
+        "description": "Anybody who may see the event may see its queue. Ordered by vote count and then by when each track was suggested, so the order is total and stable. Each row says whether the caller voted, and the count is read from the vote rows rather than from a stored counter.",
+        "operationId": "GetEventQueue",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/QueueEntry"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/tracks": {
+      "post": {
+        "tags": [
+          "EventQueueEndpoints"
+        ],
+        "summary": "Suggest a track for an event",
+        "description": "Behind the licence gate: who may suggest is who may vote. The same video twice is 409, because two rows would split its votes between two queue entries.",
+        "operationId": "PostEventTrack",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/tracks/{suggestionId}": {
+      "delete": {
+        "tags": [
+          "EventQueueEndpoints"
+        ],
+        "summary": "Remove a suggestion",
+        "description": "The suggester's or the event owner's, and nobody else's. Its votes go with it: a vote is a vote for that suggestion, and orphaned rows would leave a count that counts nothing.",
+        "operationId": "DeleteEventTrack",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "suggestionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/tracks/{suggestionId}/vote": {
+      "put": {
+        "tags": [
+          "EventVoteEndpoints"
+        ],
+        "summary": "Vote for a suggestion",
+        "description": "Idempotent: 201 the first time and 200 after, including when a concurrent request wrote the vote first — the unique index is the arbiter. On a LocationAndTimeRestricted event the body carries presence, and a missing or failed proof is 422. The coordinate is compared and discarded; it is never stored and never logged.",
+        "operationId": "PutEventVote",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "suggestionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VoteRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "201": {
+            "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "EventVoteEndpoints"
+        ],
+        "summary": "Take back a vote",
+        "description": "The caller's own vote and no other. No presence proof is asked for: leaving the venue is not a reason to be stuck having voted, and a withdrawal lowers a count rather than raising one.",
+        "operationId": "DeleteEventVote",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "suggestionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/events/{eventId}/event-codes": {
+      "post": {
+        "tags": [
+          "EventVoteEndpoints"
+        ],
+        "summary": "Issue a short-lived venue code",
+        "description": "Owner only, and rate limited per account. The code is returned once and stored only as a SHA-256 digest; it is single-use per account, so one code works for a whole room exactly once each.",
+        "operationId": "PostEventCode",
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/EventCodeRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2097,6 +2427,34 @@
         },
         "description": "One person named on a playlist."
       },
+      "CoordinatesRequest": {
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "The latitude, in degrees.",
+            "format": "double"
+          },
+          "longitude": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "description": "The longitude, in degrees.",
+            "format": "double"
+          }
+        },
+        "description": "A claimed position. Compared and discarded."
+      },
       "EmailVerificationRequest": {
         "required": [
           "token"
@@ -2109,6 +2467,25 @@
           }
         },
         "description": "The email verification payload — `docs/api/ENDPOINTS.md` §1."
+      },
+      "EventCodeRequest": {
+        "required": [
+          "ttlSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "ttlSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "How long the code should be accepted for.",
+            "format": "int32"
+          }
+        },
+        "description": "The code-issuing payload."
       },
       "EventCreation": {
         "required": [
@@ -2841,6 +3218,34 @@
       "PresenceProof": {
         "type": "integer"
       },
+      "PresenceRequest": {
+        "required": [
+          "coordinates",
+          "eventCode"
+        ],
+        "type": "object",
+        "properties": {
+          "coordinates": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Where the client says it is.",
+                "$ref": "#/components/schemas/CoordinatesRequest"
+              }
+            ]
+          },
+          "eventCode": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The code read at the venue."
+          }
+        },
+        "description": "The evidence a voter supplies — `presence` in `docs/api/ENDPOINTS.md` §4."
+      },
       "ProfileDateFieldRequest": {
         "required": [
           "value",
@@ -2945,6 +3350,46 @@
         "type": "integer",
         "description": "Who may see one profile field — subject V.1's three tiers, SDD §6.2."
       },
+      "QueueEntry": {
+        "required": [
+          "suggestionId",
+          "youtubeVideoId",
+          "suggestedByUserId",
+          "votes",
+          "callerVoted"
+        ],
+        "type": "object",
+        "properties": {
+          "suggestionId": {
+            "type": "string",
+            "description": "The suggestion.",
+            "format": "uuid"
+          },
+          "youtubeVideoId": {
+            "type": "string",
+            "description": "The video."
+          },
+          "suggestedByUserId": {
+            "type": "string",
+            "description": "Who suggested it.",
+            "format": "uuid"
+          },
+          "votes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How many accounts have voted for it, counted from the rows.",
+            "format": "int32"
+          },
+          "callerVoted": {
+            "type": "boolean",
+            "description": "Whether the caller is one of them, so a client can render a toggle."
+          }
+        },
+        "description": "One row of the vote-ordered queue."
+      },
       "RegistrationRequest": {
         "required": [
           "email",
@@ -3026,6 +3471,19 @@
           }
         },
         "description": "One session, as a client reads it — `docs/api/ENDPOINTS.md` §1."
+      },
+      "SuggestionRequest": {
+        "required": [
+          "youtubeVideoId"
+        ],
+        "type": "object",
+        "properties": {
+          "youtubeVideoId": {
+            "type": "string",
+            "description": "The video."
+          }
+        },
+        "description": "The suggestion payload — `docs/api/ENDPOINTS.md` §4."
       },
       "TokenPairResponse": {
         "required": [
@@ -3266,6 +3724,26 @@
           }
         },
         "description": "One account's profile as a **particular reader** may see it — `GET /api/v1/users/{userId}`."
+      },
+      "VoteRequest": {
+        "required": [
+          "presence"
+        ],
+        "type": "object",
+        "properties": {
+          "presence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "What the client offers as proof of being there.",
+                "$ref": "#/components/schemas/PresenceRequest"
+              }
+            ]
+          }
+        },
+        "description": "The vote payload. Empty unless the licence requires presence."
       }
     }
   },
@@ -3311,6 +3789,12 @@
     },
     {
       "name": "EventRosterEndpoints"
+    },
+    {
+      "name": "EventQueueEndpoints"
+    },
+    {
+      "name": "EventVoteEndpoints"
     }
   ]
 }

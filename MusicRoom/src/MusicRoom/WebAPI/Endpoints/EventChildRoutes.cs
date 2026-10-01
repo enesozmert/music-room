@@ -1,7 +1,7 @@
 namespace MusicRoom.WebAPI.Endpoints;
 
 /// <summary>
-/// The routes that hang off one event: its licence and its roster.
+/// The routes that hang off one event: its licence, its roster, its queue and its votes.
 /// </summary>
 /// <remarks>
 /// One call instead of two in <see cref="EventEndpoints"/>. Each route set already lives in its own class for
@@ -16,5 +16,7 @@ internal static class EventChildRoutes
     {
         EventLicenceEndpoints.Map(group);
         EventRosterEndpoints.Map(group);
+        EventQueueEndpoints.Map(group);
+        EventVoteEndpoints.Map(group);
     }
 }

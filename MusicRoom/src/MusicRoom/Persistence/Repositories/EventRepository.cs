@@ -82,6 +82,29 @@ internal sealed class EventRepository : IEventRepository
     }
 
     /// <inheritdoc />
+    public async Task<EventPresence?> FindPresenceAsync(
+        Guid eventId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken) =>
+        await _context.Events
+            .AsNoTracking()
+            .Where(candidate => candidate.Id == eventId)
+            .Select(candidate => new EventPresence(
+                candidate.Licence,
+                candidate.PresenceProof,
+                candidate.GeofenceLatitude == null
+                    || candidate.GeofenceLongitude == null
+                    || candidate.GeofenceRadiusMetres == null
+                        ? null
+                        : new PresencePolicy(
+                            candidate.GeofenceLatitude.Value,
+                            candidate.GeofenceLongitude.Value,
+                            candidate.GeofenceRadiusMetres.Value),
+                nowUtc >= candidate.StartsAtUtc && nowUtc <= candidate.EndsAtUtc))
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <inheritdoc />
     public async Task<EventDetail?> FindAsync(
         Guid eventId,
         Guid userId,

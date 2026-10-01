@@ -47,6 +47,17 @@ public sealed record EventDetail(
     uint Version,
     PresencePolicy? Policy);
 
+/// <summary>What an event's licence requires of a voter, and whether it is open right now.</summary>
+/// <param name="Licence">The licence mode.</param>
+/// <param name="Proof">Which proof a voter must supply, or null when the mode requires none.</param>
+/// <param name="Policy">The venue, or null.</param>
+/// <param name="InWindow">Whether server time is inside the event's window.</param>
+public sealed record EventPresence(
+    LicenceMode Licence,
+    PresenceProof? Proof,
+    PresencePolicy? Policy,
+    bool InWindow);
+
 /// <summary>One event in a list.</summary>
 /// <param name="EventId">The event.</param>
 /// <param name="Name">What it is called.</param>

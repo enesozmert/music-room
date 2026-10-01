@@ -2,6 +2,7 @@ using Core.Application.Pipelines.Validation;
 using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Realtime;
 using MusicRoom.Application.Features.Auth;
+using MusicRoom.Application.Features.Events.Presence;
 using MusicRoom.Application.Pipelines.Auditing;
 using MusicRoom.Application.Pipelines.Realtime;
 using FluentValidation;
@@ -52,6 +53,10 @@ public static class ApplicationServiceRegistration
 
         // Extracted from the handlers when the audit context pushed two constructors past the
         // five-parameter limit S107 enforces — SPEC-009.
+        // Rules on the evidence a voter supplies — ADR-0014. Scoped because it spends a code through the
+        // request's own repository.
+        services.AddScoped<PresenceVerifier>();
+
         services.AddScoped<SessionIssuer>();
         services.AddScoped<CredentialMailDispatcher>();
 

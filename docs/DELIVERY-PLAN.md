@@ -15,8 +15,8 @@ the audit log, bearer authentication and own-profile editing are built; each uni
 `docs/specs/`, which is where the statuses live — this plan deliberately does not count them, because a
 count written in two places is wrong in one of them within a day. The counted figures are
 `docs/progress/PROGRESS.json`, and the `State` column of the slice table below is what the script
-reads. While a stack of pull requests is open, `main` lags all of it. Slice S1a is blocked on O17,
-a mail provider account that does not exist.
+reads. While a stack of pull requests is open, `main` lags all of it. Slice S1a was blocked on O17;
+the Brevo API key arrived on 2026-10-01 and S1a is unblocked.
 Every decision recorded so far is in [[decisions-index]]; everything still open is in [[sdd]] §17.
 
 This plan sequences work. It does not decide anything — decisions go in ADRs, rules go in
@@ -184,7 +184,7 @@ got.
 |---|---|---|---|---|
 | S0 | Walking skeleton | solution per [[ADR-0011-solution-layout]], `Directory.Packages.props` with the set in [[ADR-0021-backend-dependency-set]], `docker compose` with a **local PostgreSQL container** ([[ADR-0026-environment-bring-up]]), `Makefile`, CI, `/health`, `/health/ready`, published OpenAPI | IV.1, V.8 | merged |
 | S1 | Identity | register (BCrypt cost >= 12), email verification, login, JWT + refresh rotation, password reset | V.1, V.6 | merged |
-| S1a | Mail provider adapter | the real hosted-provider implementation of `IMailService`, once the account and API key exist — issue O17. **Precondition: the T-25 rate limiter must exist first.** Owner decision 2026-09-27: an unauthenticated loop against `/auth/verification-requests` costs a log line today and burns the provider quota (T-19) the moment a real sender lands | V.1 | blocked |
+| S1a | Mail provider adapter | the real hosted-provider implementation of `IMailService` — issue O17, **unblocked 2026-10-01: the Brevo API key arrived**. **Precondition: the T-25 rate limiter must exist first.** Owner decision 2026-09-27: an unauthenticated loop against `/auth/verification-requests` costs a log line today and burns the provider quota (T-19) the moment a real sender lands | V.1 | not started |
 | S1b | Secret vault | self-hosted Infisical under a `vault` compose profile, plus `InfisicalSecretProvider` behind the abstraction — issue O18, [[ADR-0029-containerised-dev-and-secret-vault]] | owner requirement | not started |
 | S2 | Audit + client context | required headers, middleware, audit behaviour, **SignalR hub filter**, audit table | V.6 | merged |
 | S3 | Profile | three visibility tiers, per-field server-side filtering, music preferences | V.1 | in progress |
@@ -195,7 +195,6 @@ got.
 | S7 | Control Delegation + Playback | `PlaybackSession`, queue advance, device state machine, `ControlHub`, per-device licence | V.2.1, V.2.2 | not started |
 | S8 | OpenID Connect, both roles | **Relying party:** Google and Facebook through one discovery-driven validation core, acquisition branching only — Google authorization code + PKCE `S256`, Facebook Limited Login ([[ADR-0008-oidc-social-login]]). **Provider:** the API's own discovery document, JWKS, authorization and token endpoints, ID token and UserInfo, replacing the sign-in surface S1 shipped ([[ADR-0031-musicroom-as-openid-provider]]). Account linking | V.1, V.5 | not started |
 | S9 | Capacity + conformance evidence | Gatling simulations under `tests/load/`, `docs/load/REPORT.md`; fill the Verified column in [[threat-register]] and the evidence in [[asvs-conformance]] | V.7, V.6 | not started |
-
 ### Why this order
 
 - **S0 first.** Subject IV.1 requires a fresh clone to install its dependencies automatically.
@@ -205,7 +204,7 @@ got.
   day one than in slice S5.
 - **S0 to S3 run on a local PostgreSQL container; Supabase joins at S4**
   ([[ADR-0026-environment-bring-up]]). Same engine, same migrations, different connection string.
-- **External credentials are created just in time**: YouTube and the Supabase project before S4,
+- **External credentials are created just in time**: YouTube and the Supabase project before S4 (received 2026-10-01),
   Google and Facebook before S8. **Mail moved to the end of S1** (owner decision, 2026-09-24):
   SPEC-003 ships a Development-only logging `IMailService` so the verification flow is testable
   immediately, and the provider adapter lands as its own small spec once the key exists. V.1 still
