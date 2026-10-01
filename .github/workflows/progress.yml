@@ -45,37 +45,63 @@ jobs:
       - name: Count
         run: ./.agent/progress.sh --write
 
-      - name: Open or refresh the snapshot pull request
+      - name: Write the numbers into the run summary
+        run: |
+          {
+            echo '## Backend progress'
+            echo
+            echo '```'
+            ./.agent/progress.sh
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Refresh the snapshot branch
         run: |
           if git diff --quiet -- docs/progress/PROGRESS.json; then
-            echo "snapshot unchanged."
+            echo "snapshot unchanged; nothing to push." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
           # main is protected and enforce_admins is on, so this job cannot push to it and should
           # not be able to. It keeps ONE branch instead, force-pushed, so the refresh is always a
-          # single open pull request rather than one per merge.
+          # single pull request rather than one per merge.
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$SNAPSHOT_BRANCH"
           git add docs/progress/PROGRESS.json
-          git commit -m "chore(progress): refresh the snapshot
+          git commit -q -m "chore(progress): refresh the snapshot
 
           Counted by .agent/progress.sh on ${GITHUB_SHA:0:7}. Generated file, no judgement in it.
           The two values the script cannot count are read from columns: the slice State in
           docs/DELIVERY-PLAN.md and Lands in in brain/decisions/decisions-index.md."
           git push --force origin "$SNAPSHOT_BRANCH"
 
-          if [ -z "$(gh pr list --head "$SNAPSHOT_BRANCH" --state open --json number -q '.[].number')" ]; then
-            gh pr create \
+          existing="$(gh pr list --head "$SNAPSHOT_BRANCH" --state open --json number -q '.[].number')"
+          if [ -n "$existing" ]; then
+            echo "Refreshed #$existing." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Opening it needs "Allow GitHub Actions to create and approve pull requests", which is
+          # off by default. Without it the branch is still pushed and the link below is the whole
+          # of the remaining work, so a missing permission must not fail the run.
+          if gh pr create \
               --base main \
               --head "$SNAPSHOT_BRANCH" \
               --title "chore(progress): refresh the progress snapshot" \
-              --body "\`docs/progress/PROGRESS.json\` recounted by \`.agent/progress.sh\`. Generated file; the numbers move when the plan, the SDD, the endpoint inventory, the specs, the decision log or \`MusicRoom/\` move.
+              --body "\`docs/progress/PROGRESS.json\` recounted by \`.agent/progress.sh\` on \`${GITHUB_SHA:0:7}\`. Generated file; the numbers move when the plan, the SDD, the endpoint inventory, the specs, the decision log or \`MusicRoom/\` move.
 
           This branch is force-pushed on every qualifying merge, so there is at most one of these open at a time. Merging it refreshes what \`/progress\` publishes to the board.
 
-          Two values are read rather than counted, and a wrong one here means a wrong column there: the slice \`State\` in \`docs/DELIVERY-PLAN.md\` and \`Lands in\` in \`brain/decisions/decisions-index.md\`."
+          Two values are read rather than counted, and a wrong one here means a wrong column there: the slice \`State\` in \`docs/DELIVERY-PLAN.md\` and \`Lands in\` in \`brain/decisions/decisions-index.md\`."; then
+            echo "Opened a pull request for \`$SNAPSHOT_BRANCH\`." >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "pull request already open; the force-push refreshed it."
+            {
+              echo
+              echo "Pushed \`$SNAPSHOT_BRANCH\`, but could not open the pull request: Actions is not"
+              echo "permitted to create one in this repository. Open it here, or turn the permission"
+              echo "on in Settings -> Actions -> General -> Workflow permissions:"
+              echo
+              echo "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/main...$SNAPSHOT_BRANCH?expand=1"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
