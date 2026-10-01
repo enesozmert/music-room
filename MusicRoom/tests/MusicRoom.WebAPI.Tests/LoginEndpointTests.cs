@@ -260,14 +260,20 @@ internal static class TestClientContext
 
     /// <summary>Creates a client whose default headers satisfy the middleware.</summary>
     /// <param name="factory">The test host.</param>
+    /// <param name="appVersion">
+    /// The app version to report. Overridden only by SPEC-020's test that a phone which updates its app is still
+    /// the same device.
+    /// </param>
     /// <returns>A client ready to send a mutating request.</returns>
-    internal static HttpClient CreateAuditedClient(this WebApplicationFactory<Program> factory)
+    internal static HttpClient CreateAuditedClient(
+        this WebApplicationFactory<Program> factory,
+        string? appVersion = null)
     {
         HttpClient client = factory.CreateClient();
 
         client.DefaultRequestHeaders.Add(ClientContextMiddleware.PlatformHeader, Platform);
         client.DefaultRequestHeaders.Add(ClientContextMiddleware.DeviceHeader, Device);
-        client.DefaultRequestHeaders.Add(ClientContextMiddleware.AppVersionHeader, AppVersion);
+        client.DefaultRequestHeaders.Add(ClientContextMiddleware.AppVersionHeader, appVersion ?? AppVersion);
 
         return client;
     }

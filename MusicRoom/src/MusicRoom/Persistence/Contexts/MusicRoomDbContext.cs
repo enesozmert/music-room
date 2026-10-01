@@ -74,6 +74,9 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>One row per account per code: single use, enforced by the database.</summary>
     public DbSet<EventCodeRedemption> EventCodeRedemptions => Set<EventCodeRedemption>();
 
+    /// <summary>Registered devices and who holds playback control of each — subject V.2.2, ADR-0017.</summary>
+    public DbSet<Device> Devices => Set<Device>();
+
     /// <summary>Stamps the common columns, then saves — SDD §8.3.</summary>
     /// <param name="cancellationToken">The caller's cancellation token.</param>
     /// <returns>The number of rows written.</returns>

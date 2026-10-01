@@ -68,6 +68,34 @@
         }
       }
     },
+    "/api/v1/me/control-grants": {
+      "get": {
+        "tags": [
+          "DeviceControlEndpoints"
+        ],
+        "summary": "List the devices the caller has been given control of",
+        "description": "The delegation seen from the other side: what somebody else handed me, not what I handed out.",
+        "operationId": "GetControlGrants",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ControlGrantSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
     "/api/v1/auth/registrations": {
       "post": {
         "tags": [
@@ -2380,6 +2408,210 @@
           }
         }
       }
+    },
+    "/api/v1/devices": {
+      "post": {
+        "tags": [
+          "DeviceEndpoints"
+        ],
+        "summary": "Register the calling device",
+        "description": "Takes no body: the platform, the model and the app version come from the mandatory client headers. Registering the same device twice is 409, where the same device means the same owner, platform and model — a phone that updates its app is the same phone.",
+        "operationId": "PostDevice",
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "DeviceEndpoints"
+        ],
+        "summary": "List the caller's own devices",
+        "description": "Only the caller's. The route takes no account id, because a route that accepted one would be a route somebody would eventually pass somebody else's.",
+        "operationId": "GetDevices",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{deviceId}": {
+      "delete": {
+        "tags": [
+          "DeviceEndpoints"
+        ],
+        "summary": "Remove one of the caller's devices",
+        "description": "Owner only. Another account's device answers 404, never 403, because 403 would confirm it exists.",
+        "operationId": "DeleteDevice",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{deviceId}/control": {
+      "get": {
+        "tags": [
+          "DeviceControlEndpoints"
+        ],
+        "summary": "Read who controls a device",
+        "description": "The owner or the current controller may ask; anybody else gets 404. With no grant the controller is the owner. The response carries the ETag a claim sends back as If-Match.",
+        "operationId": "GetDeviceControl",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceControl"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "DeviceControlEndpoints"
+        ],
+        "summary": "Hand playback control to a friend",
+        "description": "Owner only, and requires If-Match. The grantee must be a friend of the owner, or the answer is 422. Two simultaneous claims: one 200, one 412 — the loser loses visibly, because two clients each believing they hold one device is the bug.",
+        "operationId": "PutDeviceControl",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ControlGrantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "412": {
+            "description": "Precondition Failed"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "DeviceControlEndpoints"
+        ],
+        "summary": "Return a device to its owner's control",
+        "description": "The owner's revoke and the controller's release are the same route and the same effect. A device already under owner control answers 404: there was no grant to release.",
+        "operationId": "DeleteDeviceControl",
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2427,6 +2659,55 @@
         },
         "description": "One person named on a playlist."
       },
+      "ControlGrantRequest": {
+        "required": [
+          "granteeUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "granteeUserId": {
+            "type": "string",
+            "description": "Who is being given control. Must be a friend of the owner.",
+            "format": "uuid"
+          }
+        },
+        "description": "The control grant payload — `docs/api/ENDPOINTS.md` §6."
+      },
+      "ControlGrantSummary": {
+        "required": [
+          "deviceId",
+          "ownerId",
+          "ownerDisplayName",
+          "platform",
+          "model"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "The device.",
+            "format": "uuid"
+          },
+          "ownerId": {
+            "type": "string",
+            "description": "Who owns it.",
+            "format": "uuid"
+          },
+          "ownerDisplayName": {
+            "type": "string",
+            "description": "Their display name, so a client needs no second call."
+          },
+          "platform": {
+            "type": "string",
+            "description": "Its platform."
+          },
+          "model": {
+            "type": "string",
+            "description": "Its model."
+          }
+        },
+        "description": "One device somebody else has given this caller control of."
+      },
       "CoordinatesRequest": {
         "required": [
           "latitude",
@@ -2454,6 +2735,85 @@
           }
         },
         "description": "A claimed position. Compared and discarded."
+      },
+      "DeviceControl": {
+        "required": [
+          "deviceId",
+          "ownerId",
+          "controllerUserId",
+          "isDelegated",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "The device.",
+            "format": "uuid"
+          },
+          "ownerId": {
+            "type": "string",
+            "description": "Its owner.",
+            "format": "uuid"
+          },
+          "controllerUserId": {
+            "type": "string",
+            "description": "Who may command playback on it. **Never null here**: with no grant this is the owner, because that is the\nquestion the endpoint was asked. The row's own column stays null, which is a different question — SPEC-020\ndecision 2.",
+            "format": "uuid"
+          },
+          "isDelegated": {
+            "type": "boolean",
+            "description": "Whether control is held by somebody other than the owner."
+          },
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The `xmin`, which the endpoint publishes as the `ETag`.",
+            "format": "uint32"
+          }
+        },
+        "description": "Who controls a device, and the version a claim must send back."
+      },
+      "DeviceSummary": {
+        "required": [
+          "deviceId",
+          "platform",
+          "model",
+          "appVersion",
+          "controllerUserId"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "description": "The device.",
+            "format": "uuid"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Its platform."
+          },
+          "model": {
+            "type": "string",
+            "description": "Its model."
+          },
+          "appVersion": {
+            "type": "string",
+            "description": "The application version it last registered with."
+          },
+          "controllerUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "Who holds delegated control, or null while the owner does.",
+            "format": "uuid"
+          }
+        },
+        "description": "One device, as its owner reads it."
       },
       "EmailVerificationRequest": {
         "required": [
@@ -3755,6 +4115,9 @@
       "name": "HealthEndpoints"
     },
     {
+      "name": "DeviceControlEndpoints"
+    },
+    {
       "name": "AuthEndpoints"
     },
     {
@@ -3795,6 +4158,9 @@
     },
     {
       "name": "EventVoteEndpoints"
+    },
+    {
+      "name": "DeviceEndpoints"
     }
   ]
 }

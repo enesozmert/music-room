@@ -89,6 +89,7 @@ landed.
 | S3 | **complete**: own profile with per-field visibility and music preferences, the friends graph, and reading another user's profile projected per field against the relationship |
 | S5 | **complete**: playlists with their three gates, an `xmin` concurrency token and collaborators; tracks with a sparse ordering key, a guarded reorder and the twenty-way parallel move that proves it; `PlaylistHub` at `/hubs/playlists`, authorised on join, audited by ADR-0019's filter, broadcasting after the commit |
 | S6 | **complete**: the event aggregate with its three gates, the window, invitations and attendance; suggestions, votes, the vote-ordered queue counted from the rows, venue codes and ADR-0014's presence checks; `EventHub` at `/hubs/events`, sharing one broadcast pipeline and one audit filter with `PlaylistHub` |
+| S7 | **started**: devices registered from the client headers, and control delegation — a grant to a friend, guarded by the device row's `xmin`, with revoke and release. `PlaybackSession` and `ControlHub` are the remaining unit |
 
 **No counts here on purpose.** `docs/specs/` is the authority for what is done, [[migrations-index]]
 for the schema history, and `make agent-check` for the test count — each drifted within a day of being

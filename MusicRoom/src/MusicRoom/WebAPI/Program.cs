@@ -84,6 +84,7 @@ public class Program
         app.MapUserEndpoints();
         app.MapPlaylistEndpoints();
         app.MapEventEndpoints();
+        app.MapDeviceEndpoints();
 
         // The hub is mapped after the endpoints and behind the same authentication. Its own authorisation is
         // the [Authorize] on the hub plus the join gate inside it — SPEC-016.
