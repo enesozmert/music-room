@@ -382,18 +382,31 @@ endpoints with a different transport, and the same authorisation applies.
 | `PlaylistHub` | `LeavePlaylist(playlistId)` | leave the group | `auth` |
 | `ControlHub` | — | auto-joins `user:{userId}` on connect | `auth` |
 
+`PlaylistHub` is **implemented** at `/hubs/playlists` (SPEC-016). `EventHub` and `ControlHub` stay design:
+their aggregates belong to slices S4 and S6.
+
 ### Design notes
 
 - **Mutations do not happen over the hub.** Every state change goes through the REST endpoints
   above, so one authorisation pipeline and one validation pipeline cover both transports. The hub
   carries joins, leaves and server-pushed facts.
 - A client asking to join `playlist:42` proves nothing. Group membership is authorised
-  server-side, every time.
+  server-side, every time. A reconnect is a new connection and therefore a new join, so the gate is
+  re-asked by construction rather than by remembering to.
+- **Every payload carries the playlist's version** — the same `xmin` the REST `ETag` carries, so a client
+  that receives a version it did not expect knows it missed a message and resynchronises over REST. The
+  four events are `TrackAdded`, `TrackMoved`, `TrackRemoved` and `CollaboratorChanged`.
+- **A broadcast is sent after the transaction commits**, by a pipeline behaviour outside it
+  ([[ADR-0038-realtime-broadcast-posture]]). A refused write — a `412`, a `409`, a `404` — sends nothing.
 - Authentication uses the same JWT, via the documented SignalR `access_token` query parameter on
   the WebSocket handshake.
 - **Client context is captured at the handshake**, not per invocation — a hub call carries no HTTP
-  headers. A handshake without `platform`, `device` and `appVersion` is rejected, mirroring the
-  `400` a REST mutation gets for the same omission.
+  headers. The three values go in the **query string** of the handshake (`platform`, `device`,
+  `appVersion`); a header is accepted too, for a client that can set one. A handshake without all three
+  is answered `400` by the same middleware that refuses a REST mutation without them, so neither
+  transport can produce an action nobody can attribute.
+- **The token goes in the `access_token` query parameter**, the documented SignalR mechanism, and it is
+  read **only** under `/hubs`. No REST route gains a second way to present a token.
 - **Join and leave are audited** by a hub filter writing the same record as the REST behaviour
   ([[ADR-0019-hub-action-auditing]]). Connect and disconnect are not — mobile reconnect noise
   would bury deliberate actions.

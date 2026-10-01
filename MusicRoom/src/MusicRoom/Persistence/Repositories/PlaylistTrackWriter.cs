@@ -158,7 +158,10 @@ internal sealed class PlaylistTrackWriter
 
         // Removing leaves a hole in the sparse sequence, which is what a sparse sequence is for. Nothing is
         // renumbered: the order is unchanged and the next insert reuses the gap.
-        return new TrackWriteResult(TrackWriteOutcome.Written, playlistTrackId);
+        return new TrackWriteResult(
+            TrackWriteOutcome.Written,
+            playlistTrackId,
+            await VersionAsync(playlistId, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>
@@ -207,7 +210,10 @@ internal sealed class PlaylistTrackWriter
                 cancellationToken)
             .ConfigureAwait(false);
 
-        return new TrackWriteResult(TrackWriteOutcome.Written, playlistTrackId);
+        return new TrackWriteResult(
+            TrackWriteOutcome.Written,
+            playlistTrackId,
+            await VersionAsync(playlistId, cancellationToken).ConfigureAwait(false));
     }
 
     private async Task<TrackWriteResult> InsertAsync(
@@ -232,6 +238,26 @@ internal sealed class PlaylistTrackWriter
 
         await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        return new TrackWriteResult(TrackWriteOutcome.Written, row.Id);
+        return new TrackWriteResult(
+            TrackWriteOutcome.Written,
+            row.Id,
+            await VersionAsync(playlistId, cancellationToken).ConfigureAwait(false));
     }
+
+    /// <summary>
+    /// The playlist's `xmin` after this transaction's own update to it.
+    /// </summary>
+    /// <remarks>
+    /// Read inside the transaction, which is where it is already decided: `xmin` is the id of the
+    /// transaction that last wrote the row, and that transaction is this one. The value is what the broadcast
+    /// and the next `If-Match` both carry, so the hub and REST can never disagree about which version a
+    /// client holds.
+    /// </remarks>
+    private async Task<uint> VersionAsync(Guid playlistId, CancellationToken cancellationToken) =>
+        await _context.Playlists
+            .AsNoTracking()
+            .Where(playlist => playlist.Id == playlistId)
+            .Select(playlist => playlist.Version)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
 }

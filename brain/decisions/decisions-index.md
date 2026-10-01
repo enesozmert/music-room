@@ -51,5 +51,6 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0032-refresh-token-lifetime]] | Refresh-token families live 30 days, absolute | Accepted | landed |
 | [[ADR-0033-audit-write-posture]] | The audit record commits with its action, fails closed, behind `IUnitOfWork` | Accepted | landed |
 | [[ADR-0034-profile-storage-and-visibility]] | Typed profile columns with a tier each; preferences as private rows | Accepted | landed, S3 |
+| [[ADR-0038-realtime-broadcast-posture]] | A handler queues a broadcast; a behaviour sends it after the commit | Accepted | landed |
 
 Related: [[MEMORY]] · [[system-overview]] · [[standards-router]]

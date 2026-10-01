@@ -16,9 +16,10 @@ Evaluators ask what you did *not* protect against; this table is the answer.
 
 ## Status
 
-**Design-stage register.** 29 threats. Slice S0 landed the first verified rows, S1 added T-25,
-T-26 and T-27, and closed T-25; S5 closed T-06 — the reorder race subject V.2.3 grades — and gave
-T-11 its first evidence. Every other mitigation below is *designed*, not verified.
+**Design-stage register.** 29 threats, plus one accepted residual risk recorded in the Accepted section
+(T-30, the hub's query-string token). Slice S0 landed the first verified rows, S1 added T-25,
+T-26 and T-27, and closed T-25; S5 closed T-06 — the reorder race subject V.2.3 grades — gave
+T-11 and T-12 their first evidence, and accepted T-30. Every other mitigation below is *designed*, not verified.
 The Verified column stays empty until a test, a config artifact or a named code path proves it.
 
 ## Legend
@@ -40,7 +41,7 @@ Likelihood and Impact: L / M / H. Residual = what remains **after** the planned 
 | T-09 | API key or secret committed to git | L | **critical** | `.env` git-ignored from commit 1, `.env.example` placeholders only, rotate-first leak procedure | subject V.8 makes this an **automatic project failure**; process discipline is the only control | | S0: `MusicRoom/.dockerignore` excludes `.env`; no `.env` and no credential string in any layer of the built image; `docker-compose.yml` carries no literal |
 | T-10 | YouTube quota exhaustion during the demo | M | M | prefer `videos.list` over `search.list`, debounce, cache `TrackRef`, handle `403 quotaExceeded` explicitly | a determined user can still burn quota; no per-user quota budget at launch | | — |
 | T-11 | Denial of service via unbounded input or list requests | M | M | capped `pageSize`, bounded string and collection lengths, global plus per-endpoint rate limits, and a hard **500-track cap per playlist** answered `409` (SPEC-015), which also bounds the renumber a sparse key occasionally needs | a single instance has no upstream protection; capacity is whatever V.7 measures. The cap is per playlist, not per account: an account may still hold many playlists | | S5: `PlaylistTrackEndpointTests.AddTrack_ToAFullPlaylist_Returns409Async` |
-| T-12 | SignalR connection exhaustion | M | M | bounded payloads, explicit keep-alive and timeout settings | no backplane (issue O8), so one instance is the ceiling | | — |
+| T-12 | SignalR connection exhaustion | M | M | bounded payloads, and explicit `KeepAliveInterval` of 15 seconds with a `ClientTimeoutInterval` of 60 (SPEC-016) rather than the framework defaults, so a dead mobile connection is dropped in a minute instead of being held; every hub connection must present a valid token and name a playlist it may see before it joins anything | no backplane (issue O8), so one instance is the ceiling. Nothing caps connections **per account** today: a client that reconnects in a loop is bounded by the rate limiter on the REST side and by nothing on the hub | | S5: the two settings are a named code path in `RealtimeServices`; `PlaylistHubTests` proves an anonymous handshake is refused |
 | T-13 | Database connection-pool exhaustion | M | M | small pool, short-lived connections, pooled connection string for the API | Supabase enforces a hard connection ceiling above ours | | — |
 | T-14 | Personal data over-exposure in profile responses | M | M | per-field filtering server-side by requester relationship | a new profile field added without a visibility tier; mitigated by making the tier non-nullable | | — |
 | T-15 | Sensitive data in logs | M | H | never-logged list, structured templates, no full bodies on credential endpoints | a developer logging an object graph that contains a token | | partial, S0: `GetHealthReady_WhenDatabaseUnreachable_BodyLeaksNothingAsync` proves the readiness body carries no host, connection string or exception text |
@@ -67,6 +68,7 @@ Likelihood and Impact: L / M / H. Residual = what remains **after** the planned 
 | Physical device compromise | the token is in the platform secure store; a rooted device is outside our control |
 | Supabase platform compromise | vendor trust boundary, stated rather than pretended away |
 | Sybil accounts (T-05) | email verification raises cost; full prevention needs identity proofing this project will not build |
+| An access token in a hub URL's query string (T-30) | A WebSocket handshake cannot carry an `Authorization` header, so SignalR documents `access_token` as a query parameter and the mobile client has no other option. Bounded three ways: it is read **only** under `/hubs`, so no REST route gains a second way to authenticate; Serilog's request logging records the path and not the query string, so it does not reach the application log; and the token already lives 15 minutes (ADR-0030, ADR-0032). What remains is that a URL is more copyable than a header — in a crash report, a proxy log the deployment owns, or a shared screen. Accepted on the same ground as the rest of the transport story: TLS is the deployment's job, and the alternative is no realtime on mobile at all (SPEC-016 decision 4) |
 
 ## Maintenance
 
