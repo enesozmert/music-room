@@ -301,6 +301,11 @@ rewrite the list. See §12.2.
 - Destructive changes follow expand -> migrate -> contract.
 - Every migration is recorded in [[migrations-index]].
 
+`playlists` holds one row per playlist with `owner_id`, `visibility`, `licence` and `deleted_at_utc`, and uses
+PostgreSQL's `xmin` as its concurrency token — no version column exists, which is what makes the `ETag` of §5
+free (SPEC-014). Deletion is soft, applied by a global query filter. `playlist_collaborators` holds one row per
+person named on a playlist with `can_edit`, unique per playlist and account.
+
 `friend_requests` holds one row per ordered pair, unique on `(sender_id, recipient_id)`, with a `smallint`
 status — pending, accepted or declined. `friendships` holds **one row per friendship** with the pair in
 canonical order, `user_a_id < user_b_id`, unique on the pair: symmetry is a property of the data rather than of
@@ -813,8 +818,8 @@ table to walk through at defence.
 | V.2.1 | vote race conditions | §12.1 #1, §12.2 | designed |
 | V.2.2 | per-device control licence, delegation | §5.2, §10.5, §11.3 | designed |
 | V.2.2 | what a delegate actually controls | `PlaybackSession.controllerUserId` -- [[ADR-0017-playback-session]] | designed |
-| V.2.3 | realtime multi-user playlist editing | §9.2, §10.4 | designed |
-| V.2.3 | reorder race conditions | §12.1 #2, §12.2 | designed |
+| V.2.3 | realtime multi-user playlist editing | §9.2, §10.4 | **partly implemented** -- the playlist aggregate exists with its three gates (`member`, `owner`, `licence`), a concurrency token that is PostgreSQL's own `xmin`, an `ETag` derived from it and an `If-Match` compared inside the `UPDATE` so a stale writer changes nothing and is told `412`. Collaborators carry `can_edit`, which separates reading from writing. Soft delete hides a playlist from every read. **Tracks and the hub are the next two units:** adding, reordering and removing tracks with the sparse ordering key, and `PlaylistHub` with ADR-0019's filter, are not built |
+| V.2.3 | reorder race conditions | §12.1 #2, §12.2 | **partly implemented** -- the mechanism is proven on the aggregate: `xmin` plus `If-Match` makes a concurrent metadata write fail with `412` rather than silently overwrite, and a test holds a stale token through another writer's update to show it. The reorder path itself, with the sparse ordering key, is the next unit |
 | V.2 | at least 2 of the 3 services | §5.2, [[ADR-0010-service-scope]] | **designed** — all three |
 | V.3 | backend is the single source of truth | §4.2, §8.1 | designed |
 | V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **partly implemented** -- `docs/api/openapi.json` is generated from the code and committed; it documents every route that exists — the two health endpoints, the identity surface including the three session routes, and the three `/api/v1/me` profile routes. Each mutating route documents the `400` its mandatory client headers can produce, and each authenticated route its `401`. The generated document is the count; this row does not repeat it |

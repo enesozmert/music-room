@@ -927,10 +927,471 @@
           }
         }
       }
+    },
+    "/api/v1/playlists": {
+      "post": {
+        "tags": [
+          "PlaylistEndpoints"
+        ],
+        "summary": "Create a playlist",
+        "description": "The caller owns it. A playlist may be Everyone or InvitedOnly; LocationAndTimeRestricted is 422, because that licence belongs to an event and nothing checks a geofence on a playlist.",
+        "operationId": "PostPlaylist",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaylistCreation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "PlaylistEndpoints"
+        ],
+        "summary": "List playlists",
+        "description": "One scope at a time: mine, shared with me, or public. Paged with a capped size. A private playlist the caller is not named on never appears in any scope.",
+        "operationId": "GetPlaylists",
+        "parameters": [
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "mine"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlaylistSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/playlists/{playlistId}": {
+      "get": {
+        "tags": [
+          "PlaylistEndpoints"
+        ],
+        "summary": "Read one playlist",
+        "description": "Returns the playlist with an ETag the client sends back as If-Match when it edits. A playlist the caller may not see answers 404, never 403, because 403 would confirm it exists.",
+        "operationId": "GetPlaylist",
+        "parameters": [
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaylistResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "PlaylistEndpoints"
+        ],
+        "summary": "Change a playlist's metadata",
+        "description": "Requires If-Match carrying the ETag the client last read. A stale or absent token answers 412 and changes nothing: two clients editing at once is the failure this guard exists for.",
+        "operationId": "PatchPlaylist",
+        "parameters": [
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaylistMetadata"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "412": {
+            "description": "Precondition Failed"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "PlaylistEndpoints"
+        ],
+        "summary": "Delete a playlist",
+        "description": "A soft delete, owner only: the row is stamped deleted and disappears from every read. Its audit trail keeps pointing at something that exists.",
+        "operationId": "DeletePlaylist",
+        "parameters": [
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/v1/playlists/{playlistId}/licence": {
+      "put": {
+        "tags": [
+          "PlaylistEndpoints"
+        ],
+        "summary": "Set a playlist's visibility and licence",
+        "description": "Owner only: a collaborator who may edit the contents does not decide who may see them.",
+        "operationId": "PutPlaylistLicence",
+        "parameters": [
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaylistLicenceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/playlists/{playlistId}/collaborators": {
+      "get": {
+        "tags": [
+          "PlaylistCollaboratorEndpoints"
+        ],
+        "summary": "List who is named on a playlist",
+        "description": "Anybody who may see the playlist may see who is named on it. A caller who may not see the playlist answers 404, not an empty list, because an empty list would confirm it exists.",
+        "operationId": "GetPlaylistCollaborators",
+        "parameters": [
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CollaboratorSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "PlaylistCollaboratorEndpoints"
+        ],
+        "summary": "Name somebody on a playlist",
+        "description": "Owner only. 409 when they are already named, and when the owner names themselves — they already hold every right a collaborator grant could give.",
+        "operationId": "PostPlaylistCollaborator",
+        "parameters": [
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CollaboratorCreation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        }
+      }
+    },
+    "/api/v1/playlists/{playlistId}/collaborators/{userId}": {
+      "delete": {
+        "tags": [
+          "PlaylistCollaboratorEndpoints"
+        ],
+        "summary": "Remove somebody from a playlist",
+        "description": "Owner only. 404 when there is no such grant on a playlist this caller owns.",
+        "operationId": "DeletePlaylistCollaborator",
+        "parameters": [
+          {
+            "name": "playlistId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "CollaboratorCreation": {
+        "required": [
+          "userId",
+          "canEdit"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "The account to name.",
+            "format": "uuid"
+          },
+          "canEdit": {
+            "type": "boolean",
+            "description": "Whether they may write to it."
+          }
+        },
+        "description": "The collaborator payload — `docs/api/ENDPOINTS.md` §5."
+      },
+      "CollaboratorSummary": {
+        "required": [
+          "userId",
+          "displayName",
+          "canEdit"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Their account.",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Their handle."
+          },
+          "canEdit": {
+            "type": "boolean",
+            "description": "Whether they may write to it."
+          }
+        },
+        "description": "One person named on a playlist."
+      },
       "EmailVerificationRequest": {
         "required": [
           "token"
@@ -1074,6 +1535,9 @@
           }
         }
       },
+      "LicenceMode": {
+        "type": "integer"
+      },
       "MusicPreferencesRequest": {
         "required": [
           "genres",
@@ -1183,6 +1647,144 @@
           }
         },
         "description": "The reset payload — `docs/api/ENDPOINTS.md` §1."
+      },
+      "PlaylistCreation": {
+        "required": [
+          "name",
+          "visibility",
+          "licence"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "What it is called."
+          },
+          "visibility": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Who may find it. Defaults to private.",
+                "$ref": "#/components/schemas/Visibility"
+              }
+            ]
+          },
+          "licence": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Who may write to it. Defaults to invited only.",
+                "$ref": "#/components/schemas/LicenceMode"
+              }
+            ]
+          }
+        },
+        "description": "The playlist creation payload — `docs/api/ENDPOINTS.md` §5."
+      },
+      "PlaylistLicenceRequest": {
+        "required": [
+          "visibility",
+          "licence"
+        ],
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "description": "Who may find it.",
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "licence": {
+            "description": "Who may write to it.",
+            "$ref": "#/components/schemas/LicenceMode"
+          }
+        },
+        "description": "The licence payload."
+      },
+      "PlaylistMetadata": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The new name."
+          }
+        },
+        "description": "The metadata payload for the guarded `PATCH`."
+      },
+      "PlaylistResponse": {
+        "required": [
+          "playlistId",
+          "name",
+          "visibility",
+          "licence",
+          "ownerId",
+          "mayEdit"
+        ],
+        "type": "object",
+        "properties": {
+          "playlistId": {
+            "type": "string",
+            "description": "The playlist.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "visibility": {
+            "description": "Who may find it.",
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "licence": {
+            "description": "Who may write to it.",
+            "$ref": "#/components/schemas/LicenceMode"
+          },
+          "ownerId": {
+            "type": "string",
+            "description": "Its owner.",
+            "format": "uuid"
+          },
+          "mayEdit": {
+            "type": "boolean",
+            "description": "Whether this caller may write to it, so a client can hide an editor it cannot use."
+          }
+        },
+        "description": "One playlist, as a client reads it."
+      },
+      "PlaylistSummary": {
+        "required": [
+          "playlistId",
+          "name",
+          "visibility",
+          "ownerId"
+        ],
+        "type": "object",
+        "properties": {
+          "playlistId": {
+            "type": "string",
+            "description": "The playlist.",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "visibility": {
+            "description": "Who may find it.",
+            "$ref": "#/components/schemas/Visibility"
+          },
+          "ownerId": {
+            "type": "string",
+            "description": "Its owner.",
+            "format": "uuid"
+          }
+        },
+        "description": "One playlist in a list."
       },
       "ProfileDateFieldRequest": {
         "required": [
@@ -1499,6 +2101,9 @@
         },
         "description": "The verification resend payload — `docs/api/ENDPOINTS.md` §1."
       },
+      "Visibility": {
+        "type": "integer"
+      },
       "VisibleProfile": {
         "required": [
           "userId",
@@ -1577,6 +2182,12 @@
     },
     {
       "name": "UserEndpoints"
+    },
+    {
+      "name": "PlaylistEndpoints"
+    },
+    {
+      "name": "PlaylistCollaboratorEndpoints"
     }
   ]
 }

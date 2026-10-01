@@ -85,7 +85,8 @@ stacked and unmerged, so `main` lags: read `docs/specs/` for status, `git log` f
 | S0 | solution, `Directory.Packages.props`, compose with a local PostgreSQL, `Makefile`, CI, `/health`, `/health/ready`, generated OpenAPI |
 | S1 | registration, email verification and resend, login, JWT + refresh rotation with reuse detection, password reset, credential rate limits, **bearer validation and the session endpoints** |
 | S2 | mandatory client headers and the audit log, refusal outcomes included — REST only; the hub filter waits for a hub |
-| S3 | **own profile with per-field visibility, and music preferences.** Reading another user's profile waits for the friends graph |
+| S3 | **complete**: own profile with per-field visibility and music preferences, the friends graph, and reading another user's profile projected per field against the relationship |
+| S5 | playlists with their three gates, an `xmin` concurrency token and collaborators. Tracks and `PlaylistHub` are the remaining two units |
 
 **No counts here on purpose.** `docs/specs/` is the authority for what is done, [[migrations-index]]
 for the schema history, and `make agent-check` for the test count — each drifted within a day of being

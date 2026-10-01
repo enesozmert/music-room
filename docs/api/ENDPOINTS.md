@@ -271,6 +271,17 @@ Subject V.2.3. The second contended write path.
 
 ### Design notes
 
+- **The `ETag` is the row's PostgreSQL `xmin`** (SPEC-014), so it changes whenever the row does and no code has
+  to remember to bump a version. `If-Match` is compared **inside** the `UPDATE`, so a stale writer changes
+  nothing; an absent `If-Match` is treated as a mismatch and answered `412`, because the contract lists `412`
+  and not `428` and both have the same fix — reload.
+- **A playlist's licence is `Everyone` or `InvitedOnly` only.** `LocationAndTimeRestricted` is `422`: subject
+  V.2.1 attaches location-and-time to an event, and accepting it here would imply a check nothing performs.
+- **`member` is the owner or anybody named on the playlist, plus any authenticated caller when it is public.**
+  `licence` is the owner, a collaborator with `canEdit`, or any member when the licence is `Everyone`. `owner` is
+  the owner: a collaborator who may edit the contents does not decide who may see them.
+- **`DELETE` is a soft delete.** The row stays, stamped, and a global query filter hides it from every read, so
+  the audit trail keeps pointing at something that exists.
 - **Reorder is a `PATCH` with `If-Match`.** The client sends the `ETag` it last read; a stale one
   gets `412` and the client reloads. Without this, two simultaneous moves silently overwrite each
   other — the exact failure subject V.2.3 grades.

@@ -77,6 +77,7 @@ public class Program
         app.MapProfileEndpoints();
         app.MapFriendEndpoints();
         app.MapUserEndpoints();
+        app.MapPlaylistEndpoints();
 
         await app.RunAsync();
     }
