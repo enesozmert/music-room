@@ -70,6 +70,9 @@ agent-run: ## drive unattended agent cycles — permissions scoped, output live 
 	  else empty end'" \
 	./.agent/run.sh $(CYCLES)
 
+progress: ## count how far the backend has got (WRITE=1 also writes the snapshot)
+	@./.agent/progress.sh $(if $(WRITE),--write,)
+
 land: ## land the stack of open pull requests onto main, bottom first (READY=1 to act)
 	@./.agent/land-stack.sh $(if $(READY),--ready,--dry-run) $(if $(LIMIT),--limit $(LIMIT),)
 

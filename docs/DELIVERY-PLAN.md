@@ -174,21 +174,24 @@ code, and its authorisation rule — both gates from [[sdd]] §13.2.
 **Never plan by layer.** "Domain first, then Application" never produces something that runs.
 Each slice below cuts through all five projects and ends with something demonstrable.
 
-| # | Slice | Delivers | Subject |
-|---|---|---|---|
-| S0 | Walking skeleton | solution per [[ADR-0011-solution-layout]], `Directory.Packages.props` with the set in [[ADR-0021-backend-dependency-set]], `docker compose` with a **local PostgreSQL container** ([[ADR-0026-environment-bring-up]]), `Makefile`, CI, `/health`, `/health/ready`, published OpenAPI | IV.1, V.8 |
-| S1 | Identity | register (BCrypt cost >= 12), email verification, login, JWT + refresh rotation, password reset | V.1, V.6 |
-| S1a | Mail provider adapter | **precondition: the T-25 rate limiter must exist first.** Owner decision 2026-09-27: an unauthenticated loop against `/auth/verification-requests` costs a log line today and burns the provider quota (T-19) the moment a real sender lands |
-| S1a | Mail provider adapter | the real hosted-provider implementation of `IMailService`, once the account and API key exist — issue O17 | V.1 |
-| S1b | Secret vault | self-hosted Infisical under a `vault` compose profile, plus `InfisicalSecretProvider` behind the abstraction — issue O18, [[ADR-0029-containerised-dev-and-secret-vault]] | owner requirement |
-| S2 | Audit + client context | required headers, middleware, audit behaviour, **SignalR hub filter**, audit table | V.6 |
-| S3 | Profile | three visibility tiers, per-field server-side filtering, music preferences | V.1 |
-| S4 | Catalog | YouTube adapter, `TrackRef`, caching, quota discipline | III |
-| S5 | Playlist Editor | REST + `PlaylistHub` + sparse ordering + concurrency token + parallel reorder tests | V.2.3 |
-| S6 | Track Vote | REST + `EventHub` + unique-index vote arbitration + licence policy incl. geofence and event code + parallel vote tests | V.2.1 |
-| S7 | Control Delegation + Playback | `PlaybackSession`, queue advance, device state machine, `ControlHub`, per-device licence | V.2.1, V.2.2 |
-| S8 | OpenID Connect, both roles | **Relying party:** Google and Facebook through one discovery-driven validation core, acquisition branching only — Google authorization code + PKCE `S256`, Facebook Limited Login ([[ADR-0008-oidc-social-login]]). **Provider:** the API's own discovery document, JWKS, authorization and token endpoints, ID token and UserInfo, replacing the sign-in surface S1 shipped ([[ADR-0031-musicroom-as-openid-provider]]). Account linking | V.1, V.5 |
-| S9 | Capacity + conformance evidence | Gatling simulations under `tests/load/`, `docs/load/REPORT.md`; fill the Verified column in [[threat-register]] and the evidence in [[asvs-conformance]] | V.7, V.6 |
+`State` is `merged`, `in progress`, `blocked` or `not started`, and it is read by
+`.agent/progress.sh`. Keep it true: it is the only machine-readable record of how far the plan has
+got.
+
+| # | Slice | Delivers | Subject | State |
+|---|---|---|---|---|
+| S0 | Walking skeleton | solution per [[ADR-0011-solution-layout]], `Directory.Packages.props` with the set in [[ADR-0021-backend-dependency-set]], `docker compose` with a **local PostgreSQL container** ([[ADR-0026-environment-bring-up]]), `Makefile`, CI, `/health`, `/health/ready`, published OpenAPI | IV.1, V.8 | merged |
+| S1 | Identity | register (BCrypt cost >= 12), email verification, login, JWT + refresh rotation, password reset | V.1, V.6 | merged |
+| S1a | Mail provider adapter | the real hosted-provider implementation of `IMailService`, once the account and API key exist — issue O17. **Precondition: the T-25 rate limiter must exist first.** Owner decision 2026-09-27: an unauthenticated loop against `/auth/verification-requests` costs a log line today and burns the provider quota (T-19) the moment a real sender lands | V.1 | blocked |
+| S1b | Secret vault | self-hosted Infisical under a `vault` compose profile, plus `InfisicalSecretProvider` behind the abstraction — issue O18, [[ADR-0029-containerised-dev-and-secret-vault]] | owner requirement | not started |
+| S2 | Audit + client context | required headers, middleware, audit behaviour, **SignalR hub filter**, audit table | V.6 | merged |
+| S3 | Profile | three visibility tiers, per-field server-side filtering, music preferences | V.1 | in progress |
+| S4 | Catalog | YouTube adapter, `TrackRef`, caching, quota discipline | III | not started |
+| S5 | Playlist Editor | REST + `PlaylistHub` + sparse ordering + concurrency token + parallel reorder tests | V.2.3 | not started |
+| S6 | Track Vote | REST + `EventHub` + unique-index vote arbitration + licence policy incl. geofence and event code + parallel vote tests | V.2.1 | not started |
+| S7 | Control Delegation + Playback | `PlaybackSession`, queue advance, device state machine, `ControlHub`, per-device licence | V.2.1, V.2.2 | not started |
+| S8 | OpenID Connect, both roles | **Relying party:** Google and Facebook through one discovery-driven validation core, acquisition branching only — Google authorization code + PKCE `S256`, Facebook Limited Login ([[ADR-0008-oidc-social-login]]). **Provider:** the API's own discovery document, JWKS, authorization and token endpoints, ID token and UserInfo, replacing the sign-in surface S1 shipped ([[ADR-0031-musicroom-as-openid-provider]]). Account linking | V.1, V.5 | not started |
+| S9 | Capacity + conformance evidence | Gatling simulations under `tests/load/`, `docs/load/REPORT.md`; fill the Verified column in [[threat-register]] and the evidence in [[asvs-conformance]] | V.7, V.6 | not started |
 
 ### Why this order
 
