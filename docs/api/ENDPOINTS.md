@@ -333,22 +333,29 @@ Subject V.2.2. Licence is **per device**, bound to the account.
 
 | Method | Path | Body | Success | Failures | Auth |
 |---|---|---|---|---|---|
-| POST | `/devices` | `platform`, `model`, `appVersion` | `201` | `409` already registered, `422` | `auth` |
+| POST | `/devices` | none — from `X-Client-*` headers | `201` | `409` already registered | `auth` |
 | GET | `/devices` | — | `200` own devices | `401` | `self` |
 | DELETE | `/devices/{deviceId}` | — | `204` | `404` | `self` |
 | GET | `/devices/{deviceId}/control` | — | `200` + `ETag` current controller | `404` | `self` or controller |
-| PUT | `/devices/{deviceId}/control` | `granteeUserId` | `200` | `404`, `409`, `412` | `owner` |
+| PUT | `/devices/{deviceId}/control` | `granteeUserId` | `200` | `404`, `412`, `422` not a friend | `owner` |
 | DELETE | `/devices/{deviceId}/control` | — | `204` released | `404` | `owner` or controller |
 | GET | `/me/control-grants` | paged | `200` grants held by me | `401` | `self` |
 
 ### Design notes
 
-- Control is a **single row with a state machine and a concurrency token** ([[sdd]] §11.2). Two
-  simultaneous claims: one wins, the other gets `412`. The loser must lose **visibly** — a silent
-  overwrite is the bug.
+- **§6 is implemented** (SPEC-020). Control is a **single row with a state machine and a concurrency token**
+  ([[sdd]] §11.2): `controller_user_id` on the device plus its `xmin`, compared inside the `UPDATE`. Two
+  simultaneous claims: one wins, the other gets `412`. The loser loses **visibly** — a silent overwrite is the
+  bug, and twenty parallel claims are tested for exactly one winner.
+- **Null means the owner controls it.** A revoke writes null rather than the owner's id, so there is one
+  spelling of that state; `GET .../control` still answers with the owner, because that is the question asked.
+- **A device is the same device across app updates.** `409` is keyed on `(owner, platform, model)` and
+  deliberately not on the app version.
 - `granteeUserId` must be a friend of the owner. Otherwise `422`.
 - `DELETE .../control` is allowed to both the owner (revoke) and the current controller (release).
-- `POST /devices` derives its values from the client context headers, which are mandatory anyway.
+- `POST /devices` **takes no body**: `platform`, `model` and `appVersion` come from `X-Client-Platform`,
+  `X-Client-Device` and `X-Client-App-Version`, which every mutation must send anyway. A body repeating them
+  would be a second source that can disagree with the audit record written for the same request.
 
 ---
 
