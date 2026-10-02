@@ -3,6 +3,7 @@ using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Realtime;
 using MusicRoom.Application.Features.Auth;
 using MusicRoom.Application.Features.Events.Presence;
+using MusicRoom.Application.Features.Playback;
 using MusicRoom.Application.Pipelines.Auditing;
 using MusicRoom.Application.Pipelines.Realtime;
 using FluentValidation;
@@ -59,6 +60,10 @@ public static class ApplicationServiceRegistration
 
         // The licence and the proof as one question, so no caller can ask one half and believe it asked both.
         services.AddScoped<EventVoteGate>();
+
+        // Who may command a playback session, and the writes that honour it — ADR-0017, SPEC-021.
+        services.AddScoped<PlaybackControlGate>();
+        services.AddScoped<PlaybackSessionWriter>();
 
         services.AddScoped<SessionIssuer>();
         services.AddScoped<CredentialMailDispatcher>();

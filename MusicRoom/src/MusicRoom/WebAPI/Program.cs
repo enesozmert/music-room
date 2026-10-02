@@ -278,6 +278,10 @@ internal static class RealtimeServices
     {
         endpoints.MapHub<PlaylistHub>(PlaylistHub.Path);
         endpoints.MapHub<EventHub>(EventHub.Path);
+
+        // Mapped here rather than in `Main` for the same reason the hubs are: CA1506 caps that method at 41
+        // coupled types, and it is already at the limit.
+        endpoints.MapPlaybackEndpoints();
     }
 
     /// <summary>Registers the hub, its filter, the per-invocation caller and the broadcaster.</summary>

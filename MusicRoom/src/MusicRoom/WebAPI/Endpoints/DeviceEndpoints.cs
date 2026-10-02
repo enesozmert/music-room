@@ -28,6 +28,7 @@ public static class DeviceEndpoints
         MapRemove(group);
 
         DeviceControlEndpoints.Map(group);
+        DevicePlaybackEndpoints.Map(group);
         DeviceControlEndpoints.MapGrantList(endpoints);
 
         return endpoints;

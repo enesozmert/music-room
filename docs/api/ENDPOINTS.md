@@ -375,9 +375,22 @@ Model and rationale: [[ADR-0017-playback-session]].
 
 ### Design notes
 
+- **§7 is implemented** (SPEC-021). A session is opened by the device's **owner** on a source they may see;
+  the **controller** — the owner, or the friend they delegated to — advances and jumps; the owner stops it.
 - **`expectedNowPlayingId` makes advance idempotent.** A duplicate call from a flaky mobile
-  network finds its expectation stale and gets the current state back — it never skips a second
+  network finds its expectation stale and gets `200` with the current state — it never skips a second
   track. Without it, a retry silently loses a song.
+- **Two kinds of staleness, two answers.** A stale `expectedNowPlayingId` is the retry above and is success. A
+  stale `If-Match` is `412`: somebody else moved the session first. Conflating them would lose one guarantee or
+  the other — the token stops two controllers advancing at once, the expectation stops one controller's retry
+  skipping a song.
+- **An advance with nothing left ends the session and answers `409`**, and `NowPlayingChanged` carries a null
+  now-playing so listeners stop rather than waiting.
+- **The session holds no controller of its own.** Who may command it is read from the device
+  (`controller_user_id ?? owner_id`), so a revoke takes effect on the delegate's next command — SPEC-020 put the
+  grant in one place and SPEC-021 keeps it there.
+- **A device holds at most one *live* session**, enforced by a unique index filtered on `ended_at_utc IS NULL`.
+  A stopped session keeps its row.
 - The server picks the next item: for an `Event`, the highest vote count with ties broken by
   earliest suggestion; for a `Playlist`, the next ordering key. **The client reports that the
   track ended; it never chooses what plays next.**
