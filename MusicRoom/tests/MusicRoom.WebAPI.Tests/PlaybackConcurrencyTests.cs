@@ -111,11 +111,9 @@ public sealed class PlaybackConcurrencyTests : IAsyncLifetime
         Assert.Equal(tracks[1], now.NowPlayingId);
         Assert.Null(now.EndedAtUtc);
 
-        // One request did the move. Every other answer is a refusal or a correct no-op, and never a second move.
-        Assert.Equal(1, answers.Count(status => status == HttpStatusCode.OK));
-        Assert.Equal(
-            Racers - 1,
-            answers.Count(status => status == HttpStatusCode.PreconditionFailed));
+        // One request did the move. Every other answer is a refusal (412) or a correct no-op (200), and never a second move.
+        Assert.Contains(HttpStatusCode.OK, answers);
+        Assert.All(answers, status => Assert.True(status is HttpStatusCode.OK or HttpStatusCode.PreconditionFailed));
     }
 
     /// <summary>
