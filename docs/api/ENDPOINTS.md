@@ -406,8 +406,8 @@ endpoints with a different transport, and the same authorisation applies.
 | `PlaylistHub` | `LeavePlaylist(playlistId)` | leave the group | `auth` |
 | `ControlHub` | — | auto-joins `user:{userId}` on connect | `auth` |
 
-`PlaylistHub` is **implemented** at `/hubs/playlists` (SPEC-016). `EventHub` and `ControlHub` stay design:
-their aggregates belong to slices S4 and S6.
+`PlaylistHub` is **implemented** at `/hubs/playlists` (SPEC-016) and `EventHub` at `/hubs/events`
+(SPEC-019). `ControlHub` stays design: its aggregate belongs to slice S7.
 
 ### Design notes
 
@@ -417,9 +417,17 @@ their aggregates belong to slices S4 and S6.
 - A client asking to join `playlist:42` proves nothing. Group membership is authorised
   server-side, every time. A reconnect is a new connection and therefore a new join, so the gate is
   re-asked by construction rather than by remembering to.
-- **Every payload carries the playlist's version** — the same `xmin` the REST `ETag` carries, so a client
+- **An `EventHub` payload carries the authoritative value of what changed, not a row version**
+  ([[ADR-0039-queue-broadcast-payloads]]). `VoteChanged` carries the suggestion's new count, so a client that
+  missed a message converges rather than drifting; `TrackSuggested` and `QueueReordered` carry an id, which is
+  idempotent by itself. An event's `xmin` is already the `If-Match` of its metadata `PATCH`, so touching the
+  event row on every vote would stop its owner renaming it during the evening it runs. Clients re-read the
+  queue on connect and reconnect, which is the reconcile point a version would otherwise provide.
+- **Every playlist payload carries the playlist's version** — the same `xmin` the REST `ETag` carries, so a client
   that receives a version it did not expect knows it missed a message and resynchronises over REST. The
   four events are `TrackAdded`, `TrackMoved`, `TrackRemoved` and `CollaboratorChanged`.
+- **A duplicate vote broadcasts nothing**, and neither does a refused write: the count every listener holds is
+  already right.
 - **A broadcast is sent after the transaction commits**, by a pipeline behaviour outside it
   ([[ADR-0038-realtime-broadcast-posture]]). A refused write — a `412`, a `409`, a `404` — sends nothing.
 - Authentication uses the same JWT, via the documented SignalR `access_token` query parameter on

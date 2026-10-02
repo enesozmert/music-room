@@ -15,7 +15,7 @@ internal sealed class AddCollaboratorCommandHandler
     private readonly IPlaylistRepository _playlists;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditContext _audit;
-    private readonly IPlaylistBroadcastQueue _broadcasts;
+    private readonly IBroadcastQueue _broadcasts;
 
     /// <summary>Takes the playlist write path, the caller and the audit context.</summary>
     /// <param name="playlists">Where playlists live.</param>
@@ -29,7 +29,7 @@ internal sealed class AddCollaboratorCommandHandler
         IPlaylistRepository playlists,
         ICurrentUserAccessor currentUser,
         IAuditContext audit,
-        IPlaylistBroadcastQueue broadcasts)
+        IBroadcastQueue broadcasts)
     {
         _playlists = playlists;
         _currentUser = currentUser;

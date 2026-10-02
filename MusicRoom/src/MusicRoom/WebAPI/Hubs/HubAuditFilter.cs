@@ -20,11 +20,14 @@ namespace MusicRoom.WebAPI.Hubs;
 /// A singleton, resolving per-invocation services from <see cref="HubInvocationContext.ServiceProvider"/>:
 /// that is the invocation's own scope, which is where the scoped caller holder and the audit sink live.
 /// </para>
+/// <para>
+/// **One filter for every hub.** ADR-0019 says a new hub method is audited because the filter is on the hub,
+/// not because somebody remembered; two filters would make that false the first time one of them was forgotten
+/// (SPEC-019 decision 3).
+/// </para>
 /// </remarks>
-internal sealed class PlaylistHubFilter : IHubFilter
+internal sealed class HubAuditFilter : IHubFilter
 {
-    /// <summary>What the audit record calls the thing acted on.</summary>
-    internal const string TargetType = "playlist";
 
     /// <summary>Dispatches the method, having set the caller, and records what became of it.</summary>
     /// <param name="invocationContext">The invocation SignalR is about to perform.</param>
@@ -40,7 +43,7 @@ internal sealed class PlaylistHubFilter : IHubFilter
         CancellationToken cancellationToken = invocationContext.Context.ConnectionAborted;
 
         HubCaller caller = Caller(invocationContext);
-        string? action = AuditAction(invocationContext.HubMethodName);
+        AuditedHubAction? action = AuditAction(invocationContext.HubMethodName);
 
         try
         {
@@ -90,7 +93,7 @@ internal sealed class PlaylistHubFilter : IHubFilter
     /// name the <c>HubMethodName</c> attribute publishes. Matching on one spelling only would silently audit
     /// nothing, which is the failure mode ADR-0019 exists to prevent.
     /// </remarks>
-    private static string? AuditAction(string hubMethodName)
+    private static AuditedHubAction? AuditAction(string hubMethodName)
     {
         const string asyncSuffix = "Async";
 
@@ -100,8 +103,10 @@ internal sealed class PlaylistHubFilter : IHubFilter
 
         return name switch
         {
-            PlaylistHub.JoinMethod => "playlist.join",
-            PlaylistHub.LeaveMethod => "playlist.leave",
+            PlaylistHub.JoinMethod => new AuditedHubAction("playlist.join", "playlist"),
+            PlaylistHub.LeaveMethod => new AuditedHubAction("playlist.leave", "playlist"),
+            EventHub.JoinMethod => new AuditedHubAction("event.join", "event"),
+            EventHub.LeaveMethod => new AuditedHubAction("event.leave", "event"),
             _ => null,
         };
     }
@@ -121,7 +126,7 @@ internal sealed class PlaylistHubFilter : IHubFilter
     private static async Task RecordAsync(
         HubInvocationContext invocationContext,
         HubCaller caller,
-        string? action,
+        AuditedHubAction? action,
         AuditOutcome outcome,
         CancellationToken cancellationToken)
     {
@@ -139,8 +144,8 @@ internal sealed class PlaylistHubFilter : IHubFilter
             {
                 Id = Guid.NewGuid(),
                 UserId = caller.UserId,
-                Action = action,
-                TargetType = TargetType,
+                Action = action.Action,
+                TargetType = action.TargetType,
                 TargetId = invocationContext.HubMethodArguments is [Guid playlistId, ..] ? playlistId : null,
                 Platform = context.Platform,
                 Device = context.Device,
@@ -155,3 +160,12 @@ internal sealed class PlaylistHubFilter : IHubFilter
             .ConfigureAwait(false);
     }
 }
+
+/// <summary>What one audited hub method is called in the audit log.</summary>
+/// <param name="Action">The stable action string, such as <c>event.join</c>.</param>
+/// <param name="TargetType">What kind of thing it acted on, such as <c>event</c>.</param>
+/// <remarks>
+/// A record rather than two parallel switch expressions, so a hub method cannot end up with one hub's action
+/// and another's target type.
+/// </remarks>
+internal sealed record AuditedHubAction(string Action, string TargetType);

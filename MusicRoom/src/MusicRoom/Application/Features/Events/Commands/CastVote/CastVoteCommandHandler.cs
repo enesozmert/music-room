@@ -1,6 +1,7 @@
 using MediatR;
 using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Persistence;
+using MusicRoom.Application.Abstractions.Realtime;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Application.Features.Events.Presence;
 
@@ -18,43 +19,43 @@ namespace MusicRoom.Application.Features.Events.Commands.CastVote;
 /// vote, not returned, not logged (SPEC-018 decision 5).
 /// </para>
 /// </remarks>
-internal sealed class CastVoteCommandHandler : IRequestHandler<CastVoteCommand, VoteWriteOutcome>
+internal sealed class CastVoteCommandHandler : IRequestHandler<CastVoteCommand, VoteWriteResult>
 {
-    private readonly IEventRepository _events;
+    private readonly EventVoteGate _gate;
     private readonly IEventQueueRepository _queue;
-    private readonly PresenceVerifier _presence;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditContext _audit;
+    private readonly IBroadcastQueue _broadcasts;
 
-    /// <summary>Takes the gate, the queue, the verifier, the caller and the audit context.</summary>
-    /// <param name="events">Where the `licence` gate and the policy are read.</param>
+    /// <summary>Takes the gate, the queue, the caller, the audit context and the broadcast queue.</summary>
+    /// <param name="gate">The licence and the presence proof, as one question — ADR-0014.</param>
     /// <param name="queue">Where votes live.</param>
-    /// <param name="presence">What rules on the evidence — ADR-0014.</param>
     /// <param name="currentUser">Who is voting, from the validated token.</param>
     /// <param name="audit">Where this handler states what became of the request — ADR-0033.</param>
+    /// <param name="broadcasts">What the other listeners are told, once this has committed — ADR-0035.</param>
     /// <remarks>
     /// Public on an internal type: MediatR activates the handler through a public constructor only.
     /// </remarks>
     public CastVoteCommandHandler(
-        IEventRepository events,
+        EventVoteGate gate,
         IEventQueueRepository queue,
-        PresenceVerifier presence,
         ICurrentUserAccessor currentUser,
-        IAuditContext audit)
+        IAuditContext audit,
+        IBroadcastQueue broadcasts)
     {
-        _events = events;
+        _gate = gate;
         _queue = queue;
-        _presence = presence;
         _currentUser = currentUser;
         _audit = audit;
+        _broadcasts = broadcasts;
     }
 
     /// <summary>Votes, or reports why not.</summary>
     /// <param name="request">The command.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
-    /// <returns>Recorded, unchanged, not found, or refused for want of presence.</returns>
+    /// <returns>Recorded, unchanged, not found, or refused for want of presence — with the new count.</returns>
     /// <exception cref="InvalidOperationException">No authenticated caller.</exception>
-    public async Task<VoteWriteOutcome> Handle(
+    public async Task<VoteWriteResult> Handle(
         CastVoteCommand request,
         CancellationToken cancellationToken)
     {
@@ -67,69 +68,39 @@ internal sealed class CastVoteCommandHandler : IRequestHandler<CastVoteCommand, 
 
         _audit.SetTargetId(request.EventId);
 
-        DateTime nowUtc = DateTime.UtcNow;
-
-        EventAccess access = await _events
-            .FindAccessAsync(request.EventId, userId, nowUtc, cancellationToken)
+        VoteGateDecision decision = await _gate
+            .DecideAsync(request.EventId, userId, request.Proof, cancellationToken)
             .ConfigureAwait(false);
 
-        if (!access.MayVote)
+        if (decision != VoteGateDecision.Admitted)
         {
             _audit.SetOutcome(AuditOutcome.Refused);
 
-            return VoteWriteOutcome.NotFound;
+            return decision == VoteGateDecision.PresenceNotProved
+                ? VoteWriteResult.PresenceNotProved
+                : VoteWriteResult.NotFound;
         }
 
-        if (!await ProvedPresenceAsync(request, userId, nowUtc, cancellationToken).ConfigureAwait(false))
-        {
-            _audit.SetOutcome(AuditOutcome.Refused);
+        DateTime nowUtc = DateTime.UtcNow;
 
-            return VoteWriteOutcome.PresenceNotProved;
-        }
-
-        VoteWriteOutcome outcome = await _queue
+        VoteWriteResult result = await _queue
             .TryCastVoteAsync(request.EventId, request.SuggestionId, userId, nowUtc, cancellationToken)
             .ConfigureAwait(false);
 
-        if (outcome == VoteWriteOutcome.NotFound)
+        if (result.Outcome == VoteWriteOutcome.NotFound)
         {
             _audit.SetOutcome(AuditOutcome.Refused);
+
+            return result;
         }
 
-        return outcome;
-    }
-
-    /// <summary>Asks the verifier, with the event's own stored policy.</summary>
-    private async Task<bool> ProvedPresenceAsync(
-        CastVoteCommand request,
-        Guid userId,
-        DateTime nowUtc,
-        CancellationToken cancellationToken)
-    {
-        EventPresence? presence = await _events
-            .FindPresenceAsync(request.EventId, nowUtc, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (presence is null)
+        // A duplicate vote changed nothing, so nobody is told: the count every listener holds is already right.
+        if (result.Outcome == VoteWriteOutcome.Recorded)
         {
-            return false;
+            _broadcasts.Enqueue(
+                new VoteChanged(request.EventId, nowUtc, request.SuggestionId, result.Votes));
         }
 
-        PresenceSubject subject = new(
-            request.EventId,
-            presence.Licence,
-            presence.Proof,
-            presence.Policy is null
-                ? null
-                : new Geofence(
-                    (double)presence.Policy.Latitude,
-                    (double)presence.Policy.Longitude,
-                    presence.Policy.RadiusMetres),
-            presence.InWindow,
-            nowUtc);
-
-        return await _presence
-            .IsPresentAsync(subject, request.Proof, userId, cancellationToken)
-            .ConfigureAwait(false);
+        return result;
     }
 }

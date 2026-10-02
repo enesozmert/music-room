@@ -1,6 +1,7 @@
 using MediatR;
 using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Persistence;
+using MusicRoom.Application.Abstractions.Realtime;
 using MusicRoom.Application.Abstractions.Security;
 
 namespace MusicRoom.Application.Features.Events.Commands.SuggestTrack;
@@ -20,12 +21,14 @@ internal sealed class SuggestTrackCommandHandler
     private readonly IEventQueueRepository _queue;
     private readonly ICurrentUserAccessor _currentUser;
     private readonly IAuditContext _audit;
+    private readonly IBroadcastQueue _broadcasts;
 
     /// <summary>Takes the gate, the queue, the caller and the audit context.</summary>
     /// <param name="events">Where the `licence` gate is decided.</param>
     /// <param name="queue">Where suggestions live.</param>
     /// <param name="currentUser">Who is suggesting, from the validated token.</param>
     /// <param name="audit">Where this handler states what became of the request — ADR-0033.</param>
+    /// <param name="broadcasts">What the other listeners are told, once this has committed — ADR-0035.</param>
     /// <remarks>
     /// Public on an internal type: MediatR activates the handler through a public constructor only.
     /// </remarks>
@@ -33,12 +36,14 @@ internal sealed class SuggestTrackCommandHandler
         IEventRepository events,
         IEventQueueRepository queue,
         ICurrentUserAccessor currentUser,
-        IAuditContext audit)
+        IAuditContext audit,
+        IBroadcastQueue broadcasts)
     {
         _events = events;
         _queue = queue;
         _currentUser = currentUser;
         _audit = audit;
+        _broadcasts = broadcasts;
     }
 
     /// <summary>Suggests it, or reports why not.</summary>
@@ -80,7 +85,15 @@ internal sealed class SuggestTrackCommandHandler
         if (result.Outcome != SuggestionWriteOutcome.Added)
         {
             _audit.SetOutcome(AuditOutcome.Refused);
+
+            return result;
         }
+
+        _broadcasts.Enqueue(new TrackSuggested(
+            request.EventId,
+            nowUtc,
+            result.SuggestionId!.Value,
+            request.YoutubeVideoId));
 
         return result;
     }

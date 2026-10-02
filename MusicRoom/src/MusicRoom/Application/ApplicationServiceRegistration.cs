@@ -49,13 +49,16 @@ public static class ApplicationServiceRegistration
 
         // Request-scoped for the same reason: a handler fills it, the broadcast behaviour empties it once
         // the transaction has committed — ADR-0035.
-        services.AddScoped<IPlaylistBroadcastQueue, PlaylistBroadcastQueue>();
+        services.AddScoped<IBroadcastQueue, BroadcastQueue>();
 
         // Extracted from the handlers when the audit context pushed two constructors past the
         // five-parameter limit S107 enforces — SPEC-009.
         // Rules on the evidence a voter supplies — ADR-0014. Scoped because it spends a code through the
         // request's own repository.
         services.AddScoped<PresenceVerifier>();
+
+        // The licence and the proof as one question, so no caller can ask one half and believe it asked both.
+        services.AddScoped<EventVoteGate>();
 
         services.AddScoped<SessionIssuer>();
         services.AddScoped<CredentialMailDispatcher>();

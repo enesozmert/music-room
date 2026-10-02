@@ -20,7 +20,7 @@ namespace MusicRoom.Application.Features.Events.Commands.CastVote;
 /// </para>
 /// </remarks>
 public sealed record CastVoteCommand(Guid EventId, Guid SuggestionId, PresenceProofSubmission? Proof)
-    : IRequest<VoteWriteOutcome>, IAuditableCommand
+    : IRequest<VoteWriteResult>, IAuditableCommand
 {
     /// <inheritdoc />
     public string AuditAction => "event.vote";
