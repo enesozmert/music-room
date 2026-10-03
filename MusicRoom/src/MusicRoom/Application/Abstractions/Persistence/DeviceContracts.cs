@@ -43,6 +43,25 @@ public sealed record ControlGrantSummary(
     string Platform,
     string Model);
 
+/// <summary>What a guarded grant did, and who held control before it.</summary>
+/// <param name="Outcome">The outcome.</param>
+/// <param name="PreviousControllerUserId">
+/// Who held delegated control before this write, or null when the owner did. Read **inside** the guarded
+/// transaction, before the update and under the same `xmin`, so the person to notify cannot be a guess taken
+/// from a read a concurrent grant has already invalidated — SPEC-022 decision 3.
+/// </param>
+public sealed record DeviceGrantResult(DeviceWriteOutcome Outcome, Guid? PreviousControllerUserId)
+{
+    /// <summary>No such device, or none this caller owns.</summary>
+    public static DeviceGrantResult NotFound { get; } = new(DeviceWriteOutcome.NotFound, null);
+
+    /// <summary>A stale `If-Match`: somebody claimed it first.</summary>
+    public static DeviceGrantResult Stale { get; } = new(DeviceWriteOutcome.VersionMismatch, null);
+
+    /// <summary>The grantee is not a friend of the owner.</summary>
+    public static DeviceGrantResult NotAFriend { get; } = new(DeviceWriteOutcome.NotAFriend, null);
+}
+
 /// <summary>What a guarded device write did.</summary>
 public enum DeviceWriteOutcome
 {

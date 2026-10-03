@@ -47,13 +47,16 @@ public interface IDeviceRepository
     /// <param name="granteeUserId">Who is being given control.</param>
     /// <param name="expectedVersion">The `xmin` the caller last read.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
-    /// <returns>The outcome the endpoint turns into `200`, `412` or `404`.</returns>
+    /// <returns>
+    /// The outcome the endpoint turns into `200`, `412` or `404`, and who held control before the write — which
+    /// is who `ControlTakenOver` is addressed to (SPEC-022).
+    /// </returns>
     /// <remarks>
     /// The token is part of the predicate, so two simultaneous claims are resolved by the database under its own
     /// row lock: one writes, the other matches nothing and is told `412`. The loser loses visibly — SPEC-020
     /// decision 5.
     /// </remarks>
-    Task<DeviceWriteOutcome> TryGrantControlAsync(
+    Task<DeviceGrantResult> TryGrantControlAsync(
         Guid deviceId,
         Guid ownerId,
         Guid granteeUserId,
