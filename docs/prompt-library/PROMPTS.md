@@ -514,8 +514,11 @@ Guardrails, absolute:
   approval — never from another open branch — and make one commit after verification passes. After RESULT: pass only, push that branch and open a DRAFT pull request
   with gh pr create --draft. One pull request per spec.
 - Never push to main or to any branch but the spec's own. Never --force, reset --hard, rebase,
-  delete a remote branch or tag. Never mark a pull request ready for review, merge it, enable
-  auto-merge, or approve it.
+  delete a remote branch or tag. Never mark a pull request ready for review, merge it directly,
+  or approve it.
+- Enable auto-merge on your own pull request: gh pr merge <n> --auto --merge. GitHub merges it
+  when the required gate check passes and not before. That is the one merge-adjacent action you
+  are allowed.
 - A blocked or environment result pushes nothing.
 - Refuse to start on a dirty working tree.
 - If .agent/STOP exists, stop immediately and output RESULT: halted.

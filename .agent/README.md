@@ -140,7 +140,12 @@ and the PDF is an artifact. A conflict anywhere else stops the run and names the
 below that pull request is on `main`, nothing above it was touched.
 
 `--ready` marks the batch ready for review, which is the human signal ADR-0027 asks for — one flag
-instead of one command per pull request. **A human runs this.** Wiring it into CI would mean an
+instead of one command per pull request.
+
+**Since 2026-10-03 the common case does not need this script.** Repository auto-merge is on and an
+agent enables it on its own pull request, so one lands as soon as `gate` passes. `land-stack.sh` is
+for the case auto-merge cannot handle: a pull request that is behind, conflicted, or sitting on
+another open branch. Which is to say, a stack — and `AGENTS.md` §5b now forbids building one. **A human runs this.** Wiring it into CI would mean an
 agent merging its own work, which ADR-0027 forbids; amend the ADR first if that is ever wanted.
 
 It takes the same `.lock` as `run.sh` and refuses to start under a live cycle, and it works in its
