@@ -19,6 +19,9 @@ Then stop and wait for my approval. Write no code in this turn.
 
 Constraints:
 
+- The branch for this work is cut from `origin/main`, never from another open branch. `git fetch
+  origin` first. Stacking is what cost five renumbered records and six hand-resolved conflicts
+  between 2026-09-27 and 2026-10-03 — `AGENTS.md` §5b has the measurement.
 - All backend code under `MusicRoom/`; client code under `MusicRoomApp/`. `reference/` is read-only.
 - One command or query per use case; handlers stay thin.
 - No secret in source; configuration from `.env`.

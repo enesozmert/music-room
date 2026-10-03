@@ -61,19 +61,25 @@ the project subject forbids committing third-party source.
 5. **Decisions belong to the humans.** You may draft an ADR; you may not choose the architecture.
    The subject grades whether the team can defend its own choices.
 6. **English in artifacts.** Identifiers, comments, commit messages, API fields, logs, docs.
-7. **An ADR number is claimed on `origin/main`, not in your branch.** Before you write one, run
+7. **A numbered record is claimed on `origin/main`, not in your branch.** This covers every id the
+   repository allocates: an ADR id, an `O` issue in `docs/SDD.md` §17, a `T` row in
+   `docs/owasp/THREAT-REGISTER.md`, and a spec number. Before you write one, run
 
    ```
    git ls-tree --name-only origin/main brain/decisions/
    ```
 
-   and take the first number after the highest one you see. Two branches that each pick "the next
-   number" pick the same one, and the filenames differ, so git merges both without a word: the
-   repository ends up with two files carrying one `id`, and whichever index edit lands second
-   silently drops the other decision's row. It happened three times between 2026-09-27 and
-   2026-10-01 — ADR-0030, ADR-0031, ADR-0035 and ADR-0036 each had to be renumbered after the
-   fact, which means renaming a file, two frontmatter lines and every reference across up to
+   and take the first number after the highest one you see. For an `O` or `T` row, read the table on
+   `origin/main` the same way.
+
+   Two branches that each pick "the next number" pick the same one, and git merges both without a
+   word when the filenames differ: the repository ends up with two files carrying one `id`, and
+   whichever index edit lands second silently drops the other record's row. It happened five times
+   between 2026-09-27 and 2026-10-03 — ADR-0030, ADR-0031, ADR-0035, ADR-0036 twice, and issue
+   `O19` — and each fix is a file rename, two frontmatter lines and every reference across up to
    sixteen documents. Checking costs one command.
+
+   The deeper fix is rule 8: a branch cut from `origin/main` reads the current numbers.
 
 ## 5. Definition of done for any change
 
@@ -93,7 +99,11 @@ the project subject forbids committing third-party source.
 `brain/decisions/ADR-0025-agent-git-protocol.md` and
 `brain/decisions/ADR-0027-agent-push-and-pr.md`:
 
-- One branch per spec: `feat/spec-<nnn>-<slug>`, created after the spec is approved.
+- One branch per spec: `feat/spec-<nnn>-<slug>`, **cut from `origin/main`** after the spec is
+  approved — never from the previous spec's branch. Run `git fetch origin` first.
+- **Do not stack.** If the previous spec's pull request has not merged, either wait for it or cut
+  from `origin/main` anyway and accept that the two touch the same central files. What is forbidden
+  is basing a branch on another open one, which is what builds a stack.
 - One commit per spec, only after verification passes. Conventional Commits; name the spec id in
   the body.
 - **After `RESULT: pass` only**: push that branch and open a **draft** pull request with
@@ -107,6 +117,22 @@ the project subject forbids committing third-party source.
 
 `main` carries branch protection with `enforce_admins: true`, so a direct push is refused
 mechanically, not by convention.
+
+### Why not to stack, measured
+
+Twenty-one specs reached `main` through two stacks, on 2026-09-28 and 2026-10-01 to 03. The second
+one cost, in order: nine pull requests retargeted by hand, because GitHub **closes** a child when
+its base branch is deleted rather than retargeting it, and a closed one cannot be reopened once
+that branch is gone (#22 was lost that way); a landing script whose ordering had to be rewritten
+twice, since the base chain erases itself on retargeting and commit ancestry breaks when any
+branch in the middle is rewritten; six conflict resolutions, every one of them in
+`brain/decisions/decisions-index.md` or `docs/SDD.md`, the two files every spec touches; five
+renumbered records; and a flaky test that each branch inherited and that failed `gate` twice
+before it was fixed.
+
+A branch cut from `origin/main` after the previous one merged has none of those. The whole of
+`.agent/land-stack.sh` exists to clean up after a stack, and the point of this rule is that it
+should be an emergency tool rather than a daily one.
 
 ## 6. Escalate instead of guessing
 

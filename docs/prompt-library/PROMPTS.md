@@ -177,6 +177,8 @@ Context, Decision, Consequences, Alternatives rejected.
 
 Claim the number from origin/main, not from this branch:
   git ls-tree --name-only origin/main brain/decisions/
+The same rule covers every numbered record: an O issue in SDD section 17, a T row in the threat
+register, a spec number. Read the table on origin/main before you pick.
 Take the first free number after the highest one that command prints. The index in this branch is
 not the authority — two branches that each read their own copy pick the same number, and git merges
 both because the filenames differ.
@@ -508,8 +510,8 @@ Guardrails, absolute:
 - Never mark a docs/SDD.md section 16 row "done" without code that exists.
 - Never write or modify an ADR. Draft one and stop if a decision is needed.
 - Never add or upgrade a dependency.
-- Git: create one branch feat/spec-<nnn>-<slug> after approval, and make one commit after
-  verification passes. After RESULT: pass only, push that branch and open a DRAFT pull request
+- Git: fetch origin, then create one branch feat/spec-<nnn>-<slug> from origin/main after
+  approval — never from another open branch — and make one commit after verification passes. After RESULT: pass only, push that branch and open a DRAFT pull request
   with gh pr create --draft. One pull request per spec.
 - Never push to main or to any branch but the spec's own. Never --force, reset --hard, rebase,
   delete a remote branch or tag. Never mark a pull request ready for review, merge it, enable
