@@ -116,7 +116,11 @@ the project subject forbids committing third-party source.
 - Refuse to start a run on a dirty working tree.
 
 `main` carries branch protection with `enforce_admins: true`, so a direct push is refused
-mechanically, not by convention.
+mechanically, not by convention. It does **not** require a branch to be up to date
+([[ADR-0040-pull-requests-need-not-be-up-to-date]]): auto-merge lands a pull request as soon as
+`gate` is green, and nobody rebases a behind branch by hand. The price is that two pull requests
+which pass separately can break `main` together; `backend-prod` runs on every push to `main` and
+is what catches it.
 
 ### Why not to stack, measured
 
