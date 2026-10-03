@@ -80,6 +80,13 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>Who is playing what, on which device — ADR-0017. One live session per device.</summary>
     public DbSet<PlaybackSession> PlaybackSessions => Set<PlaybackSession>();
 
+    // The catalog's two tables — `track_refs` and `track_search_cache`, ADR-0023's L2 — deliberately have no
+    // property here. This class is at the 30-type coupling limit `SonarLint.xml` enforces (S1200), and two more
+    // sets put it at 32. They reach the model through their `IEntityTypeConfiguration` classes, which
+    // `OnModelCreating` applies from this assembly, and `TrackRefRepository` asks for them with `Set<T>()`.
+    // The dependency then sits in the one class that uses them rather than in the context every aggregate
+    // shares — which is what the rule is asking for, not a way around it.
+
     /// <summary>Stamps the common columns, then saves — SDD §8.3.</summary>
     /// <param name="cancellationToken">The caller's cancellation token.</param>
     /// <returns>The number of rows written.</returns>

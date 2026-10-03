@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Application.Abstractions.Security;
+using MusicRoom.Infrastructure.Catalog;
 using MusicRoom.Infrastructure.Messaging;
 using MusicRoom.Infrastructure.Security;
 
@@ -13,8 +14,8 @@ namespace MusicRoom.Infrastructure;
 public static class InfrastructureServiceRegistration
 {
     /// <summary>
-    /// Registers the password hasher, the access-token issuer, the credential attempt limiter and the
-    /// mail sender.
+    /// Registers the password hasher, the access-token issuer, the credential attempt limiter, the catalog
+    /// and the mail sender.
     /// </summary>
     /// <param name="services">The container being built.</param>
     /// <param name="options">Everything this layer needs from configuration, already validated.</param>
@@ -55,6 +56,11 @@ public static class InfrastructureServiceRegistration
                 + "slice S1a.");
         }
 
+        // The catalog: the provider client with its resilience pipeline, and ADR-0023's two cache levels in
+        // front of it. Delegated for the same reason the mail sender is — this method is at the argument
+        // limit, and a provider concern belongs with its own wiring.
+        CatalogRegistration.Add(services, options.Catalog);
+
         services.AddSingleton<IMailService>(provider => new LoggingMailService(
             provider.GetRequiredService<ILogger<LoggingMailService>>(),
             options.VerificationLinkBaseUrl));
@@ -74,6 +80,7 @@ public static class InfrastructureServiceRegistration
 /// start at all.</param>
 /// <param name="VerificationLinkBaseUrl">Where the client serves the verification screen, from
 /// configuration. Nothing here substitutes a default for it.</param>
+/// <param name="Catalog">The YouTube key and the two cache lifetimes — ADR-0003, ADR-0023.</param>
 /// <param name="Jwt">The signing key, issuer, audience and access-token lifetime.</param>
 /// <param name="CredentialAttempts">The per-account credential limits — SPEC-006 escalation 1.</param>
 /// <remarks>
@@ -84,5 +91,6 @@ public sealed record InfrastructureOptions(
     int BCryptWorkFactor,
     bool IsDevelopment,
     string? VerificationLinkBaseUrl,
+    CatalogOptions Catalog,
     JwtOptions Jwt,
     CredentialAttemptLimits CredentialAttempts);

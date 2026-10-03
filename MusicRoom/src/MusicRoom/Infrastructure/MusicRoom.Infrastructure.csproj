@@ -12,6 +12,10 @@
     <!-- SPEC-005 escalation 1, option B. Confined to this project: Application declares
          IAccessTokenIssuer and never learns which library signs the token — ADR-0028. -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <!-- SPEC-025. The catalog is an outbound HTTP call, and this gives it a typed client plus the
+         timeout, retry and circuit breaker `youtube-integration` requires — ADR-0003. Confined to this
+         project: Application declares ICatalogProvider and never learns that it is reached over HTTP. -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
   </ItemGroup>
 
 </Project>
