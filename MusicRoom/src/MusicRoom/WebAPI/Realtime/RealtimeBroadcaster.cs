@@ -31,19 +31,23 @@ internal sealed class RealtimeBroadcaster : IRealtimeBroadcaster
 
     private readonly IHubContext<PlaylistHub> _playlists;
     private readonly IHubContext<EventHub> _events;
+    private readonly IHubContext<ControlHub> _control;
     private readonly ILogger<RealtimeBroadcaster> _logger;
 
     /// <summary>Takes both hub contexts and the log.</summary>
     /// <param name="playlists">Where playlist groups live.</param>
     /// <param name="events">Where event groups live.</param>
+    /// <param name="control">Where the per-account control groups live.</param>
     /// <param name="logger">Where an undelivered notification is reported.</param>
     public RealtimeBroadcaster(
         IHubContext<PlaylistHub> playlists,
         IHubContext<EventHub> events,
+        IHubContext<ControlHub> control,
         ILogger<RealtimeBroadcaster> logger)
     {
         _playlists = playlists;
         _events = events;
+        _control = control;
         _logger = logger;
     }
 
@@ -92,6 +96,10 @@ internal sealed class RealtimeBroadcaster : IRealtimeBroadcaster
         PlaylistBroadcast => (PlaylistGroup(broadcast), PlaylistEventName(broadcast)),
         EventBroadcast => (EventGroup(broadcast), EventEventName(broadcast)),
 
+        // The group key here is a **person**, not a shared aggregate: `AggregateId` carries the recipient, which
+        // is what `user:{userId}` means — SPEC-022 decision 1.
+        ControlBroadcast => (ControlGroup(broadcast), ControlEventName(broadcast)),
+
         // The one payload that belongs to both: a session plays from an event or from a playlist, and its
         // listeners are grouped by whichever it is — SDD §9.2.
         NowPlayingChanged playback => (
@@ -128,6 +136,20 @@ internal sealed class RealtimeBroadcaster : IRealtimeBroadcaster
             broadcast.GetType().Name,
             "No EventHub event name is declared for this payload — SDD §9.2."),
     };
+
+    private static string ControlEventName(IRealtimeBroadcast broadcast) => broadcast switch
+    {
+        ControlGranted => ControlHub.ControlGrantedEvent,
+        ControlRevoked => ControlHub.ControlRevokedEvent,
+        ControlTakenOver => ControlHub.ControlTakenOverEvent,
+        _ => throw new ArgumentOutOfRangeException(
+            nameof(broadcast),
+            broadcast.GetType().Name,
+            "No ControlHub event name is declared for this payload — SDD §9.2."),
+    };
+
+    private IClientProxy ControlGroup(IRealtimeBroadcast broadcast) =>
+        _control.Clients.Group(ControlHub.Group(broadcast.AggregateId));
 
     private IClientProxy PlaylistGroup(IRealtimeBroadcast broadcast) =>
         _playlists.Clients.Group(PlaylistHub.Group(broadcast.AggregateId));

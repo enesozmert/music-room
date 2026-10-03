@@ -103,7 +103,7 @@ internal sealed class DeviceRepository : IDeviceRepository
             .ConfigureAwait(false);
 
     /// <inheritdoc />
-    public async Task<DeviceWriteOutcome> TryGrantControlAsync(
+    public async Task<DeviceGrantResult> TryGrantControlAsync(
         Guid deviceId,
         Guid ownerId,
         Guid granteeUserId,
@@ -111,6 +111,19 @@ internal sealed class DeviceRepository : IDeviceRepository
         CancellationToken cancellationToken)
     {
         DateTime nowUtc = DateTime.UtcNow;
+
+        // Read before the write and under the same token: whoever held control at this version is who the
+        // takeover notice belongs to. If the token turns out to be stale the update below matches nothing and
+        // this value is discarded with it, so it can never name somebody a concurrent grant has displaced —
+        // SPEC-022 decision 3.
+        Guid? previousController = await _context.Devices
+            .AsNoTracking()
+            .Where(device => device.Id == deviceId
+                && device.OwnerId == ownerId
+                && device.Version == expectedVersion)
+            .Select(device => device.ControllerUserId)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
 
         // The owner and the token are both in the predicate, so a caller who does not own the device and a
         // caller holding a stale token each update nothing — and the database decides which, under its own row
@@ -130,7 +143,7 @@ internal sealed class DeviceRepository : IDeviceRepository
 
         if (updated > 0)
         {
-            return DeviceWriteOutcome.Written;
+            return new DeviceGrantResult(DeviceWriteOutcome.Written, previousController);
         }
 
         bool ownsIt = await _context.Devices
@@ -138,7 +151,7 @@ internal sealed class DeviceRepository : IDeviceRepository
             .AnyAsync(device => device.Id == deviceId && device.OwnerId == ownerId, cancellationToken)
             .ConfigureAwait(false);
 
-        return ownsIt ? DeviceWriteOutcome.VersionMismatch : DeviceWriteOutcome.NotFound;
+        return ownsIt ? DeviceGrantResult.Stale : DeviceGrantResult.NotFound;
     }
 
     /// <inheritdoc />

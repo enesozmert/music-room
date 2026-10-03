@@ -427,7 +427,7 @@ endpoints with a different transport, and the same authorisation applies.
 | `ControlHub` | — | auto-joins `user:{userId}` on connect | `auth` |
 
 `PlaylistHub` is **implemented** at `/hubs/playlists` (SPEC-016) and `EventHub` at `/hubs/events`
-(SPEC-019). `ControlHub` stays design: its aggregate belongs to slice S7.
+(SPEC-019) and `ControlHub` at `/hubs/control` (SPEC-022). All three hubs of SDD §9.2 exist.
 
 ### Design notes
 
@@ -452,6 +452,14 @@ endpoints with a different transport, and the same authorisation applies.
   ([[ADR-0038-realtime-broadcast-posture]]). A refused write — a `412`, a `409`, a `404` — sends nothing.
 - Authentication uses the same JWT, via the documented SignalR `access_token` query parameter on
   the WebSocket handshake.
+- **`ControlHub` has no invocable method.** Its group is `user:{userId}`, taken from the validated token and
+  joined automatically on connect, so a client cannot ask to listen to somebody else's control because it cannot
+  ask at all. Nothing on it is audited: ADR-0019 audits hub **methods**, and the control changes themselves are
+  already audited on the REST side as `device.grant-control` and `device.release-control`.
+- **A control change tells both sides.** A grant sends `ControlGranted` to the grantee **and** the owner; a
+  revoke or release sends `ControlRevoked` to both; a grant that replaces an existing grant additionally sends
+  `ControlTakenOver` to the controller it displaced. The owner's other clients are as wrong as the grantee's
+  until they hear — the one that made the call got the `200`, and a phone in another pocket did not.
 - **Client context is captured at the handshake**, not per invocation — a hub call carries no HTTP
   headers. The three values go in the **query string** of the handshake (`platform`, `device`,
   `appVersion`); a header is accepted too, for a client that can set one. A handshake without all three
