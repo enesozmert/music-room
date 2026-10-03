@@ -17,9 +17,9 @@ MEMORY -> Project Registry -> Project Card -> Architecture / ADR / Standard -> S
 `music-room` is an École 42 group project: a collaborative music platform
 (Music Track Vote, Music Control Delegation, Music Playlist Editor).
 Backend is the current work scope and is **well past the skeleton**: identity, credential rate
-limits, the audit log, bearer authentication, profiles with per-field visibility, the friends graph and
-playlists all exist under
-`MusicRoom/`. **Do not trust a count written here.** `docs/specs/` holds one file per unit of work
+limits, the audit log, bearer authentication, profiles with per-field visibility, the friends graph,
+and all three graded services — Playlist Editor, Track Vote, Control Delegation with Playback —
+exist under `MusicRoom/`. **Do not trust a count written here.** `docs/specs/` holds one file per unit of work
 with its status, [[delivery-plan]] holds the slice order and each slice's `State`,
 [[migrations-index]] holds the schema history, and `docs/progress/PROGRESS.json` holds the counts,
 recounted by `.agent/progress.sh` on every merge that could move them; each is the authority for
