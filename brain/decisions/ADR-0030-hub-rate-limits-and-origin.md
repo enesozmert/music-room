@@ -7,6 +7,12 @@ date: 2026-09-27
 
 # ADR-0030 — Hub call limits and handshake origin
 
+> **Amended 2026-10-04: the numbers are set.** Owner decision — 5 concurrent connections per user,
+> 20 per IP, 60 hub invocations per connection per minute. They were deliberately left
+> `UNKNOWN - requires decision` below, and then S5 and S6 shipped both hubs without any of this
+> (issue O21), so the sentence about them belonging to the S5 spec no longer has a spec to live in.
+> They are here instead, and the work lands at S9.
+
 ## Context
 
 Realtime lands at slice S5. Three decisions already cover it and none of them covers abuse of the
@@ -46,8 +52,25 @@ header at all.
   the pipeline.
 - A refused invocation throws `HubException`. The trip is logged the way SPEC-006 logs a REST
   rate-limit trip: the hub and the method, the wait, and nothing that identifies the account.
-- The numbers are `UNKNOWN - requires decision`. They belong to the S5 spec, next to the hub
-  methods they bound, and they are set there, not here.
+- The numbers, owner decision 2026-10-04:
+
+  | Limit | Value |
+  |---|---|
+  | Concurrent connections per user | **5** |
+  | Concurrent connections per IP | **20** |
+  | Hub invocations per connection | **60 per minute** |
+
+  Five per user is a phone, a tablet and a reconnect in flight, with room to spare: a person
+  controlling playback from one device and watching a playlist from another is two, and a dropped
+  connection the server has not yet reaped is a third. Twenty per IP is the venue case — a shared
+  network at an event, which is precisely where ADR-0041 found the REST limiter partitioning on
+  address and refusing 98 per cent of a ten-user step. Sixty invocations a minute is one a second
+  sustained, against a client that joins a group and then mostly listens; a vote, a reorder or a
+  queue advance is a REST write, and those carry their own limits.
+
+  They are a starting point with a measurement behind the shape rather than the value: S9 has a
+  Gatling harness and `docs/load/REPORT.md`, so the first run after this lands says whether 60 is
+  generous or tight. Changing one is an amendment here, not a code review argument.
 
 ### The handshake is bound to `CORS_ALLOWED_ORIGINS`
 
