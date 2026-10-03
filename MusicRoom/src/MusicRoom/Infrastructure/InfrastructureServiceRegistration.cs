@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Infrastructure.Catalog;
@@ -20,8 +19,8 @@ public static class InfrastructureServiceRegistration
     /// <param name="services">The container being built.</param>
     /// <param name="options">Everything this layer needs from configuration, already validated.</param>
     /// <returns>The same collection, so calls chain.</returns>
-    /// <exception cref="InvalidOperationException">The host is not Development. There is no sender
-    /// that may run outside Development yet.</exception>
+    /// <exception cref="InvalidOperationException">No mail sender is configured for this host —
+    /// <see cref="MailOptions.Validate"/> states the rule.</exception>
     /// <remarks>
     /// One options record rather than a parameter per setting: SPEC-005 left this method at five
     /// arguments, which is the .editorconfig limit (S107, proven live in S0 at six), and SPEC-006 needs
@@ -45,25 +44,15 @@ public static class InfrastructureServiceRegistration
         services.AddSingleton<ICredentialAttemptLimiter>(_ =>
             new InMemoryCredentialAttemptLimiter(options.CredentialAttempts, TimeProvider.System));
 
-        // No silent fallback. Outside Development the only available sender would write a live
-        // credential into a production log, so the host fails loudly instead — the guard the
-        // repository owner accepted for T-26 on 2026-09-26.
-        if (!options.IsDevelopment)
-        {
-            throw new InvalidOperationException(
-                "No IMailService may be registered outside Development: the only implementation "
-                + "writes the email verification link to the log. The hosted provider is O17, "
-                + "slice S1a.");
-        }
+        // No silent fallback, and no host without a sender. SPEC-024 replaced the Development-only guard
+        // with this one: the configuration names a provider, and start-up fails when it names nothing
+        // valid for this environment — T-26, ADR-0013.
+        MailServiceRegistration.Add(services, options.Mail, options.IsDevelopment);
 
         // The catalog: the provider client with its resilience pipeline, and ADR-0023's two cache levels in
         // front of it. Delegated for the same reason the mail sender is — this method is at the argument
         // limit, and a provider concern belongs with its own wiring.
         CatalogRegistration.Add(services, options.Catalog);
-
-        services.AddSingleton<IMailService>(provider => new LoggingMailService(
-            provider.GetRequiredService<ILogger<LoggingMailService>>(),
-            options.VerificationLinkBaseUrl));
 
         return services;
     }
@@ -75,11 +64,10 @@ public static class InfrastructureServiceRegistration
 /// </summary>
 /// <param name="BCryptWorkFactor">The cost from configuration. The hasher clamps it up to the ADR-0007
 /// floor, so a configuration mistake cannot weaken storage.</param>
-/// <param name="IsDevelopment">True when the host environment is Development. The only sender that
-/// exists writes the verification link to the log, so this flag decides whether the application may
-/// start at all.</param>
-/// <param name="VerificationLinkBaseUrl">Where the client serves the verification screen, from
-/// configuration. Nothing here substitutes a default for it.</param>
+/// <param name="IsDevelopment">True when the host environment is Development. One sender — the one that
+/// writes the verification link and the reset token to the log — may run there and nowhere else.</param>
+/// <param name="Mail">Which sender to register and what it needs, including the two link base URLs.
+/// Nothing here substitutes a default for either of them.</param>
 /// <param name="Catalog">The YouTube key and the two cache lifetimes — ADR-0003, ADR-0023.</param>
 /// <param name="Jwt">The signing key, issuer, audience and access-token lifetime.</param>
 /// <param name="CredentialAttempts">The per-account credential limits — SPEC-006 escalation 1.</param>
@@ -90,7 +78,7 @@ public static class InfrastructureServiceRegistration
 public sealed record InfrastructureOptions(
     int BCryptWorkFactor,
     bool IsDevelopment,
-    string? VerificationLinkBaseUrl,
+    MailOptions Mail,
     CatalogOptions Catalog,
     JwtOptions Jwt,
     CredentialAttemptLimits CredentialAttempts);
