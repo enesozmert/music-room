@@ -744,6 +744,7 @@ engineering decision; an unwritten one is an oversight.
 | Database | S0-S3 a **local PostgreSQL container**; S4 onward Supabase Free tier, Frankfurt -- [[ADR-0026-environment-bring-up]] | same engine, same migrations, different connection string |
 | Client | user devices | React Native, built by the second team member after the backend slices land |
 | CI | GitHub Actions, separate `dev` and `prod` configurations, plus an independent client job | builds and tests; **does not deploy** |
+| Merging | `main` requires the `gate` check and `enforce_admins`; **not** that a branch be up to date, since merge queue is unavailable on this plan -- [[ADR-0040-pull-requests-need-not-be-up-to-date]]. Auto-merge lands a pull request when `gate` is green | `backend-prod` runs on every push to `main`, so a semantic conflict two green pull requests create together is red within minutes |
 | Observability | Serilog to stdout; OpenTelemetry exporter configuration-driven, **off by default** -- [[ADR-0022-observability-stack]] | switched on for a load run |
 | Secrets | `EnvSecretProvider` for the everyday loop; `InfisicalSecretProvider` behind the same abstraction, vault self-hosted in the compose stack under a `vault` profile -- [[ADR-0029-containerised-dev-and-secret-vault]] | **required scope.** The abstraction lands early, the vault at S1b, and the delivered system runs on it |
 
