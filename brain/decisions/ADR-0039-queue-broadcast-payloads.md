@@ -11,7 +11,7 @@ date: 2026-10-01
 
 [[signalr-realtime]] and [[sdd]] §9.2 require that *every payload carries the aggregate id and a
 monotonic `version`, so a client that missed a message can detect the gap and resynchronise over REST*.
-`PlaylistHub` satisfies that literally ([[ADR-0035-realtime-broadcast-posture]]): a playlist row carries
+`PlaylistHub` satisfies that literally ([[ADR-0038-realtime-broadcast-posture]]): a playlist row carries
 `xmin`, every track write touches that row, and the version in the payload is the same token the REST
 `ETag` carries.
 
@@ -66,4 +66,4 @@ what makes this work.
 - **Send the whole ordered queue on every change.** Correct and simple, and it sends a page per vote to
   every listener on a mobile network. `signalr-realtime` says keep payloads small.
 
-Extends [[ADR-0035-realtime-broadcast-posture]] · implements part of [[ADR-0004-realtime-signalr]].
+Extends [[ADR-0038-realtime-broadcast-posture]] · implements part of [[ADR-0004-realtime-signalr]].

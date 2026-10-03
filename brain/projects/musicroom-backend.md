@@ -104,7 +104,8 @@ written down twice.
 - **The decisions taken during S1 to S3 are now recorded as ADRs**, so deleting a spec loses nothing:
   [[ADR-0036-access-token-mechanics]], [[ADR-0037-credential-rate-limiting]],
   [[ADR-0032-refresh-token-lifetime]], [[ADR-0033-audit-write-posture]] and
-  [[ADR-0034-profile-storage-and-visibility]]. ADR-0030 and ADR-0031 amend
-  [[ADR-0021-backend-dependency-set]]; ADR-0030 amends [[sdd]] §13.1's claim list. Accepted ADRs are never
+  [[ADR-0034-profile-storage-and-visibility]]. [[ADR-0036-access-token-mechanics]] and
+  [[ADR-0037-credential-rate-limiting]] amend [[ADR-0021-backend-dependency-set]];
+  [[ADR-0036-access-token-mechanics]] amends [[sdd]] §13.1's claim list. Accepted ADRs are never
   edited — a later change supersedes one.
 - Owner: one backend developer. The React Native client is a parallel workstream owned by the second team member ([[musicroom-mobile]]).
