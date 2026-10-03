@@ -10,8 +10,9 @@ updated: 2026-09-23
 
 How to get from the subject PDF to a defensible submission.
 
-**Status: S0 through S2 are done and S3 has started.** The identity surface, the credential rate limits,
-the audit log, bearer authentication and own-profile editing are built; each unit is a spec in
+**Status: S0 through S2, S5, S6 and S7 are merged; S3 is still open.** The identity surface, the credential
+rate limits, the audit log, bearer authentication, own-profile editing, the Playlist Editor, Track Vote and
+Control Delegation with Playback are built — all three services subject V.2 asks for; each unit is a spec in
 `docs/specs/`, which is where the statuses live — this plan deliberately does not count them, because a
 count written in two places is wrong in one of them within a day. The counted figures are
 `docs/progress/PROGRESS.json`, and the `State` column of the slice table below is what the script
@@ -190,9 +191,9 @@ got.
 | S3 | Profile | three visibility tiers, per-field server-side filtering, music preferences | V.1 | in progress |
 | S3a | OpenAPI UI | `Swashbuckle.AspNetCore.SwaggerUI` 10.2.3 over the document `AddOpenApi()` already serves, registered inside the Development branch only — [[ADR-0035-swagger-ui-for-the-openapi-document]] | owner requirement | not started |
 | S4 | Catalog | YouTube adapter, `TrackRef`, caching, quota discipline | III | not started |
-| S5 | Playlist Editor | REST + `PlaylistHub` + sparse ordering + concurrency token + parallel reorder tests | V.2.3 | not started |
-| S6 | Track Vote | REST + `EventHub` + unique-index vote arbitration + licence policy incl. geofence and event code + parallel vote tests | V.2.1 | not started |
-| S7 | Control Delegation + Playback | `PlaybackSession`, queue advance, device state machine, `ControlHub`, per-device licence | V.2.1, V.2.2 | not started |
+| S5 | Playlist Editor | REST + `PlaylistHub` + sparse ordering + concurrency token + parallel reorder tests | V.2.3 | merged |
+| S6 | Track Vote | REST + `EventHub` + unique-index vote arbitration + licence policy incl. geofence and event code + parallel vote tests | V.2.1 | merged |
+| S7 | Control Delegation + Playback | `PlaybackSession`, queue advance, device state machine, `ControlHub`, per-device licence | V.2.1, V.2.2 | merged |
 | S8 | OpenID Connect, both roles | **Relying party:** Google and Facebook through one discovery-driven validation core, acquisition branching only — Google authorization code + PKCE `S256`, Facebook Limited Login ([[ADR-0008-oidc-social-login]]). **Provider:** the API's own discovery document, JWKS, authorization and token endpoints, ID token and UserInfo, replacing the sign-in surface S1 shipped ([[ADR-0031-musicroom-as-openid-provider]]). Account linking | V.1, V.5 | not started |
 | S9 | Capacity + conformance evidence | Gatling simulations under `tests/load/`, `docs/load/REPORT.md`; fill the Verified column in [[threat-register]] and the evidence in [[asvs-conformance]] | V.7, V.6 | not started |
 ### Why this order
