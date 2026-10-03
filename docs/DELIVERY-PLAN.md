@@ -195,7 +195,7 @@ got.
 | S6 | Track Vote | REST + `EventHub` + unique-index vote arbitration + licence policy incl. geofence and event code + parallel vote tests | V.2.1 | merged |
 | S7 | Control Delegation + Playback | `PlaybackSession`, queue advance, device state machine, `ControlHub`, per-device licence | V.2.1, V.2.2 | merged |
 | S8 | OpenID Connect, both roles | **Relying party:** Google and Facebook through one discovery-driven validation core, acquisition branching only — Google authorization code + PKCE `S256`, Facebook Limited Login ([[ADR-0008-oidc-social-login]]). **Provider:** the API's own discovery document, JWKS, authorization and token endpoints, ID token and UserInfo, replacing the sign-in surface S1 shipped ([[ADR-0031-musicroom-as-openid-provider]]). Account linking | V.1, V.5 | not started |
-| S9 | Capacity + conformance evidence | Gatling simulations under `tests/load/`, `docs/load/REPORT.md`; fill the Verified column in [[threat-register]] and the evidence in [[asvs-conformance]] | V.7, V.6 | not started |
+| S9 | Capacity + conformance evidence | Gatling simulations under `tests/load/`, `docs/load/REPORT.md`; the hub call limits and handshake origin of [[ADR-0030-hub-rate-limits-and-origin]], which S5 and S6 shipped without — issue O21; fill the Verified column in [[threat-register]] and the evidence in [[asvs-conformance]] | V.7, V.6 | not started |
 ### Why this order
 
 - **S0 first.** Subject IV.1 requires a fresh clone to install its dependencies automatically.
