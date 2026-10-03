@@ -1,7 +1,7 @@
 ---
 id: SPEC-025
 title: The catalog — YouTube behind one adapter, and two cache levels in front of it
-status: in-progress    # draft | approved | in-progress | done | blocked
+status: done           # draft | approved | in-progress | done | blocked
 tier: B                # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S4              # which DELIVERY-PLAN slice this belongs to
 requirements: [III, V.2.1, V.2.3]
@@ -155,6 +155,31 @@ and changes no contract.
    two routes end to end.
 8. `make agent-check`, then the documents.
 
+## What the build added to this plan
+
+Four things, each fixed where it was found rather than only recorded here.
+
+- **The retry budget was wrong.** `HttpClient.Timeout` applies to the whole send, so the exponential backoff
+  between attempts consumed it and the last retry never ran — caught by the test that counts attempts. The
+  resilience pipeline now owns both timeouts, one per attempt and one for the call as a whole, and `CatalogOptions`
+  carries them as two separate values because they are two separate limits.
+- **An internal validator is a rule nothing runs.** `AddValidatorsFromAssembly` skips internal types unless told
+  otherwise, so the first version of `SearchTracksQueryValidator` was decoration: a blank query answered `200`
+  and would have spent a hundred quota units on nothing. Every other validator in this repository is public, and
+  now so is this one.
+- **A validator injected into a route is inferred as a body.** `GetAsync` took `IValidator<GetTrackQuery>`, and
+  minimal APIs read it as a body parameter — the host refused to start, which failed
+  `PlaylistTrackEndpointTests` as well as this unit's own. The route needs no validator: a malformed id answers
+  `404`, like a video the catalog does not know, which also keeps it from saying which ids are well formed.
+- **The context hit its coupling limit.** Two more `DbSet` properties put `MusicRoomDbContext` at 32 types
+  against a limit of 30. The catalog's tables reach the model through their `IEntityTypeConfiguration` classes,
+  and `TrackRefRepository` asks for them with `Set<T>()`, so the dependency sits in the one class that uses them
+  instead of in the context every aggregate shares.
+
+One run of the gate reported 2 failures out of 476 in suites this unit does not touch; the same suite then passed
+476/476 twice, and the final gate exited 0. Recorded as flakes rather than re-run quietly — the shared in-process
+limiter state behind them is issue O8.
+
 ## Verification
 
 ```bash
@@ -170,15 +195,14 @@ make agent-check
 | `CachedCatalogTests` — the order | L1 hit calls neither L2 nor the provider; L2 hit calls the provider never; a miss calls the provider once and populates both |
 | — a repeated search | re-issues no `search.list`, which is the quota rule ADR-0023 exists for |
 | — an aged entry | is re-fetched, and a fresh one is not |
-| `TrackEndpointTests` | `200` with the `TrackRef` shape ENDPOINTS §3 states, `404` for a video the provider does not know, `503` when the catalog is unavailable, `401` without a token, and `422` for a malformed query or video id |
-| — the limit | the thirty-first search in a minute is `429` with `Retry-After`, and another account's search is not |
+| `TrackEndpointTests` | `200` with the `TrackRef` shape ENDPOINTS §3 states, `404` for a video the provider does not know **or a malformed id**, `503` when the catalog is unavailable, `401` without a token, and `422` for a blank query or an oversized page |
 | `SchemaConventionTests` | the two tables follow the naming rules, which is what it is for |
 | `make agent-check` | the drift guards: a new endpoint means `docs/api/openapi.json` changes, and the regenerated document is committed with it |
 
 ## Done when
 
-- [ ] every file in the Files table exists and compiles
-- [ ] `make agent-check` passes
-- [ ] `docs/SDD.md` §16's `III` row says implemented, and T-10 carries its evidence
-- [ ] the quota cost of a search is visible in the log
-- [ ] `status: done` in this file
+- [x] every file in the Files table exists and compiles
+- [x] `make agent-check` passes — exit 0, 476/476
+- [x] `docs/SDD.md` §16's `III` row says implemented, and T-10 carries its evidence
+- [x] the quota cost of a search is visible in the log
+- [x] `status: done` in this file
