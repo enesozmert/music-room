@@ -684,6 +684,17 @@ charge every attempt, because the cost is in the attempt rather than in its outc
 compiled in and overridable from configuration; a non-positive override is ignored, so configuration
 cannot switch a limit off.
 
+The vote and venue-code routes carry their own policies, keyed on the **validated account** rather than
+the address: 60 votes a minute and 10 codes in 5 minutes (SPEC-018). An event is a room full of people
+on one network, so an address key would make them share one allowance — which is exactly what happened
+until SPEC-023's load measurement found it. The limiter middleware ran before authentication, so the
+partition key saw no claims and silently took its address fallback.
+[[ADR-0041-limiter-after-authentication]] fixed the order: authentication, then the limiter, then
+authorisation, then the client-context middleware. The limiter still runs before any handler and any
+database work, so a flood is still refused cheaply — the load report measures a refusal at about one
+millisecond. `EventVoteRateLimitingTests` is the regression: two accounts on one address, and the
+second must still be able to vote.
+
 ### 13.4 Audit log — mandatory, and distinct from application logging
 
 | | Audit log | Application log |
@@ -787,19 +798,33 @@ project failure.
 
 ### 14.4 Capacity
 
-Tool: **Gatling**, from its Docker image, simulations committed under `tests/load/` --
-[[ADR-0018-load-testing-tool]]. It is named in the subject and supports WebSocket natively, so one
-methodology covers both REST throughput and SignalR fan-out.
+Tool: **Gatling**, simulations committed under `tests/load/` -- [[ADR-0018-load-testing-tool]]. It
+is named in the subject and supports WebSocket natively, so one methodology covers both REST
+throughput and SignalR fan-out. It runs as `gatling-maven-plugin` inside `maven:3-eclipse-temurin-21`
+and not from a Gatling image, because no official Gatling image resolves; SPEC-023 records the
+deviation with its probe evidence.
 
-Subject R1 V.7 requires a measured and justified concurrent-user figure with the server
-specification declared. The report at `docs/load/REPORT.md` does not exist yet. REST throughput
-and SignalR connection fan-out are measured **separately** — they are different limits. See
-[[load-testing]].
+**Measured on 2026-10-03 — `docs/load/REPORT.md`.** Five scenarios, five steps each from 10 to 200
+concurrent, against one API container and one PostgreSQL container on an Apple M5 Pro whose Docker VM
+had 15 CPUs and 7.75 GiB. The stated figure is **100 concurrent users performing contended writes,
+and 200 reading or listening, on that machine**. REST throughput and SignalR connection fan-out are
+measured separately — they are different limits. See [[load-testing]].
 
-The API is on-premise and the database is off-premise: latency to Frankfurt is inside every
-measured number, and the report must say so rather than gloss over it. Confirm the free tier's
-current connection ceiling and quotas on the day of the run -- the connection ceiling, not
-storage, is the operative limit.
+The bottleneck is **PostgreSQL's connection count, not CPU**: at 200 concurrent collaborators a
+quarter of the reads answered `500` with `53300: sorry, too many clients already` while 62% of the
+VM's CPU was still idle. Npgsql's default maximum pool size equals the server's default
+`max_connections`, so the pool may ask for more connections than the server will give. The pair of
+numbers that fixes it is a deployment decision and is issue O22.
+
+The measurement also found a defect in shipped code: the rate limiter ran before authentication, so
+SPEC-018's per-account vote policy partitioned on the remote address and a whole venue shared one
+allowance. [[ADR-0041-limiter-after-authentication]] fixes the order, §13.3 records it, and the
+re-measurement is in the report.
+
+The figure above is for this machine and this topology only. The API is on-premise and the database
+is off-premise once S4 lands: latency to Frankfurt will be inside every number measured then, and
+Supabase's pooler changes the connection ceiling entirely, so that run is a new measurement rather
+than a correction of this one.
 
 ---
 
@@ -881,8 +906,8 @@ table to walk through at defence.
 | V.6 | brute force and session theft protections | §13.1, §13.3 | **implemented** -- **brute force:** every credential endpoint carries a per-IP policy (one per endpoint, so a registration loop cannot spend the sign-in allowance) and a per-account counter with progressive backoff, answering `429` with `Retry-After` and an empty body; the numbers are in §13.3 and the trip is logged without naming the account. **Session theft:** refresh tokens are stored only as SHA-256 digests, rotate on every use through a `consumed_at_utc IS NULL AND revoked_at_utc IS NULL AND expires_at_utc > @now` conditional update, and presenting an already-rotated token revokes the whole family in the same transaction. Parallel tests prove both concurrency claims: 20 concurrent rotations of one token produce exactly one `200`, one spent row and one replacement. Remaining gap, recorded and not silent: limiter state is per process, so several instances would each hold their own -- O8 |
 | V.6 | document remaining threats | §13.6, [[threat-register]] | **partly implemented** -- the register's table carries 29 rows and its Accepted section carries one more residual risk, T-30, so the highest id is ahead of the row count by design. The Verified column is filled for every threat a shipped slice closed or bounded: T-01, T-06, T-11, T-12, T-17, T-19, T-25, T-26, T-27, T-28 and T-29 all name tests or code paths, and T-30 is accepted with its reasoning rather than verified. The rows still empty belong to slices that do not exist yet. Issue **O20** -- renumbered from O19 when the OpenID Provider work claimed that id -- is the one item §13.2 claimed and did not have |
 | V.6 | log platform, device, app version per action | §10.7, §13.4, [[ADR-0019-hub-action-auditing]] | **partly implemented** -- **REST is done:** middleware refuses any mutating request that omits `X-Client-Platform`, `X-Client-Device` or `X-Client-App-Version` with a bodiless `400`, and an `AuditBehaviour` writes exactly one `audit_records` row per handled command, carrying those three values plus the action, the target type, the trace id and the instant. The record is written **inside the command's transaction**, so an effect without a record cannot exist and a record without an effect cannot either; if the audit write fails the whole command fails (owner decision, 2026-09-27, fail closed). A command refused by validation leaves no record. `user_id` is null on every row until an endpoint authenticates its caller, because every mutating endpoint that exists is anonymous -- stated, not hidden, and it is now populated wherever the handler knows the account. Since SPEC-009 the row also says **what became of** the action — `completed`, `refused`, `throttled`, `expired` or `reusedetected` (§13.4) — so a failed login, a rejected token and a detected refresh-token family revocation are each visible as themselves. A throttled credential attempt is recorded too, which needed the limiter's refusal to stop being an exception. **The hub is covered too** (SPEC-016): `PlaylistHub` captures the three values at the handshake — from the query string, because a WebSocket handshake carries no headers — and the same middleware answers `400` when any is missing, so an unattributable action is impossible on either transport. A global hub filter writes the same record for `JoinPlaylist` and `LeavePlaylist`, with `completed` or `refused`, so the audit table has one schema and one query surface. Connect and disconnect stay out on purpose: mobile reconnect noise would bury the deliberate actions (ADR-0019) |
-| V.7 | measure and justify concurrent users | §14.4, [[ADR-0018-load-testing-tool]] | tool decided; measurement not started |
-| V.7 | declare server specification | §14.1, [[ADR-0015-hosting-and-deployment]], [[ADR-0016-supabase-plan-region]] | machine and region decided; measurement not started |
+| V.7 | measure and justify concurrent users | §14.4, `docs/load/REPORT.md`, `tests/load/` | **done** — five Gatling scenarios, 10 to 200 concurrent; 100 concurrent writers and 200 readers on the declared machine, with the bottleneck named (PostgreSQL connections, not CPU) and O22 opened for it |
+| V.7 | declare server specification | §14.4, `docs/load/REPORT.md` §1 | **done** — host and Docker VM both declared, because only one of them is the system under test. The hosted figure is a separate measurement once O11 and S4 land |
 | V.6 | OWASP conformance of all code | [[asvs-conformance]], §13 | target committed, evidence pending |
 | V.8 | per-layer tests | [[testing]], [[ADR-0012-test-stack]] | **partly implemented** -- tests in four projects, the count being whatever `make agent-check` prints rather than a number that rots here: validation and pipeline behaviours (`MusicRoom.Application.Tests`), infrastructure (`MusicRoom.Infrastructure.Tests`), persistence (`MusicRoom.Persistence.Tests`, which holds the built model to the schema naming conventions without needing an engine) and API integration (`MusicRoom.WebAPI.Tests`, Testcontainers-backed against a real PostgreSQL). Every slice with a contended write carries the parallel test AGENTS.md requires, each asserting final database state rather than status codes alone: one row from 20 parallel registrations of an address; one `204` and one `consumed_at_utc` from 20 verifications of a token; one `200`, one spent row and one replacement from 20 refresh-token rotations; one `204` and no live refresh token from 20 password resets; one friendship from 20 accepts; one `200` and nineteen `412` from 20 playlist reorders; twenty votes and a count of twenty from twenty accounts, against one row from 20 votes by one account; one spent venue code; one controller from 20 simultaneous claims; and one track advanced from 20 parallel advances. **The realtime layer is tested too** -- three hub suites and three broadcast suites drive a real SignalR client against the test host. The domain layer has no tests of its own: its types carry no behaviour worth isolating, which is a consequence of the anaemic shape ADR-0028 chose and is stated here rather than left as a gap |
 | V.8 | continuous integration | [[ci-cd-containerization]] | **done** -- `.github/workflows/backend-dev.yml` and `backend-prod.yml`: restore, format, build -warnaserror, test, vulnerable-package scan, OpenAPI drift check; prod also builds the image. No deployment, by [[ADR-0015-hosting-and-deployment]] |
@@ -919,6 +944,7 @@ defence, not more.
 | O19 | RS256 key pair: generation, storage, JWKS exposure and rotation with an overlap window | the OpenID Provider surface at S8 | [[ADR-0031-musicroom-as-openid-provider]]. `EnvSecretProvider` holds the private key until the vault lands at S1b, after which it belongs there. Rotation needs an overlap so tokens signed by the outgoing key keep verifying |
 | O20 | PostgreSQL Row Level Security policies are not written | nothing — it is defence in depth | §13.2 claimed RLS was enabled; no migration creates a policy. Opened by the SPEC-013 SDD sync on 2026-09-29. Deny-by-default policies on the per-account tables would mean a query that forgot its `WHERE` returns nothing rather than everything. Cost: every read path needs a session variable carrying the caller, which the current single-connection-pool design does not set |
 | O21 | Hub call limits and handshake origin are decided and not built | V.6, and T-12 in [[threat-register]] | [[ADR-0030-hub-rate-limits-and-origin]] was accepted on 2026-09-27 and S5 shipped `PlaylistHub` and S6 `EventHub` without it: no concurrent-connection ceiling, no per-connection invocation limit, no `Origin` check on the handshake. `RequireRateLimiting` guards the REST credential endpoints only. One authorised connection can spend an event's write path at request rate. Moved to S9 with the other conformance work; **the numbers the ADR left as `UNKNOWN - requires decision` are still owed** |
+| O22 | Npgsql pool size and PostgreSQL `max_connections` are not set against each other | the V.7 figure above 100 concurrent writers | opened by SPEC-023's measurement on 2026-10-03. Both default to 100 and the server reserves superuser slots, so the pool may ask for connections the server will not give and the request fails with `53300` instead of queueing. Capping the pool below `max_connections` fixes the failure mode; raising `max_connections` moves the ceiling. **Not fixed here on purpose:** S4 moves `DATABASE_URL` to Supabase, whose pooler changes the arithmetic, and [[load-testing]] requires the change and its re-measurement in one unit |
 | O16 | OpenTelemetry must earn its place | credibility of the V.7 bottleneck claim | [[ADR-0022-observability-stack]]: capture one trace during the Gatling run showing EF Core, HttpClient and total request time together |
 
 ### Closed

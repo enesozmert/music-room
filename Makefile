@@ -31,8 +31,26 @@ test: ## run the full test suite
 lint: ## formatting is the single .editorconfig authority
 	dotnet format $(SOLUTION) --verify-no-changes
 
-load: ## run the load scenario
-	@echo "make load: no simulation yet. Gatling scenarios arrive with slice S9 — see load-testing."
+# Gatling runs through its own Maven plugin inside the first-party `maven` image: no official Gatling
+# image resolves from this registry, and the one that does is an unmaintained third-party mirror —
+# SPEC-023 decision 1. SCENARIO picks one simulation; with none, all five run.
+LOAD_IMAGE := maven:3-eclipse-temurin-21
+LOAD_SIMULATION_queue-read := musicroom.QueueReadSimulation
+LOAD_SIMULATION_vote-storm := musicroom.VoteStormSimulation
+LOAD_SIMULATION_reorder    := musicroom.PlaylistReorderSimulation
+LOAD_SIMULATION_fan-out    := musicroom.HubFanOutSimulation
+LOAD_SIMULATION_login      := musicroom.LoginBurstSimulation
+
+load: ## run a Gatling scenario against the compose stack: make load SCENARIO=vote-storm
+	@test -d tests/load/seed/out || { \
+		echo "make load: no seed. Run tests/load/seed/seed.sh against a running stack first."; exit 1; }
+	docker run --rm --network host \
+		-v "$(PWD)/tests/load:/load" -v "$(HOME)/.m2:/root/.m2" \
+		-w /load \
+		-e MUSICROOM_BASE_URL="$${MUSICROOM_BASE_URL:-http://localhost:8080}" \
+		-e MUSICROOM_SEED_DIR=/load/seed/out \
+		$(LOAD_IMAGE) mvn -q -B gatling:test \
+		$(if $(SCENARIO),-Dgatling.simulationClass=$(LOAD_SIMULATION_$(SCENARIO)),)
 
 # The generator boots the host, which requires DATABASE_URL. This placeholder is not a secret and
 # never opens a socket: only a request to /health/ready connects.

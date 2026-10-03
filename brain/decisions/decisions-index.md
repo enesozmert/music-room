@@ -48,5 +48,6 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0038-realtime-broadcast-posture]] | A handler queues a broadcast; a behaviour sends it after the commit | Accepted | landed |
 | [[ADR-0039-queue-broadcast-payloads]] | An `EventHub` payload carries the authoritative value, not a row version | Accepted | landed |
 | [[ADR-0040-pull-requests-need-not-be-up-to-date]] | A pull request need not be up to date with `main` to merge | Accepted | landed |
+| [[ADR-0041-limiter-after-authentication]] | The rate limiter runs after authentication, so a per-account limit is per account | Accepted | landed |
 
 Related: [[MEMORY]] · [[system-overview]] · [[standards-router]]

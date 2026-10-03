@@ -38,3 +38,8 @@ reference/
 
 # Claude Code: personal settings stay out of the shared configuration.
 .claude/settings.local.json
+
+# Load harness output. The Gatling reports and the seeded ids both belong to one throwaway run
+# against one throwaway database — SPEC-023.
+tests/load/target/
+tests/load/seed/out/
