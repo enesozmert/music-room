@@ -64,13 +64,16 @@ public class Program
         WebApplication app = builder.Build();
 
         app.UseSerilogRequestLogging();
-        app.UseRateLimiter();
 
-        // Order is load-bearing. The limiter stays first, so a flood is refused before the server verifies a
-        // signature — SPEC-006. Authentication comes next, so the client-context middleware can put the
-        // validated `sub` into the audit record — SPEC-010. The client-context middleware is last of the
-        // three, so a request the limiter refuses is not answered 400 for a missing header — SPEC-008.
+        // Order is load-bearing, and this is the order ADR-0040 settled after SPEC-023 measured the vote
+        // route. Authentication comes first, because the per-account policies partition on the validated
+        // `sub` and a limiter that runs before it sees no claims and silently falls back to the address —
+        // which turned a per-account vote limit into one bucket for a whole venue. The limiter comes next,
+        // before authorisation and before any handler, so a flood is still refused before the request
+        // reaches the database. The client-context middleware is last, so a request the limiter refuses is
+        // not answered 400 for a missing header — SPEC-008.
         app.UseAuthentication();
+        app.UseRateLimiter();
         app.UseAuthorization();
         app.UseMiddleware<ClientContextMiddleware>();
 
