@@ -110,8 +110,11 @@ the project subject forbids committing third-party source.
   `gh pr create --draft`. One pull request per spec.
 - **Never** push to `main` or any branch other than the spec's own. Never `--force`, never
   `reset --hard`, never `rebase`, never delete a remote branch or tag.
-- **Never** mark a pull request ready for review, merge it, enable auto-merge, or approve it.
-  Those two decisions belong to a human.
+- **Never** mark a pull request ready for review, merge it directly, or approve it.
+- **Auto-merge is allowed and expected** — `gh pr merge --auto --merge` on the spec's own pull
+  request. Repository auto-merge is on, so GitHub merges it once the required `gate` check passes
+  and never before ([[ADR-0027-agent-push-and-pr]], amended 2026-10-03). `gate` is therefore the
+  whole of review: a defect it does not catch reaches `main` unread. Run `/review-diff` yourself.
 - A blocked or environment result pushes nothing. The work stays local and the diff is the evidence.
 - Refuse to start a run on a dirty working tree.
 

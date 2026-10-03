@@ -18,6 +18,24 @@ cheapest part of the work.
 Pushing is an outward action. A misfiring cycle would write to the remote, and that is exactly
 what the prohibition prevented. Removing it needs something better than a promise in a prompt.
 
+> **Amended 2026-10-03: the repository carries auto-merge, and the gate is the reviewer.**
+>
+> Owner decision. Pull requests piled up waiting for a human to type `gh pr merge`, which is the
+> same backlog that produced two stacks and everything they cost (`AGENTS.md` §5b). Repository
+> auto-merge is now on, and a pull request whose required `gate` check passes merges by itself.
+>
+> What that changes in the list below: **`--auto` merge is no longer forbidden.** Marking a pull
+> request ready for review, merging it directly, and approving one still are. The agent's hands
+> stay off the merge button; GitHub presses it when `gate` is green.
+>
+> What that costs, stated rather than discovered: nobody reads the diff before it lands. `gate`
+> becomes the whole of review — restore, format, build `-warnaserror`, test, the vulnerable-package
+> scan and the OpenAPI drift check. A defect those six do not catch reaches `main` unread. The
+> trade was taken knowing it: a pull request nobody merges is not reviewed either, it is only
+> delayed.
+>
+> `/review-diff` is the compensating control and it is a human's to run, before or after the merge.
+
 ## Decision
 
 At stage 5, **after** `RESULT: pass`, the agent:
@@ -34,7 +52,7 @@ One pull request per spec. Nothing else changes about the git protocol from
 - `--force` in any form, on any branch
 - deleting a remote branch or a tag
 - marking a pull request ready for review
-- merging, `--auto` merge, or approving
+- merging directly, or approving
 - reopening, closing or editing anyone else's pull request
 
 ### What makes this safe rather than hopeful
