@@ -65,8 +65,8 @@ public sealed class HubLimitTests : IAsyncLifetime
         await using HubConnection third = HubClients.Build(factory, token);
 
         // Act
-        await first.StartAsync(TestContext.Current.CancellationToken);
-        await second.StartAsync(TestContext.Current.CancellationToken);
+        await SettledStartAsync(first);
+        await SettledStartAsync(second);
 
         // Assert — the third is refused, and the two that hold slots are untouched.
         await Assert.ThrowsAnyAsync<Exception>(
@@ -94,14 +94,18 @@ public sealed class HubLimitTests : IAsyncLifetime
         string token = await TokenAsync(factory, "hub-ceiling-release@example.com");
 
         HubConnection first = HubClients.Build(factory, token);
-        await first.StartAsync(TestContext.Current.CancellationToken);
+        await SettledStartAsync(first);
 
         // Act — close it, then connect again.
         await first.StopAsync(TestContext.Current.CancellationToken);
         await first.DisposeAsync();
 
         await using HubConnection second = HubClients.Build(factory, token);
-        await second.StartAsync(TestContext.Current.CancellationToken);
+
+        // The slot is released in OnDisconnectedAsync, which a closed connection cannot round-trip
+        // against, so the reconnect is retried inside a bounded window rather than assumed to be
+        // instant. A ceiling that never released would exhaust every attempt and fail here.
+        await RetryStartAsync(second);
 
         // Assert
         Assert.Equal(HubConnectionState.Connected, second.State);
@@ -125,7 +129,7 @@ public sealed class HubLimitTests : IAsyncLifetime
         await using HubConnection other = HubClients.Build(factory, second);
 
         // Act
-        await held.StartAsync(TestContext.Current.CancellationToken);
+        await SettledStartAsync(held);
 
         // Assert — a different account from the same address is refused, which is the whole point of the key.
         await Assert.ThrowsAnyAsync<Exception>(
@@ -236,6 +240,54 @@ public sealed class HubLimitTests : IAsyncLifetime
         client.Dispose();
 
         return pair.AccessToken;
+    }
+
+    /// <summary>Starts a connection and waits until the server has certainly taken its slot.</summary>
+    /// <remarks>
+    /// <c>StartAsync</c> returns when the handshake completes, which is <b>before</b> <c>OnConnectedAsync</c>
+    /// has run — and <c>OnConnectedAsync</c> is where the slot is taken (SPEC-026 decision 2). A round trip
+    /// through a hub method is the barrier: the server cannot answer an invocation until the lifetime step
+    /// before it has finished. Leaving a group nothing joined is the cheapest one available, and
+    /// <c>LeavePlaylist</c> is <c>Groups.RemoveFromGroupAsync</c> and nothing else.
+    /// <para>
+    /// Without this the ceiling tests race against the server's own bookkeeping, and `gate` failed twice on
+    /// one commit — once on the per-user ceiling and once on the per-address one. See `L-042`: a test must
+    /// not wait for a thing to prove it did not happen.
+    /// </para>
+    /// </remarks>
+    /// <param name="connection">The connection to start.</param>
+    private static async Task SettledStartAsync(HubConnection connection)
+    {
+        await connection.StartAsync(TestContext.Current.CancellationToken);
+
+        await connection.InvokeAsync(
+            PlaylistHub.LeaveMethod, Guid.Empty, TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>Starts a connection, retrying while the server still holds the slot being released.</summary>
+    /// <remarks>
+    /// Deterministic in outcome rather than in timing: a released slot is taken within the window, and a
+    /// ceiling that counts up and never down fails every attempt and then the test. Bounded so a real
+    /// regression fails rather than hangs.
+    /// </remarks>
+    /// <param name="connection">The connection to start.</param>
+    private static async Task RetryStartAsync(HubConnection connection)
+    {
+        const int attempts = 20;
+
+        for (int attempt = 1; attempt <= attempts; attempt++)
+        {
+            try
+            {
+                await connection.StartAsync(TestContext.Current.CancellationToken);
+
+                return;
+            }
+            catch (Exception) when (attempt < attempts)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
+            }
+        }
     }
 
     private static async Task<int> RefusedJoinCountAsync(WebApplicationFactory<Program> factory)
