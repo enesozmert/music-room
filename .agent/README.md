@@ -68,7 +68,7 @@ silently ignored and the protection you think you have does not exist. Both dire
 verified — an allowed path writes, `reference/` is refused.
 
 A Bash allowlist by command prefix is defence in depth, not a sandbox: `dotnet` and `make` can
-reach a shell. The spec gate, branch protection and draft pull requests are the real controls.
+reach a shell. The spec gate and branch protection are the real controls.
 
 ## What keeps this safe
 
@@ -93,7 +93,7 @@ writes under `reference/`. See `PROMPTS.md` section 3.1.
 ## Reviewing what a run produced
 
 ```bash
-gh pr list --draft                       # one draft per passing spec
+gh pr list                               # one pull request per passing spec
 gh pr diff <number>
 gh pr ready <number>                     # you decide this
 gh pr merge <number> --merge             # and this
@@ -117,7 +117,7 @@ make land READY=1         # land them
 make land READY=1 LIMIT=3 # land the bottom three and stop
 ```
 
-Spec work arrives as one branch and one draft pull request each ([[ADR-0025-agent-git-protocol]],
+Spec work arrives as one branch and one pull request each ([[ADR-0025-agent-git-protocol]],
 [[ADR-0027-agent-push-and-pr]]), and several stack up. Merging a stack by hand is three commands
 per pull request and two traps:
 
@@ -139,8 +139,9 @@ A conflict in a `.pdf` is resolved by rerunning `docs/build-pdf.sh`, because Mar
 and the PDF is an artifact. A conflict anywhere else stops the run and names the files: everything
 below that pull request is on `main`, nothing above it was touched.
 
-`--ready` marks the batch ready for review, which is the human signal ADR-0027 asks for — one flag
-instead of one command per pull request.
+`--ready` used to be the human signal ADR-0027 asked for. Since 2026-10-04 an agent opens an
+ordinary pull request and enables auto-merge on it, so the flag only matters for one somebody left
+as a draft by hand.
 
 **Since 2026-10-03 the common case does not need this script.** Repository auto-merge is on and an
 agent enables it on its own pull request, so one lands as soon as `gate` passes. `land-stack.sh` is

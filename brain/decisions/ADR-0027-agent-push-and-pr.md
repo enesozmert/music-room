@@ -6,7 +6,7 @@ date: 2026-09-24
 supersedes: ADR-0025 (push clause only)
 ---
 
-# ADR-0027 — The agent pushes its branch and opens a draft pull request
+# ADR-0027 — The agent pushes its branch and opens a pull request
 
 ## Context
 
@@ -24,9 +24,16 @@ what the prohibition prevented. Removing it needs something better than a promis
 > same backlog that produced two stacks and everything they cost (`AGENTS.md` §5b). Repository
 > auto-merge is now on, and a pull request whose required `gate` check passes merges by itself.
 >
-> What that changes in the list below: **`--auto` merge is no longer forbidden.** Marking a pull
-> request ready for review, merging it directly, and approving one still are. The agent's hands
-> stay off the merge button; GitHub presses it when `gate` is green.
+> What that changes in the list below: **`--auto` merge is no longer forbidden.** Merging directly
+> and approving still are. The agent's hands stay off the merge button; GitHub presses it when
+> `gate` is green.
+>
+> **Amended again 2026-10-04: the pull request is not a draft.** Auto-merge refuses a draft —
+> `enablePullRequestAutoMerge` answers *"Pull request is a draft"* — so #68 and #70 sat at
+> `auto=false` until a human marked them ready. The draft and the amendment above could not both
+> stand, and the draft was the half with nothing behind it: it meant *a human should look*, written
+> when a human merged, and `gate` is what looks now. The agent opens an ordinary pull request and
+> enables auto-merge on it in the same step.
 >
 > What that costs, stated rather than discovered: nobody reads the diff before it lands. `gate`
 > becomes the whole of review — restore, format, build `-warnaserror`, test, the vulnerable-package
@@ -41,7 +48,10 @@ what the prohibition prevented. Removing it needs something better than a promis
 At stage 5, **after** `RESULT: pass`, the agent:
 
 1. pushes its own `feat/spec-<nnn>-<slug>` branch, and
-2. opens a **draft** pull request with `gh pr create --draft`.
+2. opens a pull request with `gh pr create`, and
+3. enables auto-merge on it with `gh pr merge --auto --merge`.
+
+   Not a draft: auto-merge refuses one outright.
 
 One pull request per spec. Nothing else changes about the git protocol from
 [[ADR-0025-agent-git-protocol]].
@@ -51,7 +61,6 @@ One pull request per spec. Nothing else changes about the git protocol from
 - pushing to `main`, or to any branch that is not the spec's own
 - `--force` in any form, on any branch
 - deleting a remote branch or a tag
-- marking a pull request ready for review
 - merging directly, or approving
 - reopening, closing or editing anyone else's pull request
 
@@ -63,7 +72,7 @@ Three layers, none of them a prompt:
 |---|---|
 | Precondition | the push happens only after `RESULT: pass`; a blocked or environment result pushes nothing |
 | Remote | `main` carries branch protection with **`enforce_admins: true`** — direct pushes, force pushes and branch deletion are refused even for the repository owner's token |
-| Human gate | the pull request is a **draft**. Draft pull requests cannot be merged, so nothing reaches `main` without a person marking it ready |
+| Machine gate | the required `gate` check. Auto-merge lands the pull request when it passes and never before, so nothing reaches `main` that did not build, format, test and pass the vulnerable-package and OpenAPI drift scans — amended 2026-10-03 and 2026-10-04 |
 
 `enforce_admins` matters more than it looks: the agent runs with the owner's `gh` token. With
 admin enforcement off, branch protection would have been decorative.
@@ -75,7 +84,7 @@ admin enforcement off, branch protection would have been decorative.
 - **Per-spec review stays intact.** One spec, one branch, one commit, one pull request, one
   decision to merge or discard.
 - CI runs per spec, so a regression is attributed to one unit of work.
-- Branches and draft pull requests accumulate during a long run. Cheap, and self-describing.
+- Branches and pull requests accumulate during a long run. Cheap, and self-describing.
 - The human keeps the two decisions that matter: ready-for-review, and merge.
 - `required_status_checks` is empty until the workflows exist (slice S0 creates them). Add the
   check names to the protection rule as soon as they do, otherwise CI is advisory.
@@ -89,10 +98,16 @@ admin enforcement off, branch protection would have been decorative.
   which is stronger. Rejected for ergonomics: the stage that knows the spec id, the requirements
   advanced and the verification output is stage 5, and that is where a good pull request body is
   written.
-- **Normal pull request instead of draft** — one fewer click, and one fewer thing standing between
+- ~~**Normal pull request instead of draft**~~ — rejected in 2026-09, adopted on 2026-10-04 once
+  auto-merge made the draft a blocker rather than a gate. The original objection, below, was that it
+  is one fewer thing standing between
   an unattended cycle and `main`.
-- **Auto-merge on green CI** — the most automated option and the wrong one here. Green CI is not a
-  correct implementation: subject V.2 grades race-condition handling, and a concurrency bug can
-  pass every test that exists. Human review is the control for exactly that class of defect.
+- ~~**Auto-merge on green CI**~~ — rejected in 2026-09, **adopted on 2026-10-03**. The objection
+  stands as written and is now a stated cost rather than a reason: green CI is not a correct
+  implementation, subject V.2 grades race-condition handling, and a concurrency bug can pass every
+  test that exists. What changed is the comparison. The alternative was never human review; it was
+  a pull request nobody merged — eight of them stacked, twice, costing what `AGENTS.md` §5b
+  measures. A review that does not happen is not a control. `/review-diff` is the one that remains,
+  and it is a human's to run.
 - **Push at the end of a run rather than per spec** — fewer CI runs, but a failure then spans
   several pull requests at once.

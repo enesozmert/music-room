@@ -470,11 +470,12 @@ For the spec just completed:
 - add a brain/lessons/lessons-index.md row only if something durable was learned
 - regenerate docs/api/openapi.json if an endpoint changed
 - commit the work on the spec's branch with a Conventional Commits message naming the spec id
-- push that branch and open a draft pull request:
-  `gh pr create --draft --title "<type>(<scope>): <subject>" --body-file <a file you write>`
+- push that branch and open a pull request:
+  `gh pr create --title "<type>(<scope>): <subject>" --body-file <a file you write>`
   The body states: the spec id, the subject requirements advanced, the verification commands and
   their result, the OWASP checklist outcome, and anything a reviewer must check by hand.
-  Do not mark it ready for review. Do not merge.
+  Then enable auto-merge: `gh pr merge <n> --auto --merge`. Not a draft — auto-merge refuses one.
+  Do not merge it yourself and do not approve it; GitHub merges it when `gate` passes.
 - output a 5-line summary: unit, files changed, tests added, requirements advanced, what is next
 ```
 
@@ -512,10 +513,10 @@ Guardrails, absolute:
 - Never add or upgrade a dependency.
 - Git: fetch origin, then create one branch feat/spec-<nnn>-<slug> from origin/main after
   approval — never from another open branch — and make one commit after verification passes. After RESULT: pass only, push that branch and open a DRAFT pull request
-  with gh pr create --draft. One pull request per spec.
+  with gh pr create, then enable auto-merge with gh pr merge --auto --merge. One pull request per
+  spec, and not a draft: auto-merge refuses a draft.
 - Never push to main or to any branch but the spec's own. Never --force, reset --hard, rebase,
-  delete a remote branch or tag. Never mark a pull request ready for review, merge it directly,
-  or approve it.
+  delete a remote branch or tag. Never merge a pull request directly, and never approve one.
 - Enable auto-merge on your own pull request: gh pr merge <n> --auto --merge. GitHub merges it
   when the required gate check passes and not before. That is the one merge-adjacent action you
   are allowed.
@@ -559,7 +560,7 @@ make agent-run            # scoped permissions + live output
 make agent-run CYCLES=5
 ```
 
-Cycles stack up: one branch and one draft pull request per spec, each based on the last. Landing
+Cycles used to stack up: one branch and one pull request per spec, each based on the last. Landing
 them is its own job, and doing it by hand loses a pull request to GitHub's base-branch behaviour —
 so it is scripted:
 
