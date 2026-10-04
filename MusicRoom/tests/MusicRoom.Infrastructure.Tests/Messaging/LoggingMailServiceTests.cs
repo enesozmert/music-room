@@ -1,7 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MusicRoom.Application.Abstractions.Messaging;
+using MusicRoom.Domain.Entities;
 using MusicRoom.Infrastructure;
+using MusicRoom.Infrastructure.Catalog;
 using MusicRoom.Infrastructure.Security;
 using Xunit;
 
@@ -128,6 +130,14 @@ public sealed class LoggingMailServiceTests
             WorkFactor,
             isDevelopment,
             BaseUrl,
+
+            // No key: this suite is about the mail sender, and a catalog with no key reaches no provider.
+            new CatalogOptions(
+                null,
+                TrackRef.DefaultLifetime,
+                TrackSearchCache.DefaultLifetime,
+                CatalogOptions.DefaultMemoryLifetime,
+                CatalogOptions.DefaultRequestTimeout),
             new JwtOptions(
                 new string('k', JwtOptions.MinimumSigningKeyBytes),
                 "musicroom-tests",

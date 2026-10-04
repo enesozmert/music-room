@@ -2652,6 +2652,124 @@
         }
       }
     },
+    "/api/v1/tracks": {
+      "get": {
+        "tags": [
+          "TrackEndpoints"
+        ],
+        "summary": "Search the catalog",
+        "description": "The only route that can reach YouTube's expensive search call, so it is rate limited per account and its results are cached. A repeated query inside the cache window costs no quota at all.",
+        "operationId": "GetTracks",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrackMetadata"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tracks/{youtubeVideoId}": {
+      "get": {
+        "tags": [
+          "TrackEndpoints"
+        ],
+        "summary": "Resolve one track",
+        "description": "Prefers both cache levels, then one cheap metadata call. A video the catalog does not know is 404, and so is a malformed id — the contract lists no 422 here, and one answer for both keeps the route from saying which ids are well formed. A catalog that cannot answer at all is 503.",
+        "operationId": "GetTrack",
+        "parameters": [
+          {
+            "name": "youtubeVideoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrackMetadata"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
     "/api/v1/playback-sessions": {
       "post": {
         "tags": [
@@ -4313,6 +4431,44 @@
         },
         "description": "The move payload. Exactly one neighbour, or `422`."
       },
+      "TrackMetadata": {
+        "required": [
+          "youtubeVideoId",
+          "title",
+          "channel",
+          "durationSeconds",
+          "thumbnailUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "youtubeVideoId": {
+            "type": "string",
+            "description": "The 11-character video id."
+          },
+          "title": {
+            "type": "string",
+            "description": "The video's title."
+          },
+          "channel": {
+            "type": "string",
+            "description": "The channel that published it."
+          },
+          "durationSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How long it runs; zero for a live stream.",
+            "format": "int32"
+          },
+          "thumbnailUrl": {
+            "type": "string",
+            "description": "A thumbnail URL, served by the provider and never proxied."
+          }
+        },
+        "description": "One track, as every layer above `Infrastructure` sees it — `docs/api/ENDPOINTS.md` §3."
+      },
       "UpdateProfileRequest": {
         "required": [
           "realName",
@@ -4535,6 +4691,9 @@
     },
     {
       "name": "DevicePlaybackEndpoints"
+    },
+    {
+      "name": "TrackEndpoints"
     },
     {
       "name": "PlaybackEndpoints"
