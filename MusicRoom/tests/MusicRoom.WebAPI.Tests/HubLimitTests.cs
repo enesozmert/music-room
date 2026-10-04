@@ -255,6 +255,7 @@ public sealed class HubLimitTests : IAsyncLifetime
         {
             webHost.UseSetting("DATABASE_URL", _database.GetConnectionString());
             TestJwtSettings.Apply(webHost);
+            TestMailSettings.Apply(webHost);
             TestRateLimitSettings.Relax(webHost);
 
             foreach ((string key, string value) in settings)
