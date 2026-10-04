@@ -29,6 +29,7 @@ public sealed class ControlHubTests : IAsyncLifetime
     private readonly RecordingMailService _mail = new();
 
     private WebApplicationFactory<Program> _factory = null!;
+    private HubConnectedBarrier _barrier = null!;
 
     /// <summary>Starts the engine, replaces the mail sender, and brings the schema up.</summary>
     public async ValueTask InitializeAsync()
@@ -43,6 +44,10 @@ public sealed class ControlHubTests : IAsyncLifetime
             TestRateLimitSettings.Relax(webHost);
             webHost.ConfigureTestServices(services =>
                 services.AddSingleton<IMailService>(_mail));
+
+            // `ControlHub` has no method to round-trip through, so the suite fences on the server's own
+            // `OnConnectedAsync` instead of on `StartAsync`, which returns before the group is joined.
+            _barrier = HubConnectedBarrier.Install(webHost);
         });
 
         using IServiceScope scope = _factory.Services.CreateScope();
@@ -120,7 +125,7 @@ public sealed class ControlHubTests : IAsyncLifetime
         party.Grantee.Dispose();
 
         await using HubConnection listener = Connect(party.GranteePair);
-        await listener.StartAsync(TestContext.Current.CancellationToken);
+        await _barrier.StartAsync(listener, TestContext.Current.CancellationToken);
 
         TaskCompletionSource<GrantedEvent> received = Listen<GrantedEvent>(
             listener, ControlHub.ControlGrantedEvent);
@@ -150,7 +155,7 @@ public sealed class ControlHubTests : IAsyncLifetime
         party.Grantee.Dispose();
 
         await using HubConnection listener = Connect(party.OwnerPair);
-        await listener.StartAsync(TestContext.Current.CancellationToken);
+        await _barrier.StartAsync(listener, TestContext.Current.CancellationToken);
 
         TaskCompletionSource<GrantedEvent> received = Listen<GrantedEvent>(
             listener, ControlHub.ControlGrantedEvent);
@@ -187,7 +192,7 @@ public sealed class ControlHubTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
 
         await using HubConnection displaced = Connect(party.GranteePair);
-        await displaced.StartAsync(TestContext.Current.CancellationToken);
+        await _barrier.StartAsync(displaced, TestContext.Current.CancellationToken);
 
         TaskCompletionSource<TakenOverEvent> received = Listen<TakenOverEvent>(
             displaced, ControlHub.ControlTakenOverEvent);
@@ -217,7 +222,7 @@ public sealed class ControlHubTests : IAsyncLifetime
         party.Grantee.Dispose();
 
         await using HubConnection listener = Connect(party.GranteePair);
-        await listener.StartAsync(TestContext.Current.CancellationToken);
+        await _barrier.StartAsync(listener, TestContext.Current.CancellationToken);
 
         TaskCompletionSource<RevokedEvent> received = Listen<RevokedEvent>(
             listener, ControlHub.ControlRevokedEvent);
@@ -245,7 +250,7 @@ public sealed class ControlHubTests : IAsyncLifetime
         party.Grantee.Dispose();
 
         await using HubConnection listener = Connect(party.OwnerPair);
-        await listener.StartAsync(TestContext.Current.CancellationToken);
+        await _barrier.StartAsync(listener, TestContext.Current.CancellationToken);
 
         TaskCompletionSource<RevokedEvent> received = Listen<RevokedEvent>(
             listener, ControlHub.ControlRevokedEvent);
@@ -275,7 +280,7 @@ public sealed class ControlHubTests : IAsyncLifetime
         outsider.Dispose();
 
         await using HubConnection listener = Connect(outsiderPair);
-        await listener.StartAsync(TestContext.Current.CancellationToken);
+        await _barrier.StartAsync(listener, TestContext.Current.CancellationToken);
 
         List<GrantedEvent> received = Collect<GrantedEvent>(listener, ControlHub.ControlGrantedEvent);
 
@@ -306,7 +311,7 @@ public sealed class ControlHubTests : IAsyncLifetime
         Guid deviceId = await DeviceRequests.RegisterAsync(a);
 
         await using HubConnection listener = Connect(ownerPair);
-        await listener.StartAsync(TestContext.Current.CancellationToken);
+        await _barrier.StartAsync(listener, TestContext.Current.CancellationToken);
 
         List<GrantedEvent> received = Collect<GrantedEvent>(listener, ControlHub.ControlGrantedEvent);
 

@@ -477,6 +477,17 @@ endpoints with a different transport, and the same authorisation applies.
   transport can produce an action nobody can attribute.
 - **The token goes in the `access_token` query parameter**, the documented SignalR mechanism, and it is
   read **only** under `/hubs`. No REST route gains a second way to present a token.
+- **The handshake can be refused three ways, and each says something different** (SPEC-026,
+  [[ADR-0030-hub-rate-limits-and-origin]]):
+  - `400` — the three client values are missing, as above.
+  - `403` — the request carries an `Origin` that is not in `CORS_ALLOWED_ORIGINS`. A request with **no**
+    `Origin` passes: that is the native client, which is not a browser and sends none. The response names
+    neither the list nor the reason, because a response that described the policy would be a way to probe it.
+  - `429` with `Retry-After` — the caller already holds the concurrent-connection ceiling: **5 per account, 20
+    per address**. A slot frees when a connection closes.
+- **A hub method may be invoked 60 times a minute per connection.** The next one throws a `HubException`
+  saying to slow down, and the refusal is audited `refused` exactly as a refused join is. The limit is per
+  connection, and the connection ceiling above is what bounds how many of them one caller may hold.
 - **Join and leave are audited** by a hub filter writing the same record as the REST behaviour
   ([[ADR-0019-hub-action-auditing]]). Connect and disconnect are not — mobile reconnect noise
   would bury deliberate actions.

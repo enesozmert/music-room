@@ -46,7 +46,17 @@ header at all.
 
 ### Both a connection ceiling and a per-connection call limit
 
-- A **concurrent connection ceiling**, per user and per IP. Exceeding it refuses the handshake.
+- A **concurrent connection ceiling**, per user and per IP. Exceeding it refuses the handshake —
+  *usually*. The refusal has two layers and only one of them is authoritative: the middleware reads
+  the count and answers `429` before the handshake, and `OnConnectedAsync` takes the slot. A client
+  whose `StartAsync` has returned is not yet counted, because `OnConnectedAsync` has not run, so a
+  burst of negotiates can pass a read that is a moment stale. Those connections are refused a
+  moment later, when the slot is actually claimed, and the client sees a drop rather than a refused
+  handshake. **Accepted:** the ceiling bounds the steady state, which is what T-12 is about; making
+  the middleware authoritative would mean holding a slot for a handshake that may never complete.
+  It is recorded here because `ADR-0030` promised a refused handshake and the implementation
+  delivers that only when the count has caught up — observed 2026-10-04, when two `gate` runs on
+  one commit disagreed about it.
 - A **per-connection invocation limit** on hub methods, enforced inside the filter
   [[ADR-0019-hub-action-auditing]] already installs. One filter, two jobs — not a second filter in
   the pipeline.
