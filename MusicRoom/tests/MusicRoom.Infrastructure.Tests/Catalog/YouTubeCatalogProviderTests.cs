@@ -6,6 +6,7 @@ using MusicRoom.Application.Abstractions.Catalog;
 using MusicRoom.Domain.Entities;
 using MusicRoom.Infrastructure;
 using MusicRoom.Infrastructure.Catalog;
+using MusicRoom.Infrastructure.Messaging;
 using MusicRoom.Infrastructure.Security;
 using MusicRoom.Infrastructure.Tests.Messaging;
 using Xunit;
@@ -236,7 +237,7 @@ public sealed class YouTubeCatalogProviderTests
         services.AddInfrastructureServices(new InfrastructureOptions(
             WorkFactor,
             IsDevelopment: true,
-            VerificationLinkBaseUrl: null,
+            new MailOptions(MailOptions.LoggingProvider, null, null, null, null, null),
             options,
             new JwtOptions(
                 new string('k', JwtOptions.MinimumSigningKeyBytes),

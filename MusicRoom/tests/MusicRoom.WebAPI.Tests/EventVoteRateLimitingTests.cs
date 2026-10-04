@@ -47,6 +47,7 @@ public sealed class EventVoteRateLimitingTests : IAsyncLifetime
         {
             webHost.UseSetting("DATABASE_URL", _database.GetConnectionString());
             TestJwtSettings.Apply(webHost);
+            TestMailSettings.Apply(webHost);
 
             // The credential limits are raised because signing two accounts in is not what is under test.
             // The vote limit is not raised: it is the subject of this suite.

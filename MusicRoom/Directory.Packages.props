@@ -47,13 +47,20 @@
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
   </ItemGroup>
 
-  <ItemGroup Label="Outbound HTTP — ADR-0003, SPEC-025 gate 2">
+  <ItemGroup Label="Outbound HTTP — ADR-0003 and ADR-0013, SPEC-024 and SPEC-025 gate 2">
     <!-- Approved by the repository owner on 2026-10-04. `youtube-integration` requires a timeout, retry
          on 5xx and 429 only, and a circuit breaker so a provider outage does not exhaust the thread
          pool; this is the first-party, Polly-backed way to get all three, and it brings
          Microsoft.Extensions.Http with it for the typed client. The rejected alternative was
          hand-rolling a breaker in a DelegatingHandler. Used by the catalog adapter alone. -->
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />
+    <!-- Beyond the ADR-0021 list, approved by the repository owner on 2026-10-04. It gives the Brevo
+         sender a typed HttpClient with a bounded timeout and a handler the container owns, instead of
+         a client this project news up and holds for the process lifetime. First-party, and it ships.
+         The alternative the owner rejected was registering the client from WebAPI, which keeps this
+         project's dependency set untouched and moves the adapter's registration out of the layer that
+         owns the adapter. -->
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.0" />
   </ItemGroup>
 
   <ItemGroup Label="Observability — ADR-0022">
