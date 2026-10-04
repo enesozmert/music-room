@@ -195,7 +195,6 @@ internal static class EnvironmentConfiguration
         configuration["VERIFICATION_LINK_BASE_URL"];
 
     /// <summary>
-<<<<<<< HEAD
     /// Reads the realtime ceilings and the allowed origins — [[ADR-0030]], numbers of 2026-10-04.
     /// </summary>
     /// <remarks>
@@ -236,7 +235,8 @@ internal static class EnvironmentConfiguration
 
         return configured > 0 ? configured : approved;
     }
-=======
+
+    /// <summary>
     /// Reads the catalog's key and cache lifetimes — ADR-0003, ADR-0023.
     /// </summary>
     /// <remarks>
@@ -291,7 +291,6 @@ internal static class InfrastructureSetup
             EnvironmentConfiguration.ReadCatalogOptions(builder.Configuration),
             EnvironmentConfiguration.RequireJwtOptions(builder.Configuration),
             EnvironmentConfiguration.ReadCredentialAttemptLimits(builder.Configuration)));
->>>>>>> origin/main
 }
 
 /// <summary>
@@ -462,7 +461,7 @@ internal static class ApiServices
         services.AddProblemDetails();
         CredentialRateLimiterPolicies.Add(services, configuration);
         EventRateLimiterPolicies.Add(services);
-<<<<<<< HEAD
+        CatalogRateLimiterPolicies.Add(services);
         AddCors(services, configuration);
     }
 
@@ -506,9 +505,6 @@ internal static class ApiServices
                     // unless they are exposed: the concurrency guard and the limiter would both be invisible.
                     .WithExposedHeaders("ETag", "Retry-After");
             }));
-=======
-        CatalogRateLimiterPolicies.Add(services);
->>>>>>> origin/main
     }
 }
 
