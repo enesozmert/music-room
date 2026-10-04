@@ -798,6 +798,31 @@ Passwords, tokens, refresh tokens, API keys, `Authorization` headers, database c
 strings, Supabase keys, OAuth client secrets. A mobile bundle can be unpacked, so it holds none
 of these.
 
+### 13.5b Where configuration comes from
+
+Every secret and every setting is read through **one abstraction**, `ISecretProvider`, declared in
+`Application` and implemented in `Infrastructure` — [[ADR-0029-containerised-dev-and-secret-vault]],
+SPEC-030. Nothing above `Infrastructure/Configuration` names a configuration source, and
+`EnvironmentConfiguration` in the composition root is the only caller.
+
+| Provider | When | State |
+|---|---|---|
+| `EnvSecretProvider` | the default: the process environment, which `docker compose` fills from `.env` | **built** |
+| `InfisicalSecretProvider` | enabled by configuration, reading a self-hosted Infisical in the same stack | the rest of S1b — issue **O18** |
+
+Three rules the abstraction decides once, rather than at the thirteen call sites that used to:
+
+- **A required value that is absent stops start-up**, with a message naming the variable. `DATABASE_URL`,
+  the JWT settings and `MAIL_PROVIDER` are the three guards this preserves.
+- **Blank is absent.** A host that writes `MAIL_PROVIDER=` has configured nothing, and a blank number falls
+  back to its approved default instead of failing to convert.
+- **A name may appear in a failure message; a value may not** — §13.5, and `secrets-management`'s rule against
+  printing a secret even while debugging. Nothing in the provider logs.
+
+A value that is present and unparseable — `RATE_LIMIT_ACCOUNT_PERMITS=abc` — still stops start-up. The
+callers clamp what they receive, so a *valid* but useless override is the case that is ignored: a
+non-positive permit cannot switch a limit off.
+
 ### 13.6 Residual risk
 
 R1 V.6 requires the remaining threats to be identified and their protections described.

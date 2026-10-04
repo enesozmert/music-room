@@ -140,6 +140,26 @@ this unit does not change that.
 4. Tests: the provider's four cases, and the three start-up refusals that must still happen.
 5. `make agent-check`, then the documents.
 
+## What the build added to this plan
+
+Three things, none of them a design change, and the third is a behaviour change the walk had already asked for.
+
+- **The interface needed two more members than the Steps named.** `ReadInteger` and `ReadBoolean` exist because
+  nine of the thirteen reads are numbers and one is the OpenTelemetry switch. Without them, `Observability`
+  would have been the single call site still naming a configuration source, which is precisely what the "no code
+  outside `Infrastructure/Configuration`" line forbids.
+- **`EnvSecretProvider` is public, not internal as the walk said.** The composition root constructs one *before*
+  a container exists — `DATABASE_URL` and the JWT settings are read while services are still being registered —
+  so an internal type could not be reached. It is registered as well, so a later request-time reader resolves the
+  same behaviour, and `SecretProviderStartupTests` asserts that the registration and the start-up construction
+  agree.
+- **Blank now reads as absent for numbers too, which is a real change.** `GetValue<int>("")` throws — so before
+  this unit, `RATE_LIMIT_ACCOUNT_PERMITS=` stopped the host rather than falling back to the approved permit. The
+  walk's own item said blank-is-absent belongs in the provider "once, rather than at thirteen call sites", so it
+  applies to every read: an empty value takes the default, and a value that is present and unparseable still
+  stops start-up. The spec's "no default changes" held for every non-blank case; this is the one edge it did not
+  foresee, and it is recorded here rather than left for a reader to find.
+
 ## Verification
 
 ```bash
@@ -158,8 +178,8 @@ make agent-check
 
 ## Done when
 
-- [ ] every file in the Files table exists and compiles
-- [ ] no code outside `Infrastructure/Configuration` names a configuration source
-- [ ] `make agent-check` passes
-- [ ] the three start-up guards still refuse, with their messages intact
-- [ ] `status: done` in this file
+- [x] every file in the Files table exists and compiles
+- [x] no code outside `Infrastructure/Configuration` names a configuration source
+- [x] `make agent-check` passes
+- [x] the three start-up guards still refuse, with their messages intact
+- [x] `status: done` in this file
