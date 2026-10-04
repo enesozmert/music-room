@@ -84,6 +84,7 @@ public class Program
         app.MapHealthEndpoints();
         app.MapAuthEndpoints();
         app.MapProfileEndpoints();
+        app.MapAccountPasswordEndpoints();
         app.MapFriendEndpoints();
         app.MapUserEndpoints();
         app.MapPlaylistEndpoints();

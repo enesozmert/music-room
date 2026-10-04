@@ -184,7 +184,7 @@ got.
 | # | Slice | Delivers | Subject | State |
 |---|---|---|---|---|
 | S0 | Walking skeleton | solution per [[ADR-0011-solution-layout]], `Directory.Packages.props` with the set in [[ADR-0021-backend-dependency-set]], `docker compose` with a **local PostgreSQL container** ([[ADR-0026-environment-bring-up]]), `Makefile`, CI, `/health`, `/health/ready`, published OpenAPI | IV.1, V.8 | merged |
-| S1 | Identity | register (BCrypt cost >= 12), email verification, login, JWT + refresh rotation, password reset | V.1, V.6 | merged |
+| S1 | Identity | register (BCrypt cost >= 12), email verification, login, JWT + refresh rotation, password reset, **and changing a password while signed in** — `POST /me/password`, SPEC-028, which revokes every other session and keeps the caller's | V.1, V.6 | merged |
 | S1a | Mail provider adapter | the real hosted-provider implementation of `IMailService` — issue O17, **unblocked 2026-10-01: the Brevo API key arrived**. **Precondition: the T-25 rate limiter must exist first.** Owner decision 2026-09-27: an unauthenticated loop against `/auth/verification-requests` costs a log line today and burns the provider quota (T-19) the moment a real sender lands | V.1 | not started |
 | S1b | Secret vault | self-hosted Infisical under a `vault` compose profile, plus `InfisicalSecretProvider` behind the abstraction — issue O18, [[ADR-0029-containerised-dev-and-secret-vault]] | owner requirement | not started |
 | S2 | Audit + client context | required headers, middleware, audit behaviour, **SignalR hub filter**, audit table | V.6 | merged |
