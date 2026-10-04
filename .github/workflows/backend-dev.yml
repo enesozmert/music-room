@@ -72,6 +72,9 @@ jobs:
           # The OpenAPI generator boots the real host; the SPEC-003 start-up guard
           # refuses an IMailService outside Development.
           ASPNETCORE_ENVIRONMENT: Development
+          # SPEC-024 made a mail sender a start-up requirement too, so the document build needs one.
+          # `logging` opens no socket and needs no provider key: generating a document sends nothing.
+          MAIL_PROVIDER: logging
         run: |
           dotnet build MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj \
             --no-restore -p:GenerateOpenApiDocument=true

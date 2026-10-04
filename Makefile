@@ -65,10 +65,12 @@ OPENAPI_JWT_AUDIENCE := musicroom-openapi
 OPENAPI_JWT_ACCESS_TOKEN_MINUTES := 15
 
 openapi: ## regenerate docs/api/openapi.json from the code
-	# The generator boots the real host to read the document off it, so the environment must be
-	# Development: the SPEC-003 start-up guard refuses an IMailService anywhere else, and a
-	# document build is a development-time operation.
+	# The generator boots the real host to read the document off it, so every start-up requirement has
+	# to be satisfied. The environment is Development because a document build is a development-time
+	# operation, and MAIL_PROVIDER is set because SPEC-024 made a mail sender a start-up requirement:
+	# `logging` opens no socket, so generating a document sends nothing and needs no provider key.
 	ASPNETCORE_ENVIRONMENT=Development DATABASE_URL="$(OPENAPI_DATABASE_URL)" \
+	MAIL_PROVIDER=logging \
 	JWT_SIGNING_KEY="$(OPENAPI_JWT_SIGNING_KEY)" \
 	JWT_ISSUER="$(OPENAPI_JWT_ISSUER)" \
 	JWT_AUDIENCE="$(OPENAPI_JWT_AUDIENCE)" \
