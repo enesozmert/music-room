@@ -178,13 +178,13 @@ make agent-check
 | `MailOptionsTests` | `brevo` without a key, or without `MAIL_FROM`, is refused; `logging` outside Development is refused; an unknown value is refused |
 | `MailProviderStartupTests` | a Development host with `MAIL_PROVIDER=logging` resolves `LoggingMailService`; any host with `brevo` and its two values resolves `BrevoMailService`; a Production host with an empty `MAIL_PROVIDER` fails to start |
 | `LoggingMailServiceTests` | unchanged and still passing — the Development path is not collateral |
-| **manual, once, by the owner — OUTSTANDING** | `MAIL_PROVIDER=brevo` with the real key and `MAIL_FROM` filled, a registration, and the message arriving in a real mailbox from the sandbox sender. No automated test spends quota (decision 7), so this is the only evidence that the provider call itself works end to end. Everything else in this table passes |
+| **manual, once, by the owner — DONE 2026-10-04** | `MAIL_PROVIDER=brevo` with the real key and `MAIL_FROM` filled, a registration, and the message arriving in a real mailbox from the sandbox sender. No automated test spends quota (decision 7), so this is the only evidence that the provider call itself works end to end. Run on 2026-10-04: a registration answered `202`, `POST https://api.brevo.com/v3/smtp/email` answered `201`, and the owner confirmed the message in the mailbox. The first attempt answered `401`, because `MAIL_API_KEY` held an SMTP key (`xsmtpsib-`) and this adapter calls the REST API, which takes a v3 API key (`xkeysib-`) — `.env.example` now says so |
 
 ## Done when
 
 - [x] every file in the Files table exists and compiles
 - [x] `make agent-check` passes
-- [ ] **a real message arrives, sent by the owner's manual run** — the one open item
+- [x] **a real message arrives, sent by the owner's manual run** — done 2026-10-04, Brevo answered `201` and the message was in the mailbox
 - [x] T-26 is closed in `docs/owasp/THREAT-REGISTER.md` and O17 in `docs/SDD.md` §17
 - [x] `docs/DELIVERY-PLAN.md` S1a is `merged`, and the stale S3 and S9 states are correct
 - [x] `status: done` in this file
