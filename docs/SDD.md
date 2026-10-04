@@ -300,6 +300,13 @@ rewrite the list. See §12.2.
 - Two connection strings: pooled (Supavisor) for the API, **direct** for migrations.
 - Destructive changes follow expand -> migrate -> contract.
 - Every migration is recorded in [[migrations-index]].
+- **The schema tool does not start the application.**
+  `MusicRoomDesignTimeDbContextFactory` builds the context for `dotnet ef` from `DATABASE_URL` alone, so
+  `make migrate` and `make migration` depend on the one setting they use and on nothing else (SPEC-029). Before
+  it, `dotnet ef` fell back to the web host and ran every start-up guard the host has: a `.env` with
+  `MAIL_PROVIDER=brevo` and an empty `MAIL_FROM` stopped a migration. The guards stay as they are — they close
+  threat T-26 — and the factory takes the schema off their path. A missing `DATABASE_URL` is still a refusal
+  naming the key, because ADR-0026 gives it no default on either path.
 
 `playlists` holds one row per playlist with `owner_id`, `visibility`, `licence` and `deleted_at_utc`, and uses
 PostgreSQL's `xmin` as its concurrency token — no version column exists, which is what makes the `ETag` of §5
