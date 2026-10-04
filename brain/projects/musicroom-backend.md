@@ -85,6 +85,7 @@ landed.
 |---|---|
 | S0 | solution, `Directory.Packages.props`, compose with a local PostgreSQL, `Makefile`, CI, `/health`, `/health/ready`, generated OpenAPI |
 | S1 | registration, email verification and resend, login, JWT + refresh rotation with reuse detection, password reset, credential rate limits, **bearer validation and the session endpoints** |
+| S4 | the catalog: one YouTube adapter behind `ICatalogProvider`, two cache levels (`IMemoryCache`, then `track_refs`), a cached query-to-ids mapping, `GET /tracks` with a 30-a-minute per-account limit, and `503` rather than `500` when the quota is spent. **Not yet:** `DATABASE_URL` still points at the local container, not Supabase |
 | S2 | mandatory client headers and the audit log, refusal outcomes included — REST only; the hub filter waits for a hub |
 | S3 | **complete**: own profile with per-field visibility and music preferences, the friends graph, and reading another user's profile projected per field against the relationship |
 | S5 | **complete**: playlists with their three gates, an `xmin` concurrency token and collaborators; tracks with a sparse ordering key, a guarded reorder and the twenty-way parallel move that proves it; `PlaylistHub` at `/hubs/playlists`, authorised on join, audited by ADR-0019's filter, broadcasting after the commit |

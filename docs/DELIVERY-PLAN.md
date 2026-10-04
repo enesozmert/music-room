@@ -190,7 +190,7 @@ got.
 | S2 | Audit + client context | required headers, middleware, audit behaviour, **SignalR hub filter**, audit table | V.6 | merged |
 | S3 | Profile | three visibility tiers, per-field server-side filtering, music preferences | V.1 | in progress |
 | S3a | OpenAPI UI | `Swashbuckle.AspNetCore.SwaggerUI` 10.2.3 over the document `AddOpenApi()` already serves, registered inside the Development branch only — [[ADR-0035-swagger-ui-for-the-openapi-document]] | owner requirement | not started |
-| S4 | Catalog | YouTube adapter, `TrackRef`, caching, quota discipline | III | not started |
+| S4 | Catalog | YouTube adapter, `TrackRef`, caching, quota discipline — **built 2026-10-04 by SPEC-025**: one adapter, two cache levels, `GET /tracks` and `GET /tracks/{id}`, a per-account search limit and `503` on a spent quota. **Still open in this slice:** pointing `DATABASE_URL` at Supabase, which changes the connection ceiling issue O22 describes and needs its own Gatling re-measurement | III | in progress |
 | S5 | Playlist Editor | REST + `PlaylistHub` + sparse ordering + concurrency token + parallel reorder tests | V.2.3 | merged |
 | S6 | Track Vote | REST + `EventHub` + unique-index vote arbitration + licence policy incl. geofence and event code + parallel vote tests | V.2.1 | merged |
 | S7 | Control Delegation + Playback | `PlaybackSession`, queue advance, device state machine, `ControlHub`, per-device licence | V.2.1, V.2.2 | merged |

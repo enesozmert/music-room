@@ -6,7 +6,9 @@ using MusicRoom.Application;
 using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Realtime;
 using MusicRoom.Application.Abstractions.Security;
+using MusicRoom.Domain.Entities;
 using MusicRoom.Infrastructure;
+using MusicRoom.Infrastructure.Catalog;
 using MusicRoom.Infrastructure.Security;
 using MusicRoom.Persistence;
 using MusicRoom.WebAPI.Endpoints;
@@ -45,12 +47,11 @@ public class Program
 
         builder.Services.AddApplicationServices();
         builder.Services.AddPersistenceServices(connectionString);
-        builder.Services.AddInfrastructureServices(new InfrastructureOptions(
-            EnvironmentConfiguration.ReadBCryptWorkFactor(builder.Configuration),
-            builder.Environment.IsDevelopment(),
-            EnvironmentConfiguration.ReadVerificationLinkBaseUrl(builder.Configuration),
-            EnvironmentConfiguration.RequireJwtOptions(builder.Configuration),
-            EnvironmentConfiguration.ReadCredentialAttemptLimits(builder.Configuration)));
+
+        // Through a helper rather than inline: CA1506 caps `Main` at 41 coupled types and it is at the limit,
+        // so SPEC-025's CatalogOptions pushed it over — the same reason CallerServices and RealtimeServices
+        // below are their own classes.
+        InfrastructureSetup.Add(builder);
 
         ApiServices.Add(builder.Services, builder.Configuration);
 
@@ -94,6 +95,7 @@ public class Program
         app.MapPlaylistEndpoints();
         app.MapEventEndpoints();
         app.MapDeviceEndpoints();
+        app.MapTrackEndpoints();
 
         // The hub is mapped after the endpoints and behind the same authentication. Its own authorisation is
         // the [Authorize] on the hub plus the join gate inside it — SPEC-016.
@@ -193,6 +195,7 @@ internal static class EnvironmentConfiguration
         configuration["VERIFICATION_LINK_BASE_URL"];
 
     /// <summary>
+<<<<<<< HEAD
     /// Reads the realtime ceilings and the allowed origins — [[ADR-0030]], numbers of 2026-10-04.
     /// </summary>
     /// <remarks>
@@ -233,6 +236,62 @@ internal static class EnvironmentConfiguration
 
         return configured > 0 ? configured : approved;
     }
+=======
+    /// Reads the catalog's key and cache lifetimes — ADR-0003, ADR-0023.
+    /// </summary>
+    /// <remarks>
+    /// A missing <c>YOUTUBE_API_KEY</c> is tolerated rather than fatal, and that is deliberate: the catalog then
+    /// answers from its two cache levels and reports the provider unavailable. `youtube-integration` requires a
+    /// provider outage to degrade rather than stop an event, and a host with no key is the same situation.
+    /// <para>
+    /// The lifetimes default to ADR-0023's policy, so a host that overrides nothing still caches the way the
+    /// decision says.
+    /// </para>
+    /// </remarks>
+    internal static CatalogOptions ReadCatalogOptions(IConfiguration configuration) =>
+        new(
+            configuration["YOUTUBE_API_KEY"],
+            ReadSpan(configuration, "CATALOG_TRACK_LIFETIME_HOURS", TrackRef.DefaultLifetime),
+            ReadSpan(configuration, "CATALOG_SEARCH_LIFETIME_HOURS", TrackSearchCache.DefaultLifetime),
+            CatalogOptions.DefaultMemoryLifetime,
+            CatalogOptions.DefaultRequestTimeout);
+
+    /// <summary>
+    /// Reads a lifetime in whole hours, falling back to the decided value.
+    /// </summary>
+    /// <remarks>
+    /// A non-positive override is ignored rather than honoured, for the reason the rate limits are read the same
+    /// way: configuration must not be able to switch a cache off and send every read to the provider.
+    /// </remarks>
+    private static TimeSpan ReadSpan(IConfiguration configuration, string key, TimeSpan approved)
+    {
+        int hours = configuration.GetValue(key, 0);
+
+        return hours > 0 ? TimeSpan.FromHours(hours) : approved;
+    }
+}
+
+/// <summary>
+/// Builds the infrastructure options from configuration and registers the layer.
+/// </summary>
+/// <remarks>
+/// Its own class rather than more lines in <c>Main</c>, which CA1506 caps at 41 coupled types and which
+/// SPEC-025 pushed to 42 by adding <see cref="CatalogOptions"/> to the record — the same reason
+/// <c>CallerServices</c> exists.
+/// </remarks>
+internal static class InfrastructureSetup
+{
+    /// <summary>Registers the hasher, the token issuer, the attempt limiter, the catalog and the sender.</summary>
+    /// <param name="builder">The host being built.</param>
+    internal static void Add(WebApplicationBuilder builder) =>
+        builder.Services.AddInfrastructureServices(new InfrastructureOptions(
+            EnvironmentConfiguration.ReadBCryptWorkFactor(builder.Configuration),
+            builder.Environment.IsDevelopment(),
+            EnvironmentConfiguration.ReadVerificationLinkBaseUrl(builder.Configuration),
+            EnvironmentConfiguration.ReadCatalogOptions(builder.Configuration),
+            EnvironmentConfiguration.RequireJwtOptions(builder.Configuration),
+            EnvironmentConfiguration.ReadCredentialAttemptLimits(builder.Configuration)));
+>>>>>>> origin/main
 }
 
 /// <summary>
@@ -403,6 +462,7 @@ internal static class ApiServices
         services.AddProblemDetails();
         CredentialRateLimiterPolicies.Add(services, configuration);
         EventRateLimiterPolicies.Add(services);
+<<<<<<< HEAD
         AddCors(services, configuration);
     }
 
@@ -446,6 +506,9 @@ internal static class ApiServices
                     // unless they are exposed: the concurrency guard and the limiter would both be invisible.
                     .WithExposedHeaders("ETag", "Retry-After");
             }));
+=======
+        CatalogRateLimiterPolicies.Add(services);
+>>>>>>> origin/main
     }
 }
 

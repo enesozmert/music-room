@@ -26,7 +26,7 @@ Source: https://owasp.org/API-Security/ (2023 edition; re-check when OWASP publi
 | API7 | Server Side Request Forgery | the YouTube adapter | only fixed provider hosts; no user-supplied URL fetched server-side; thumbnail URLs are stored and returned, never fetched by us |
 | API8 | Security Misconfiguration | pipeline, CORS, headers, environments | CORS allow-list from configuration (the client's base URL is configurable, so this cannot be hardcoded); security headers; no detailed errors outside Development |
 | API9 | Improper Inventory Management | versioning and documentation | every endpoint present in the OpenAPI document with all response codes; `docs/api/openapi.json` updated in the same PR; no undocumented or forgotten endpoint; `/api/v1` versioning respected |
-| API10 | Unsafe Consumption of APIs | Google, Facebook, YouTube responses | provider responses validated before use; ID tokens verified against JWKS with `iss`, `aud`, `exp`, `nonce`; provider data treated as untrusted input, never echoed unescaped |
+| API10 | Unsafe Consumption of APIs | Google, Facebook, YouTube responses | provider responses validated before use; ID tokens verified against JWKS with `iss`, `aud`, `exp`, `nonce`; provider data treated as untrusted input, never echoed unescaped. **YouTube, SPEC-025:** the payload is deserialised into partial records that name only the five fields a `TrackRef` needs, so a field the provider adds or moves cannot break a read; an error body is never logged and never propagated — the status code is the whole of what a reader gets; a timeout, a bounded retry and a circuit breaker stand between a provider outage and this server's threads |
 
 ## SignalR-specific
 

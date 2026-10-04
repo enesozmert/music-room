@@ -416,10 +416,16 @@ joined from the validated token on connect, so there is nothing for a client to 
 
 | Interface | Usage | Design note |
 |---|---|---|
-| YouTube Data API v3 | `videos.list` preferred; `search.list` only on real user input | quota is billed in units and `search.list` is the expensive call; results are cached as normalised `TrackRef` |
+| YouTube Data API v3 | `videos.list` preferred; `search.list` only on real user input | **built, SPEC-025.** Quota is billed in units and `search.list` costs about a hundred times a `videos.list`, so one adapter reaches the provider and two cache levels stand in front of it: `IMemoryCache`, then `track_refs`, then YouTube — [[ADR-0023-catalog-cache]]. A searched query's id list is cached as well, in `track_search_cache`, so a repeated search re-issues nothing. Every call logs its unit cost, `403 quotaExceeded` and a provider `5xx` both answer `503`, and the pipeline carries a per-attempt timeout, a bounded retry on `5xx` and `429` only, and a circuit breaker. With no key configured the caches still answer |
 | YouTube player SDK | client-side playback | backend decides what and when, never streams media |
 | Google / Facebook | authorization code flow with PKCE | provider token validated server-side against JWKS; a client-supplied profile is never trusted |
 | Mail provider | verification and reset mail | hosted free tier behind `IMailService`; API key server-side -- [[ADR-0013-mail-provider]] |
+
+**The catalog degrades rather than failing.** `youtube-integration` requires an event to keep running
+when the provider does not: a stale `track_refs` row is served in preference to an error, and a write
+path — suggesting a track, adding one to a playlist — never calls the provider at all. It validates the
+video id's shape and stores it, and metadata is resolved on read. So a spent quota costs titles, not
+votes.
 
 ---
 
@@ -937,7 +943,7 @@ table to walk through at defence.
 | IV.1 | dependencies install from a fresh clone | §14.2, `Makefile`, `docker-compose.yml` | **done** -- clone, `cp .env.example .env`, fill, `make up`. Verified end to end: the API container serves `/health` and `/health/ready` against the compose PostgreSQL |
 | IV.2 | mobile app covers all operations | `MusicRoomApp/`, [[musicroom-mobile]] | sequential workstream, owned by the UI developer; starts after S9 — [[delivery-plan]] "Work split" |
 | VII | submitted in the git repository | [[ADR-0020-monorepo-layout]] | **designed** -- one clone holds backend, client and documentation |
-| III | the SDK must not do our work | §4.2, §9.3 | designed |
+| III | the SDK must not do our work | §9.3, `tests/.../Catalog` | **implemented** — `GET /api/v1/tracks` and `GET /api/v1/tracks/{youtubeVideoId}`, both authenticated, behind one adapter and ADR-0023's two cache levels. YouTube supplies metadata only: voting, licences, visibility, delegation and collaborative editing are this system's own logic and none of them calls the provider. A write path never does either, so a provider outage costs titles rather than an event. The key is server-side, the quota cost of every call is logged, and no test spends it |
 
 "Designed" means the decision and the mechanism are recorded, and nothing more. "Partly
 implemented" and "done" name code that exists on a branch and passes `make agent-check`; the row

@@ -30,6 +30,7 @@ public static class PersistenceServiceRegistration
         IdentityRepositories.Add(services);
         CollaborationRepositories.Add(services);
         PlaybackRepositories.Add(services);
+        CatalogRepositories.Add(services);
 
         services.AddScoped<IAuditSink, AuditSink>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -83,4 +84,17 @@ internal static class PlaybackRepositories
         services.AddScoped<IPlaybackSessionRepository, PlaybackSessionRepository>();
         services.AddScoped<IPlaybackQueueReader, PlaybackQueueReader>();
     }
+}
+
+/// <summary>The catalog's persistent cache — the fourth context, ADR-0023's L2.</summary>
+/// <remarks>
+/// Its own group for the same reason the other three have one: the coupling gate caps a single registration
+/// method at 30 types, and a new repository should have one obvious home.
+/// </remarks>
+internal static class CatalogRepositories
+{
+    /// <summary>Registers them.</summary>
+    /// <param name="services">The container being built.</param>
+    internal static void Add(IServiceCollection services) =>
+        services.AddScoped<ITrackRefRepository, TrackRefRepository>();
 }

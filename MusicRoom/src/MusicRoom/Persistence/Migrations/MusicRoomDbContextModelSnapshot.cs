@@ -1009,6 +1009,101 @@ namespace MusicRoom.Persistence.Migrations
                     b.ToTable("refresh_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("MusicRoom.Domain.Entities.TrackRef", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("channel");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<int>("DurationSeconds")
+                        .HasColumnType("integer")
+                        .HasColumnName("duration_seconds");
+
+                    b.Property<DateTime>("FetchedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fetched_at_utc");
+
+                    b.Property<string>("ThumbnailUrl")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("thumbnail_url");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("YoutubeVideoId")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("youtube_video_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("YoutubeVideoId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_track_refs_youtube_video_id");
+
+                    b.ToTable("track_refs", (string)null);
+                });
+
+            modelBuilder.Entity("MusicRoom.Domain.Entities.TrackSearchCache", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTime>("FetchedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("fetched_at_utc");
+
+                    b.Property<string>("Query")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("query");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.PrimitiveCollection<string[]>("VideoIds")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("video_ids");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Query")
+                        .IsUnique()
+                        .HasDatabaseName("ux_track_search_cache_query");
+
+                    b.ToTable("track_search_cache", (string)null);
+                });
+
             modelBuilder.Entity("MusicRoom.Domain.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
