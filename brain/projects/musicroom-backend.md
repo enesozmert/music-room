@@ -31,7 +31,7 @@ Single source of truth for all service data. Clients are thin remote controls.
 | Code limits | 40-line methods, complexity 10, 15 methods/type, analyzer-enforced ([[ADR-0009-code-quality-gates]]) |
 | CI | GitHub Actions, `dev` and `prod` configs, **no deploy** ([[ADR-0015-hosting-and-deployment]]) |
 | Runtime | local Docker on a declared machine; DB Supabase Free, Frankfurt ([[ADR-0016-supabase-plan-region]]) |
-| Mail | hosted provider free tier, behind `IMailService` ([[ADR-0013-mail-provider]]) |
+| Mail | **Brevo**, behind `IMailService`, selected by `MAIL_PROVIDER`; sandbox sender ([[ADR-0013-mail-provider]], SPEC-024) |
 
 ## Bounded contexts (planned)
 
@@ -85,6 +85,7 @@ landed.
 |---|---|
 | S0 | solution, `Directory.Packages.props`, compose with a local PostgreSQL, `Makefile`, CI, `/health`, `/health/ready`, generated OpenAPI |
 | S1 | registration, email verification and resend, login, JWT + refresh rotation with reuse detection, password reset, credential rate limits, **bearer validation and the session endpoints** |
+| S1a | **complete**: the hosted mail sender. `MAIL_PROVIDER` chooses `brevo` or, on a Development host only, the sender that logs the link; a host with neither does not start. Verification and reset messages reach a real mailbox from Brevo's sandbox sender — O17 and T-26 closed |
 | S4 | the catalog: one YouTube adapter behind `ICatalogProvider`, two cache levels (`IMemoryCache`, then `track_refs`), a cached query-to-ids mapping, `GET /tracks` with a 30-a-minute per-account limit, and `503` rather than `500` when the quota is spent. **Not yet:** `DATABASE_URL` still points at the local container, not Supabase |
 | S2 | mandatory client headers and the audit log, refusal outcomes included — REST only; the hub filter waits for a hub |
 | S3 | **complete**: own profile with per-field visibility and music preferences, the friends graph, and reading another user's profile projected per field against the relationship |
@@ -102,8 +103,10 @@ written down twice.
 
 - Remaining open: remote deployment target (O11), SignalR backplane (O8, deliberately deferred),
   fluent assertion library (O12), silent-controller recovery (O13), music preferences consumer (O14),
-  OpenTelemetry evidence (O16), self-hosted vault (O18), RLS policies (O20),   the Npgsql pool against `max_connections` (O22, opened by the load measurement).
-- **Credentials received:** Brevo API key for mail (unblocking O17/S1a), YouTube and Supabase keys (unblocking S4). Facebook/Google OIDC credentials for S8 are partially pending.
+  OpenTelemetry evidence (O16), self-hosted vault (O18), RLS policies (O20),
+  the Npgsql pool against `max_connections` (O22, opened by the load measurement). **O17 closed**
+  2026-10-04 with the Brevo sender.
+- **Credentials received:** Brevo API key for mail (**spent — S1a is built**), YouTube and Supabase keys (unblocking S4). Facebook/Google OIDC credentials for S8 are partially pending.
 - **The decisions taken during S1 to S3 are now recorded as ADRs**, so deleting a spec loses nothing:
   [[ADR-0036-access-token-mechanics]], [[ADR-0037-credential-rate-limiting]],
   [[ADR-0032-refresh-token-lifetime]], [[ADR-0033-audit-write-posture]] and

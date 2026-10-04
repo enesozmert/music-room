@@ -41,6 +41,11 @@ public sealed class TrackEndpointTests : IAsyncLifetime
             webHost.UseSetting("DATABASE_URL", _database.GetConnectionString());
             TestJwtSettings.Apply(webHost);
             TestRateLimitSettings.Relax(webHost);
+
+            // SPEC-024 made a host without a mail sender refuse to start, so every suite that boots the
+            // application names one — the Development-only logging sender here, since this suite is the
+            // catalog's. MailProviderStartupTests is the one that deliberately does not.
+            TestMailSettings.Apply(webHost);
             webHost.ConfigureTestServices(services =>
             {
                 services.AddSingleton<IMailService>(_mail);

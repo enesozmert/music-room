@@ -16,6 +16,10 @@
          timeout, retry and circuit breaker `youtube-integration` requires — ADR-0003. Confined to this
          project: Application declares ICatalogProvider and never learns that it is reached over HTTP. -->
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <!-- SPEC-024 gate 2. The hosted mail sender is an outbound HTTP call, and this is what gives it a
+         typed client with a timeout the container configures — ADR-0013. Confined to this project:
+         Application declares IMailService and never learns that a provider is reached over HTTP. -->
+    <PackageReference Include="Microsoft.Extensions.Http" />
   </ItemGroup>
 
 </Project>
