@@ -9,6 +9,7 @@ using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Domain.Entities;
 using MusicRoom.Infrastructure;
 using MusicRoom.Infrastructure.Catalog;
+using MusicRoom.Infrastructure.Messaging;
 using MusicRoom.Infrastructure.Security;
 using MusicRoom.Persistence;
 using MusicRoom.WebAPI.Endpoints;
@@ -48,9 +49,9 @@ public class Program
         builder.Services.AddApplicationServices();
         builder.Services.AddPersistenceServices(connectionString);
 
-        // Through a helper rather than inline: CA1506 caps `Main` at 41 coupled types and it is at the limit,
-        // so SPEC-025's CatalogOptions pushed it over — the same reason CallerServices and RealtimeServices
-        // below are their own classes.
+        // Through a helper rather than inline: CA1506 caps `Main` at 41 coupled types and it is at the
+        // limit, so SPEC-024's MailOptions and SPEC-025's CatalogOptions each pushed it over — the same
+        // reason CallerServices and RealtimeServices below are their own classes.
         InfrastructureSetup.Add(builder);
 
         ApiServices.Add(builder.Services, builder.Configuration);
@@ -180,14 +181,27 @@ internal static class EnvironmentConfiguration
     }
 
     /// <summary>
-    /// Reads where the client serves the verification screen. Read the way <c>DATABASE_URL</c> is —
-    /// straight from configuration, with no default — but unset is tolerated rather than fatal: the
-    /// Development sender then logs the bare token and says the variable is missing. A hard-coded
-    /// fallback would print a link to a machine nobody intended, which is the failure mode this
-    /// avoids. Absent while the hosted provider is still O17 / slice S1a.
+    /// Reads which mail sender to run and what it needs — ADR-0013, SPEC-024.
     /// </summary>
-    internal static string? ReadVerificationLinkBaseUrl(IConfiguration configuration) =>
-        configuration["VERIFICATION_LINK_BASE_URL"];
+    /// <remarks>
+    /// Read the way <c>DATABASE_URL</c> is, straight from configuration with no default, and validated by
+    /// <see cref="MailOptions.Validate"/> inside the registration rather than here: a missing provider, a
+    /// missing key and the Development-only sender on a production host are one rule, and it belongs with the
+    /// code that acts on it.
+    /// <para>
+    /// The two link bases are tolerated unset rather than fatal — a message then carries the bare token and
+    /// says what to do with it. A hard-coded fallback would send a link to a machine nobody intended, which
+    /// is the failure mode this avoids.
+    /// </para>
+    /// </remarks>
+    internal static MailOptions ReadMailOptions(IConfiguration configuration) =>
+        new(
+            (configuration["MAIL_PROVIDER"] ?? string.Empty).Trim().ToLowerInvariant(),
+            configuration["MAIL_API_KEY"],
+            configuration["MAIL_FROM"],
+            configuration["MAIL_FROM_NAME"],
+            configuration["VERIFICATION_LINK_BASE_URL"],
+            configuration["PASSWORD_RESET_LINK_BASE_URL"]);
 
     /// <summary>
     /// Reads the catalog's key and cache lifetimes — ADR-0003, ADR-0023.
@@ -229,18 +243,18 @@ internal static class EnvironmentConfiguration
 /// </summary>
 /// <remarks>
 /// Its own class rather than more lines in <c>Main</c>, which CA1506 caps at 41 coupled types and which
-/// SPEC-025 pushed to 42 by adding <see cref="CatalogOptions"/> to the record — the same reason
+/// SPEC-024 and SPEC-025 pushed it to 42 by adding <see cref="MailOptions"/> and <see cref="CatalogOptions"/> to the record — the same reason
 /// <c>CallerServices</c> exists.
 /// </remarks>
 internal static class InfrastructureSetup
 {
-    /// <summary>Registers the hasher, the token issuer, the attempt limiter, the catalog and the sender.</summary>
+    /// <summary>Registers the hasher, the token issuer, the attempt limiter, the mail sender and the catalog.</summary>
     /// <param name="builder">The host being built.</param>
     internal static void Add(WebApplicationBuilder builder) =>
         builder.Services.AddInfrastructureServices(new InfrastructureOptions(
             EnvironmentConfiguration.ReadBCryptWorkFactor(builder.Configuration),
             builder.Environment.IsDevelopment(),
-            EnvironmentConfiguration.ReadVerificationLinkBaseUrl(builder.Configuration),
+            EnvironmentConfiguration.ReadMailOptions(builder.Configuration),
             EnvironmentConfiguration.ReadCatalogOptions(builder.Configuration),
             EnvironmentConfiguration.RequireJwtOptions(builder.Configuration),
             EnvironmentConfiguration.ReadCredentialAttemptLimits(builder.Configuration)));

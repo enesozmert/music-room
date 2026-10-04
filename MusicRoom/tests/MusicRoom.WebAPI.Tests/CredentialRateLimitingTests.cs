@@ -301,6 +301,7 @@ public sealed class CredentialRateLimitingTests : IAsyncLifetime
         {
             webHost.UseSetting("DATABASE_URL", _database.GetConnectionString());
             TestJwtSettings.Apply(webHost);
+            TestMailSettings.Apply(webHost);
 
             foreach ((string key, string value) in settings)
             {

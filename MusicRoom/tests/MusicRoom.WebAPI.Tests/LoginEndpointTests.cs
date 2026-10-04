@@ -38,6 +38,7 @@ public sealed class LoginEndpointTests : IAsyncLifetime
         {
             webHost.UseSetting("DATABASE_URL", _database.GetConnectionString());
             TestJwtSettings.Apply(webHost);
+            TestMailSettings.Apply(webHost);
             TestRateLimitSettings.Relax(webHost);
             webHost.ConfigureTestServices(services =>
                 services.AddSingleton<IMailService>(_mail));
@@ -238,6 +239,25 @@ internal static class TestJwtSettings
         webHost.UseSetting("JWT_AUDIENCE", "musicroom-tests-client");
         webHost.UseSetting("JWT_ACCESS_TOKEN_MINUTES", "15");
     }
+}
+
+/// <summary>
+/// The mail sender a test host runs, because SPEC-024 made a sender a start-up requirement.
+/// </summary>
+/// <remarks>
+/// Every suite that builds a host needs one, the way every suite needs <see cref="TestJwtSettings"/>: with no
+/// `MAIL_PROVIDER` the application refuses to start, which is the guard that closed T-26 and is asserted by
+/// `MailProviderStartupTests` — the one suite that deliberately does not call this.
+/// <para>
+/// `logging` rather than `brevo`, so no suite can reach a provider or spend its quota (T-19).
+/// </para>
+/// </remarks>
+internal static class TestMailSettings
+{
+    /// <summary>Registers the Development sender on a test host.</summary>
+    /// <param name="webHost">The builder being configured.</param>
+    internal static void Apply(IWebHostBuilder webHost) =>
+        webHost.UseSetting("MAIL_PROVIDER", "logging");
 }
 
 /// <summary>

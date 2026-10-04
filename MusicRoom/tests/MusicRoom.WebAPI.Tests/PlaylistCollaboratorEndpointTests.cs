@@ -39,6 +39,7 @@ public sealed class PlaylistCollaboratorEndpointTests : IAsyncLifetime
         {
             webHost.UseSetting("DATABASE_URL", _database.GetConnectionString());
             TestJwtSettings.Apply(webHost);
+            TestMailSettings.Apply(webHost);
             TestRateLimitSettings.Relax(webHost);
             webHost.ConfigureTestServices(services =>
                 services.AddSingleton<IMailService>(_mail));

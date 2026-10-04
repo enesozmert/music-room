@@ -105,6 +105,7 @@ public sealed class HealthEndpointTests
 
             // The JWT settings are start-up requirements too, since SPEC-005.
             TestJwtSettings.Apply(webHost);
+            TestMailSettings.Apply(webHost);
 
             webHost.ConfigureTestServices(services =>
                 services.Configure<HealthCheckServiceOptions>(options =>

@@ -4,6 +4,7 @@ using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Domain.Entities;
 using MusicRoom.Infrastructure;
 using MusicRoom.Infrastructure.Catalog;
+using MusicRoom.Infrastructure.Messaging;
 using MusicRoom.Infrastructure.Security;
 using Xunit;
 
@@ -103,11 +104,16 @@ public sealed class LoggingMailServiceTests
     }
 
     /// <summary>
-    /// Outside Development the registration refuses to run. The guard is mechanical, not a promise:
+    /// Outside Development this sender refuses to be registered. The guard is mechanical, not a promise:
     /// no code path writes a verification token into a non-Development log.
     /// </summary>
+    /// <remarks>
+    /// SPEC-024 moved the rule from "the host must be Development" to "the configured provider must be
+    /// allowed here", which is the same refusal for this sender and no longer blocks a host that has a real
+    /// one — T-26, ADR-0013.
+    /// </remarks>
     [Fact]
-    public void AddInfrastructureServices_OutsideDevelopment_Throws()
+    public void AddInfrastructureServices_WithTheLoggingSenderOutsideDevelopment_Throws()
     {
         // Arrange
         ServiceCollection services = new();
@@ -116,8 +122,9 @@ public sealed class LoggingMailServiceTests
         InvalidOperationException exception = Assert.Throws<InvalidOperationException>(
             () => services.AddInfrastructureServices(Options(isDevelopment: false)));
 
-        // Assert — the message names the decision, not a way to make start-up succeed.
-        Assert.Contains("S1a", exception.Message, StringComparison.Ordinal);
+        // Assert — the message names the decision and the way out, which is a real provider.
+        Assert.Contains("T-26", exception.Message, StringComparison.Ordinal);
+        Assert.Contains(MailOptions.BrevoProvider, exception.Message, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -129,7 +136,7 @@ public sealed class LoggingMailServiceTests
         new(
             WorkFactor,
             isDevelopment,
-            BaseUrl,
+            new MailOptions(MailOptions.LoggingProvider, null, null, null, BaseUrl, BaseUrl),
 
             // No key: this suite is about the mail sender, and a catalog with no key reaches no provider.
             new CatalogOptions(
@@ -151,9 +158,10 @@ public sealed class LoggingMailServiceTests
     private static IMailService ResolveMailService(MessageLog log, string? verificationLinkBaseUrl)
     {
         ServiceCollection services = new();
-        services.AddInfrastructureServices(Options(isDevelopment: true) with
+        InfrastructureOptions options = Options(isDevelopment: true);
+        services.AddInfrastructureServices(options with
         {
-            VerificationLinkBaseUrl = verificationLinkBaseUrl,
+            Mail = options.Mail with { VerificationLinkBaseUrl = verificationLinkBaseUrl },
         });
 
         ServiceDescriptor descriptor = services.Single(
@@ -191,7 +199,7 @@ public sealed class LoggingMailServiceTests
     /// Answers the one service the registered factory asks for. Hand-written rather than mocked:
     /// this test project pins no mocking package, and one service is all the factory needs.
     /// </summary>
-    private sealed class RecordingLoggerProvider : IServiceProvider
+    internal sealed class RecordingLoggerProvider : IServiceProvider
     {
         private readonly MessageLog _log;
 

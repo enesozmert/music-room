@@ -5,6 +5,7 @@ using MusicRoom.Application.Abstractions.Persistence;
 using MusicRoom.Domain.Entities;
 using MusicRoom.Infrastructure;
 using MusicRoom.Infrastructure.Catalog;
+using MusicRoom.Infrastructure.Messaging;
 using MusicRoom.Infrastructure.Security;
 using Xunit;
 
@@ -243,7 +244,7 @@ public sealed class CachedCatalogTests
         services.AddInfrastructureServices(new InfrastructureOptions(
             WorkFactor,
             IsDevelopment: true,
-            VerificationLinkBaseUrl: null,
+            new MailOptions(MailOptions.LoggingProvider, null, null, null, null, null),
             options,
             new JwtOptions(
                 new string('k', JwtOptions.MinimumSigningKeyBytes),
