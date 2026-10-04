@@ -4,11 +4,13 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MusicRoom.Application;
 using MusicRoom.Application.Abstractions.Auditing;
+using MusicRoom.Application.Abstractions.Configuration;
 using MusicRoom.Application.Abstractions.Realtime;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Domain.Entities;
 using MusicRoom.Infrastructure;
 using MusicRoom.Infrastructure.Catalog;
+using MusicRoom.Infrastructure.Configuration;
 using MusicRoom.Infrastructure.Messaging;
 using MusicRoom.Infrastructure.Security;
 using MusicRoom.Persistence;
@@ -113,26 +115,32 @@ public class Program
 internal static class EnvironmentConfiguration
 {
     /// <summary>
+    /// The provider every read below goes through — [[ADR-0029]], SPEC-030.
+    /// </summary>
+    /// <param name="configuration">The configuration the host built.</param>
+    /// <returns>The provider.</returns>
+    /// <remarks>
+    /// Constructed here rather than resolved from the container, because these reads happen **while** services
+    /// are being registered: the connection string and the JWT settings are needed before a container exists to
+    /// resolve anything from. The same type is registered as well, so a later request-time reader gets the same
+    /// behaviour — <c>AddInfrastructureServices</c>.
+    /// </remarks>
+    internal static ISecretProvider For(IConfiguration configuration) => new EnvSecretProvider(configuration);
+
+    /// <summary>
     /// Reads the vendor-neutral <c>DATABASE_URL</c> — ADR-0026. There is deliberately no fallback
     /// and no default: a missing connection string fails start-up loudly rather than quietly
     /// pointing the application somewhere nobody intended.
     /// </summary>
-    internal static string RequireDatabaseUrl(IConfiguration configuration)
-    {
-        string? connectionString = configuration["DATABASE_URL"];
-
-        return string.IsNullOrWhiteSpace(connectionString)
-            ? throw new InvalidOperationException(
-                "DATABASE_URL is not set. Copy .env.example to .env and fill it in — see ADR-0026.")
-            : connectionString;
-    }
+    internal static string RequireDatabaseUrl(IConfiguration configuration) =>
+        For(configuration).Require("DATABASE_URL");
 
     /// <summary>
     /// Reads the BCrypt cost. The floor is enforced in the hasher, not here: configuration is
     /// allowed to raise the cost and never to drop it below ADR-0007's minimum.
     /// </summary>
     internal static int ReadBCryptWorkFactor(IConfiguration configuration) =>
-        configuration.GetValue("Security:BCryptWorkFactor", BCryptPasswordHasher.MinimumWorkFactor);
+        For(configuration).ReadInteger("Security:BCryptWorkFactor", BCryptPasswordHasher.MinimumWorkFactor);
 
     /// <summary>
     /// Reads the four JWT settings — SDD §13.1. Read the way <c>DATABASE_URL</c> is: straight from
@@ -142,10 +150,12 @@ internal static class EnvironmentConfiguration
     /// </summary>
     internal static JwtOptions RequireJwtOptions(IConfiguration configuration)
     {
-        string? signingKey = configuration["JWT_SIGNING_KEY"];
-        string? issuer = configuration["JWT_ISSUER"];
-        string? audience = configuration["JWT_AUDIENCE"];
-        string? accessTokenMinutes = configuration["JWT_ACCESS_TOKEN_MINUTES"];
+        ISecretProvider secrets = For(configuration);
+
+        string? signingKey = secrets.Read("JWT_SIGNING_KEY");
+        string? issuer = secrets.Read("JWT_ISSUER");
+        string? audience = secrets.Read("JWT_AUDIENCE");
+        string? accessTokenMinutes = secrets.Read("JWT_ACCESS_TOKEN_MINUTES");
 
         if (string.IsNullOrWhiteSpace(issuer)
             || string.IsNullOrWhiteSpace(audience)
@@ -169,13 +179,15 @@ internal static class EnvironmentConfiguration
     /// </summary>
     internal static CredentialAttemptLimits ReadCredentialAttemptLimits(IConfiguration configuration)
     {
-        int permits = configuration.GetValue(
+        ISecretProvider secrets = For(configuration);
+
+        int permits = secrets.ReadInteger(
             "RATE_LIMIT_ACCOUNT_PERMITS",
             CredentialAttemptLimits.DefaultPermitsPerWindow);
-        int windowMinutes = configuration.GetValue(
+        int windowMinutes = secrets.ReadInteger(
             "RATE_LIMIT_ACCOUNT_WINDOW_MINUTES",
             CredentialAttemptLimits.DefaultWindowMinutes);
-        int penaltyWindows = configuration.GetValue(
+        int penaltyWindows = secrets.ReadInteger(
             "RATE_LIMIT_ACCOUNT_MAX_PENALTY_WINDOWS",
             CredentialAttemptLimits.DefaultMaximumPenaltyWindows);
 
@@ -200,14 +212,20 @@ internal static class EnvironmentConfiguration
     /// is the failure mode this avoids.
     /// </para>
     /// </remarks>
-    internal static MailOptions ReadMailOptions(IConfiguration configuration) =>
-        new(
-            (configuration["MAIL_PROVIDER"] ?? string.Empty).Trim().ToLowerInvariant(),
-            configuration["MAIL_API_KEY"],
-            configuration["MAIL_FROM"],
-            configuration["MAIL_FROM_NAME"],
-            configuration["VERIFICATION_LINK_BASE_URL"],
-            configuration["PASSWORD_RESET_LINK_BASE_URL"]);
+    internal static MailOptions ReadMailOptions(IConfiguration configuration)
+    {
+        ISecretProvider secrets = For(configuration);
+
+        // The provider already reads blank as absent, so `MAIL_PROVIDER=` arrives here as null and
+        // `MailOptions.Validate` refuses it — the behaviour SPEC-024 built, now decided in one place.
+        return new MailOptions(
+            (secrets.Read("MAIL_PROVIDER") ?? string.Empty).Trim().ToLowerInvariant(),
+            secrets.Read("MAIL_API_KEY"),
+            secrets.Read("MAIL_FROM"),
+            secrets.Read("MAIL_FROM_NAME"),
+            secrets.Read("VERIFICATION_LINK_BASE_URL"),
+            secrets.Read("PASSWORD_RESET_LINK_BASE_URL"));
+    }
 
     /// <summary>
     /// Reads the realtime ceilings and the allowed origins — [[ADR-0030]], numbers of 2026-10-04.
@@ -240,13 +258,13 @@ internal static class EnvironmentConfiguration
     /// <summary>The origins a browser may connect from, as `CORS_ALLOWED_ORIGINS` lists them.</summary>
     internal static IReadOnlyList<string> ReadOrigins(IConfiguration configuration) =>
         [
-            .. (configuration["CORS_ALLOWED_ORIGINS"] ?? string.Empty)
+            .. (For(configuration).Read("CORS_ALLOWED_ORIGINS") ?? string.Empty)
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
         ];
 
     private static int ReadCeiling(IConfiguration configuration, string key, int approved)
     {
-        int configured = configuration.GetValue(key, approved);
+        int configured = For(configuration).ReadInteger(key, approved);
 
         return configured > 0 ? configured : approved;
     }
@@ -265,7 +283,7 @@ internal static class EnvironmentConfiguration
     /// </remarks>
     internal static CatalogOptions ReadCatalogOptions(IConfiguration configuration) =>
         new(
-            configuration["YOUTUBE_API_KEY"],
+            For(configuration).Read("YOUTUBE_API_KEY"),
             ReadSpan(configuration, "CATALOG_TRACK_LIFETIME_HOURS", TrackRef.DefaultLifetime),
             ReadSpan(configuration, "CATALOG_SEARCH_LIFETIME_HOURS", TrackSearchCache.DefaultLifetime),
             CatalogOptions.DefaultMemoryLifetime,
@@ -280,7 +298,7 @@ internal static class EnvironmentConfiguration
     /// </remarks>
     private static TimeSpan ReadSpan(IConfiguration configuration, string key, TimeSpan approved)
     {
-        int hours = configuration.GetValue(key, 0);
+        int hours = For(configuration).ReadInteger(key, 0);
 
         return hours > 0 ? TimeSpan.FromHours(hours) : approved;
     }
@@ -543,7 +561,9 @@ internal static class Observability
     {
         const string serviceName = "musicroom-api";
 
-        bool exporterEnabled = configuration.GetValue("OTEL_EXPORTER_ENABLED", defaultValue: false);
+        bool exporterEnabled = EnvironmentConfiguration
+            .For(configuration)
+            .ReadBoolean("OTEL_EXPORTER_ENABLED", fallback: false);
 
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource.AddService(serviceName))

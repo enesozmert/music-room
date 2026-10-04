@@ -1,7 +1,10 @@
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using MusicRoom.Application.Abstractions.Configuration;
 using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Infrastructure.Catalog;
+using MusicRoom.Infrastructure.Configuration;
 using MusicRoom.Infrastructure.Messaging;
 using MusicRoom.Infrastructure.Security;
 
@@ -33,6 +36,11 @@ public static class InfrastructureServiceRegistration
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(options);
+
+        // Registered as well as constructed at start-up: the composition root needs one before a container
+        // exists, and anything resolving the abstraction later must get the same behaviour — SPEC-030.
+        services.AddSingleton<ISecretProvider>(provider =>
+            new EnvSecretProvider(provider.GetRequiredService<IConfiguration>()));
 
         services.AddSingleton<IPasswordHasher>(_ => new BCryptPasswordHasher(options.BCryptWorkFactor));
 
