@@ -75,6 +75,7 @@ Subject V.1, V.5. Rules: [[authentication-authorization]], [[social-oauth]].
 | DELETE | `/auth/sessions/{sessionId}` | — | `204` | `401`, `404` | `self` |
 | POST | `/auth/password-reset-requests` | `email` | `202` | `429` | `anon` |
 | POST | `/auth/password-resets` | `token`, `newPassword` | `204` | `400`, `410`, `422`, `429` | `anon` |
+| POST | `/me/password` | `currentPassword`, `newPassword` | `204` | `401`, `422`, `429` | `auth` |
 | GET | `/auth/social-links` | — | `200` list | `401` | `self` |
 | POST | `/auth/social-links` | `provider`, `idToken` | `201` | `409` already linked, `422` | `auth` |
 | DELETE | `/auth/social-links/{provider}` | — | `204` | `409` last sign-in method | `self` |
@@ -110,6 +111,15 @@ replacement passes.
 - `/auth/tokens` performs refresh **rotation**. Presenting an already-rotated refresh token
   revokes the whole family and returns `401` — this is the session-theft detector (T-03).
 - `/auth/password-resets` revokes every refresh token for that account on success.
+- **`POST /me/password` answers `422` for a wrong current password, not `401`** (SPEC-028). The caller's token
+  is valid and the request is authenticated; what failed is a precondition, and a `401` would tell a
+  well-behaved client its session had ended and send it into a refresh-then-retry loop over a typo. There is
+  nothing to hide either — the caller already knows which account this is — so the message says which check
+  failed.
+- **A change ends every *other* session; the caller's own survives**, because it is the session that just
+  proved it holds the new credential. A reset cannot prove that and still revokes every family (ASVS V7.4.3).
+  The route carries both halves of the credential limit, a per-IP policy and the per-account counter, so a
+  stolen access token is not an oracle for guessing the password at request speed.
 - **A session is a refresh-token family.** `GET /auth/sessions` returns one entry per live family with the
   `platform`, `device` and `appVersion` that started it, when it started and when it stops being renewable —
   never a token or a digest. `DELETE /auth/sessions/current` ends the family named by the access token's

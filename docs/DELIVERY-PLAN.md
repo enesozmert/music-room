@@ -184,7 +184,7 @@ got.
 | # | Slice | Delivers | Subject | State |
 |---|---|---|---|---|
 | S0 | Walking skeleton | solution per [[ADR-0011-solution-layout]], `Directory.Packages.props` with the set in [[ADR-0021-backend-dependency-set]], `docker compose` with a **local PostgreSQL container** ([[ADR-0026-environment-bring-up]]), `Makefile`, CI, `/health`, `/health/ready`, published OpenAPI | IV.1, V.8 | merged |
-| S1 | Identity | register (BCrypt cost >= 12), email verification, login, JWT + refresh rotation, password reset | V.1, V.6 | merged |
+| S1 | Identity | register (BCrypt cost >= 12), email verification, login, JWT + refresh rotation, password reset, **and changing a password while signed in** — `POST /me/password`, SPEC-028, which revokes every other session and keeps the caller's | V.1, V.6 | merged |
 | S1a | Mail provider adapter | the real hosted-provider implementation of `IMailService` — issue O17, closed 2026-10-04 by SPEC-024: `BrevoMailService` behind the abstraction, selected by `MAIL_PROVIDER`, with the Development logging sender kept for local work and refused anywhere else. The precondition held: the T-25 rate limiter landed with SPEC-006 | V.1 | merged |
 | S1b | Secret vault | self-hosted Infisical under a `vault` compose profile, plus `InfisicalSecretProvider` behind the abstraction — issue O18, [[ADR-0029-containerised-dev-and-secret-vault]] | owner requirement | not started |
 | S2 | Audit + client context | required headers, middleware, audit behaviour, **SignalR hub filter**, audit table | V.6 | merged |

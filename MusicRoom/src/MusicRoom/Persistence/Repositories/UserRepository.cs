@@ -139,6 +139,46 @@ internal sealed class UserRepository : IUserRepository
             .SingleOrDefaultAsync(cancellationToken);
 
     /// <inheritdoc />
+    public Task<UserCredential?> FindCredentialByIdAsync(Guid userId, CancellationToken cancellationToken) =>
+        _context.Users
+            .AsNoTracking()
+            .Where(user => user.Id == userId)
+            // Projected in the database, as the by-address read is, so the hash arrives without the display
+            // name and the address that would make an accidental log entry a profile.
+            .Select(user => new UserCredential(user.Id, user.PasswordHash, user.IsEmailVerified))
+            .SingleOrDefaultAsync(cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<bool> TryChangePasswordAsync(
+        Guid userId,
+        string newPasswordHash,
+        Guid keepFamilyId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        // Both writes or neither — the reset path's reasoning, for the same reason: a change that replaced the
+        // hash and failed to revoke would leave a thief holding a live session behind a password its owner had
+        // already changed.
+        await using IDbContextTransaction? transaction =
+            await BeginIfNoneAsync(cancellationToken).ConfigureAwait(false);
+
+        int changedRows = await ReplacePasswordHashAsync(userId, newPasswordHash, nowUtc, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (changedRows == 0)
+        {
+            // No such account, or it is soft-deleted behind the global query filter. Nothing to commit.
+            return false;
+        }
+
+        await RevokeEveryRefreshTokenExceptAsync(userId, keepFamilyId, nowUtc, cancellationToken)
+            .ConfigureAwait(false);
+        await CommitIfOwnedAsync(transaction, cancellationToken).ConfigureAwait(false);
+
+        return true;
+    }
+
+    /// <inheritdoc />
     public async Task<bool> TryIssuePasswordResetTokenAsync(
         string email,
         PasswordResetToken token,
@@ -268,6 +308,29 @@ internal sealed class UserRepository : IUserRepository
         CancellationToken cancellationToken) =>
         _context.RefreshTokens
             .Where(token => token.UserId == userId && token.RevokedAtUtc == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(token => token.RevokedAtUtc, nowUtc)
+                    .SetProperty(token => token.UpdatedAtUtc, nowUtc),
+                cancellationToken);
+
+    /// <summary>
+    /// Revokes every unrevoked refresh token of an account **except** one family's — SPEC-028.
+    /// </summary>
+    /// <remarks>
+    /// ASVS V7.4.3 asks that the other sessions end after a credential change. Ending the caller's own as well
+    /// would log somebody out of the device they just used to change their password, which buys nothing: that
+    /// session already proved it holds the new credential.
+    /// </remarks>
+    private Task<int> RevokeEveryRefreshTokenExceptAsync(
+        Guid userId,
+        Guid keepFamilyId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken) =>
+        _context.RefreshTokens
+            .Where(token => token.UserId == userId
+                && token.FamilyId != keepFamilyId
+                && token.RevokedAtUtc == null)
             .ExecuteUpdateAsync(
                 setters => setters
                     .SetProperty(token => token.RevokedAtUtc, nowUtc)
