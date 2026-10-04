@@ -117,6 +117,44 @@ public interface IUserRepository
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Reads the stored credential for an account, by id.
+    /// </summary>
+    /// <param name="userId">The account from the validated token.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The credential, or null when no such account exists or it is soft-deleted.</returns>
+    /// <remarks>
+    /// By id rather than by address, because the caller of a password change is already authenticated and the
+    /// address is not part of that request — SPEC-028. The hash comes back so the handler can ask the hasher to
+    /// verify against it; nothing returns it to a caller and nothing logs it.
+    /// </remarks>
+    Task<UserCredential?> FindCredentialByIdAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Replaces an account's password hash and revokes every refresh family except one.
+    /// </summary>
+    /// <param name="userId">The account.</param>
+    /// <param name="newPasswordHash">The hash to store.</param>
+    /// <param name="keepFamilyId">The refresh family to spare: the caller's own session, which the `sid`
+    /// claim names — SPEC-010.</param>
+    /// <param name="nowUtc">The server's clock.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>True when the account existed and the write happened.</returns>
+    /// <remarks>
+    /// Both writes or neither, for the reason the reset path gives: a change that replaced the hash and failed
+    /// to revoke would leave a thief holding a live session behind a password its owner had already changed.
+    /// <para>
+    /// The caller's own family is spared deliberately — ASVS V7.4.3 asks that the *other* sessions end, and
+    /// logging somebody out of the device they just used to change their password is not a security gain.
+    /// </para>
+    /// </remarks>
+    Task<bool> TryChangePasswordAsync(
+        Guid userId,
+        string newPasswordHash,
+        Guid keepFamilyId,
+        DateTime nowUtc,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Spends a reset token, replaces the password hash, and revokes every refresh-token family the
     /// account holds — all three in one transaction.
     /// </summary>
