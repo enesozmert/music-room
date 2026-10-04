@@ -90,7 +90,8 @@ landed.
 | S5 | **complete**: playlists with their three gates, an `xmin` concurrency token and collaborators; tracks with a sparse ordering key, a guarded reorder and the twenty-way parallel move that proves it; `PlaylistHub` at `/hubs/playlists`, authorised on join, audited by ADR-0019's filter, broadcasting after the commit |
 | S6 | **complete**: the event aggregate with its three gates, the window, invitations and attendance; suggestions, votes, the vote-ordered queue counted from the rows, venue codes and ADR-0014's presence checks; `EventHub` at `/hubs/events`, sharing one broadcast pipeline and one audit filter with `PlaylistHub` |
 | S7 | **complete**: devices registered from the client headers; control delegation to a friend, guarded by the device row's `xmin`, with revoke and release; playback sessions with a server-chosen next track, an idempotent advance, an explicit jump and `NowPlayingChanged`; `ControlHub` telling both sides that control moved |
-| S9 | started: capacity measured — five Gatling scenarios under `tests/load/`, the numbers in `docs/load/REPORT.md`. **100 concurrent writers and 200 readers on the declared machine**, the ceiling being PostgreSQL's connection count and not CPU (O22). The run found a live defect: the rate limiter ran before authentication, so the per-account vote limit was a per-address limit — [[ADR-0041-limiter-after-authentication]]. Still open in S9: ADR-0030's hub limits (O21, numbers owed) and the `asvs-conformance` evidence |
+| S9 | capacity measured — five Gatling scenarios under `tests/load/`, numbers in `docs/load/REPORT.md`: **100 concurrent writers and 200 readers on the declared machine**, the ceiling being PostgreSQL's connection count and not CPU (O22). That run found a live defect — the rate limiter ran before authentication, so the per-account vote limit was a per-address limit ([[ADR-0041-limiter-after-authentication]]). The realtime limits are built too (SPEC-026): 5 connections per account, 20 per address, 60 hub invocations a minute per connection, and the handshake `Origin` checked against `CORS_ALLOWED_ORIGINS`, which code reads for the first time — O21 closed. Remaining in S9: the re-measurement ADR-0030 asks for, and the `asvs-conformance` evidence |
+
 
 **No counts here on purpose.** `docs/specs/` is the authority for what is done, [[migrations-index]]
 for the schema history, and `make agent-check` for the test count — each drifted within a day of being
@@ -100,8 +101,7 @@ written down twice.
 
 - Remaining open: remote deployment target (O11), SignalR backplane (O8, deliberately deferred),
   fluent assertion library (O12), silent-controller recovery (O13), music preferences consumer (O14),
-  OpenTelemetry evidence (O16), self-hosted vault (O18), RLS policies (O20), hub call limits (O21),
-  the Npgsql pool against `max_connections` (O22, opened by the load measurement).
+  OpenTelemetry evidence (O16), self-hosted vault (O18), RLS policies (O20),   the Npgsql pool against `max_connections` (O22, opened by the load measurement).
 - **Credentials received:** Brevo API key for mail (unblocking O17/S1a), YouTube and Supabase keys (unblocking S4). Facebook/Google OIDC credentials for S8 are partially pending.
 - **The decisions taken during S1 to S3 are now recorded as ADRs**, so deleting a spec loses nothing:
   [[ADR-0036-access-token-mechanics]], [[ADR-0037-credential-rate-limiting]],

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using MusicRoom.WebAPI.Hubs;
 
 namespace MusicRoom.WebAPI.Middleware;
 
@@ -46,10 +47,22 @@ public sealed class ClientContextMiddleware
     private static readonly string[] _mutatingMethods = ["POST", "PUT", "PATCH", "DELETE"];
 
     private readonly RequestDelegate _next;
+    private readonly HubConnectionRegistry _connections;
+    private readonly HubConnectionLimits _limits;
 
-    /// <summary>Takes the next stage of the pipeline.</summary>
+    /// <summary>Takes the next stage of the pipeline and the realtime ceilings.</summary>
     /// <param name="next">The rest of the pipeline.</param>
-    public ClientContextMiddleware(RequestDelegate next) => _next = next;
+    /// <param name="connections">The current connection counts, for the handshake ceiling.</param>
+    /// <param name="limits">ADR-0030's numbers and the allowed origins.</param>
+    public ClientContextMiddleware(
+        RequestDelegate next,
+        HubConnectionRegistry connections,
+        HubConnectionLimits limits)
+    {
+        _next = next;
+        _connections = connections;
+        _limits = limits;
+    }
 
     /// <summary>Validates the headers, or refuses the request.</summary>
     /// <param name="httpContext">The request being handled.</param>
@@ -68,16 +81,41 @@ public sealed class ClientContextMiddleware
         // headers. Everywhere else they are headers and only headers — SPEC-016 decision 3.
         bool fromQuery = IsHubHandshake(httpContext);
 
+        if (fromQuery && !await HandshakeIsAllowedAsync(httpContext).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        if (!TryReadContext(httpContext, fromQuery))
+        {
+            // Bodiless: the missing header names are in the contract, and a response listing which one was
+            // absent is a description of the client's own request that the client already has.
+            httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
+        await _next(httpContext);
+    }
+
+    /// <summary>
+    /// Reads the three values and stores them, or reports that one is missing.
+    /// </summary>
+    /// <param name="httpContext">The request being handled.</param>
+    /// <param name="fromQuery">Whether the values come from the handshake's query string.</param>
+    /// <returns>False when a value is absent, blank or overlong.</returns>
+    /// <remarks>
+    /// Its own method because SPEC-026 added the handshake checks above and pushed <c>InvokeAsync</c> past the
+    /// complexity gate; the branches here are the same ones it had.
+    /// </remarks>
+    private static bool TryReadContext(HttpContext httpContext, bool fromQuery)
+    {
         string? platform = Read(httpContext, PlatformHeader, fromQuery ? "platform" : null);
         string? device = Read(httpContext, DeviceHeader, fromQuery ? "device" : null);
         string? appVersion = Read(httpContext, AppVersionHeader, fromQuery ? "appVersion" : null);
 
         if (platform is null || device is null || appVersion is null)
         {
-            // Bodiless: the missing header names are in the contract, and a response listing which one was
-            // absent is a description of the client's own request that the client already has.
-            httpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-            return;
+            return false;
         }
 
         httpContext.Items[ContextItemKey] = new ClientContextValues(
@@ -89,7 +127,58 @@ public sealed class ClientContextMiddleware
             // middleware runs after UseAuthentication — SPEC-010.
             ClaimedUserId(httpContext));
 
-        await _next(httpContext);
+        return true;
+    }
+
+    /// <summary>
+    /// Refuses a handshake from a disallowed origin, or one that is already at the connection ceiling.
+    /// </summary>
+    /// <param name="httpContext">The negotiate being handled.</param>
+    /// <returns>False when the handshake has been refused and the response is written.</returns>
+    /// <remarks>
+    /// Here rather than in the hub, for the reason SPEC-016 recorded: a refusal thrown in `OnConnectedAsync` does
+    /// not reliably fail a client's `StartAsync` over long polling, so a check the client must see belongs in the
+    /// middleware. The authoritative ceiling is still the filter's — this one reads a count it does not own, and
+    /// two simultaneous negotiates can both pass it (SPEC-026 decision 2).
+    /// <para>
+    /// `403` for the origin and `429` for the ceiling: one is "not you, ever", the other is "not now". A client
+    /// can retry the second and should not retry the first.
+    /// </para>
+    /// </remarks>
+    private async Task<bool> HandshakeIsAllowedAsync(HttpContext httpContext)
+    {
+        string? origin = httpContext.Request.Headers.Origin.FirstOrDefault();
+
+        if (!_limits.AllowsOrigin(origin))
+        {
+            // Bodiless, and it names neither the allowed list nor the reason: a response that described the
+            // policy would be a probe for finding an origin that passes it.
+            httpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+
+            return false;
+        }
+
+        bool hasRoom = _connections.HasRoomFor(
+            HubConnectionRegistry.UserKey(ClaimedUserId(httpContext)),
+            _limits.ConnectionsPerUser)
+            && _connections.HasRoomFor(
+                HubConnectionRegistry.AddressKey(httpContext.Connection.RemoteIpAddress?.ToString()),
+                _limits.ConnectionsPerAddress);
+
+        if (hasRoom)
+        {
+            return true;
+        }
+
+        httpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+        // The wait is the honest one: a slot frees when a connection closes, and nothing here knows when that
+        // will be. A fixed number would be a guess dressed as a promise.
+        httpContext.Response.Headers.RetryAfter = "5";
+
+        await httpContext.Response.CompleteAsync().ConfigureAwait(false);
+
+        return false;
     }
 
     /// <summary>

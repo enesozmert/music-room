@@ -57,13 +57,19 @@ public class Program
         // The audit behaviour reads the client context through this abstraction; the implementation is a
         // WebAPI type because HttpContext is — SPEC-008.
         CallerServices.Add(builder.Services, builder.Configuration);
-        RealtimeServices.Add(builder.Services);
+        RealtimeServices.Add(builder);
         Observability.AddTracing(builder.Services, builder.Configuration);
         HealthRegistration.Add(builder.Services, connectionString);
 
         WebApplication app = builder.Build();
 
         app.UseSerilogRequestLogging();
+
+        // Before authentication, because a browser's preflight carries no credentials and must be answered
+        // whatever the request that follows it needs. The policy is the one `CORS_ALLOWED_ORIGINS` names, and an
+        // empty list allows nothing — SPEC-026 decision 6, which is also what gives ADR-0030's handshake check a
+        // list to compare against.
+        ApiServices.UseCrossOrigin(app);
 
         // Order is load-bearing, and this is the order ADR-0040 settled after SPEC-023 measured the vote
         // route. Authentication comes first, because the per-account policies partition on the validated
@@ -185,6 +191,48 @@ internal static class EnvironmentConfiguration
     /// </summary>
     internal static string? ReadVerificationLinkBaseUrl(IConfiguration configuration) =>
         configuration["VERIFICATION_LINK_BASE_URL"];
+
+    /// <summary>
+    /// Reads the realtime ceilings and the allowed origins — [[ADR-0030]], numbers of 2026-10-04.
+    /// </summary>
+    /// <remarks>
+    /// The decided values are the defaults, so a host that overrides nothing still limits at the approved
+    /// numbers. A non-positive override is ignored, exactly as the credential limits ignore one: configuration
+    /// may raise or lower a ceiling and must not be able to switch it off.
+    /// <para>
+    /// `CORS_ALLOWED_ORIGINS` is a comma-separated list and an empty value means **no** cross-origin request is
+    /// allowed. "Unset" reading as "everything" is how a development convenience becomes a production hole.
+    /// </para>
+    /// </remarks>
+    internal static HubConnectionLimits ReadHubLimits(IConfiguration configuration) =>
+        new(
+            ReadCeiling(
+                configuration,
+                "HUB_CONNECTIONS_PER_USER",
+                HubConnectionLimits.DefaultConnectionsPerUser),
+            ReadCeiling(
+                configuration,
+                "HUB_CONNECTIONS_PER_IP",
+                HubConnectionLimits.DefaultConnectionsPerAddress),
+            ReadCeiling(
+                configuration,
+                "HUB_INVOCATIONS_PER_MINUTE",
+                HubConnectionLimits.DefaultInvocationsPerConnectionPerMinute),
+            ReadOrigins(configuration));
+
+    /// <summary>The origins a browser may connect from, as `CORS_ALLOWED_ORIGINS` lists them.</summary>
+    internal static IReadOnlyList<string> ReadOrigins(IConfiguration configuration) =>
+        [
+            .. (configuration["CORS_ALLOWED_ORIGINS"] ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries),
+        ];
+
+    private static int ReadCeiling(IConfiguration configuration, string key, int approved)
+    {
+        int configured = configuration.GetValue(key, approved);
+
+        return configured > 0 ? configured : approved;
+    }
 }
 
 /// <summary>
@@ -258,6 +306,19 @@ internal static class CallerServices
 /// Its own class rather than more lines in <c>Main</c>, which CA1506 caps at 41 coupled types — the same
 /// reason <c>CallerServices</c> exists.
 /// </remarks>
+/// <summary>
+/// The cross-origin policy, from the list ADR-0030 and the hub handshake share.
+/// </summary>
+/// <remarks>
+/// Added by SPEC-026, which found `CORS_ALLOWED_ORIGINS` in `.env.example` and in no code: the ADR says the
+/// handshake validates `Origin` against *"the same list REST uses"*, and REST used none. One list, because two
+/// would drift — the reasoning ADR-0030 gives for not adding a second allowlist for the hub.
+/// <para>
+/// An empty list allows no cross-origin request at all. Credentials are allowed only for the named origins,
+/// which is why a wildcard is not an option here even in Development: `AllowAnyOrigin` with
+/// `AllowCredentials` is rejected by the framework, and rightly.
+/// </para>
+/// </remarks>
 internal static class RealtimeServices
 {
     /// <summary>
@@ -289,9 +350,13 @@ internal static class RealtimeServices
     }
 
     /// <summary>Registers the hub, its filter, the per-invocation caller and the broadcaster.</summary>
-    /// <param name="services">The container being built.</param>
-    internal static void Add(IServiceCollection services)
+    /// <param name="builder">The host being built. The ceilings are read from its configuration here rather
+    /// than in <c>Main</c>, which CA1506 caps at 41 coupled types and which this unit pushed to 42.</param>
+    internal static void Add(WebApplicationBuilder builder)
     {
+        IServiceCollection services = builder.Services;
+        HubConnectionLimits limits = EnvironmentConfiguration.ReadHubLimits(builder.Configuration);
+
         // Scoped: SignalR creates a scope per invocation, so one instance holds one call's caller. The two
         // accessors read it when there is no HttpContext.
         services.AddScoped<HubCaller>();
@@ -307,6 +372,9 @@ internal static class RealtimeServices
         });
 
         services.AddSingleton<HubAuditFilter>();
+        services.AddSingleton(limits);
+        services.AddSingleton<HubConnectionRegistry>();
+        services.AddSingleton(_ => new HubInvocationLimiter(TimeProvider.System));
         services.AddScoped<IRealtimeBroadcaster, RealtimeBroadcaster>();
     }
 }
@@ -316,6 +384,14 @@ internal static class RealtimeServices
 /// </summary>
 internal static class ApiServices
 {
+    /// <summary>
+    /// The name of the one cross-origin policy this API has.
+    /// </summary>
+    /// <remarks>
+    /// One policy, because ADR-0030 refused a second allowlist for the hub on the grounds that two lists drift.
+    /// </remarks>
+    internal const string CorsPolicy = "musicroom-clients";
+
     /// <summary>
     /// ADR-0021 chose the built-in rate limiting middleware. SPEC-006 replaced the S0 placeholder
     /// policy, which was registered and attached to nothing, with one policy per credential endpoint —
@@ -327,6 +403,49 @@ internal static class ApiServices
         services.AddProblemDetails();
         CredentialRateLimiterPolicies.Add(services, configuration);
         EventRateLimiterPolicies.Add(services);
+        AddCors(services, configuration);
+    }
+
+    /// <summary>
+    /// Applies the cross-origin policy to the pipeline.
+    /// </summary>
+    /// <param name="app">The application being built.</param>
+    /// <remarks>
+    /// Called from here rather than written inline in <c>Main</c>, which CA1506 caps at 41 coupled types: naming
+    /// the CORS extension there was the forty-second.
+    /// </remarks>
+    internal static void UseCrossOrigin(WebApplication app) => app.UseCors(CorsPolicy);
+
+    /// <summary>Registers the policy named by <see cref="CorsPolicy"/>.</summary>
+    /// <param name="services">The container being built.</param>
+    /// <param name="configuration">Where the origin list lives.</param>
+    private static void AddCors(IServiceCollection services, IConfiguration configuration)
+    {
+        string[] origins = [.. EnvironmentConfiguration.ReadOrigins(configuration)];
+
+        services.AddCors(options => options.AddPolicy(
+            CorsPolicy,
+            policy =>
+            {
+                if (origins.Length == 0)
+                {
+                    // No origin is allowed. A browser gets no `Access-Control-Allow-Origin` header and refuses
+                    // the request itself, which is the correct answer to an unconfigured list.
+                    return;
+                }
+
+                policy.WithOrigins(origins)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+
+                    // The bearer token travels in a header rather than a cookie, so this is not what carries
+                    // the credential — it is what lets a browser read the response at all.
+                    .AllowCredentials()
+
+                    // `ETag` and `Retry-After` are part of this API's contract, and a browser cannot read either
+                    // unless they are exposed: the concurrency guard and the limiter would both be invisible.
+                    .WithExposedHeaders("ETag", "Retry-After");
+            }));
     }
 }
 
