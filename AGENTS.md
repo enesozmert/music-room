@@ -106,11 +106,12 @@ the project subject forbids committing third-party source.
   is basing a branch on another open one, which is what builds a stack.
 - One commit per spec, only after verification passes. Conventional Commits; name the spec id in
   the body.
-- **After `RESULT: pass` only**: push that branch and open a **draft** pull request with
-  `gh pr create --draft`. One pull request per spec.
+- **After `RESULT: pass` only**: push that branch, open a pull request with `gh pr create`, and
+  enable auto-merge on it with `gh pr merge --auto --merge`. One pull request per spec, and **not a
+  draft** — auto-merge refuses a draft outright.
 - **Never** push to `main` or any branch other than the spec's own. Never `--force`, never
   `reset --hard`, never `rebase`, never delete a remote branch or tag.
-- **Never** mark a pull request ready for review, merge it directly, or approve it.
+- **Never** merge a pull request directly, and never approve one.
 - **Auto-merge is allowed and expected** — `gh pr merge --auto --merge` on the spec's own pull
   request. Repository auto-merge is on, so GitHub merges it once the required `gate` check passes
   and never before ([[ADR-0027-agent-push-and-pr]], amended 2026-10-03). `gate` is therefore the
