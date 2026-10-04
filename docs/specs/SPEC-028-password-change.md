@@ -159,6 +159,6 @@ make agent-check
 
 - [x] every file in the Files table exists and compiles
 - [x] `make agent-check` passes
-- [ ] **T-31 is closed, and the four ASVS rows say met** — both live in SPEC-027, which is in review; see below
+- [x] **T-31 is closed, and the four ASVS rows say met** — done by SPEC-027, which landed second and owed it
 - [x] `docs/api/ENDPOINTS.md` carries the route
 - [x] `status: done` in this file

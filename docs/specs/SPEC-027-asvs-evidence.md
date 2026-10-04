@@ -149,5 +149,9 @@ make agent-check
 - [x] every committed requirement carries an outcome and an artifact or a reason
 - [x] the Status section is true
 - [x] T-31 to T-33 exist with their residual risk
+- [x] **T-31 is closed, and the rows it blocked say met** — SPEC-028 built `PUT /me/password` while this unit was
+  in review, and the two agreed that whichever landed second would carry the close. This one landed second, so
+  it marks the register row closed and moves V6.2.2, V6.2.3 and V7.5.1 to met, with V7.4.3 naming its second
+  mechanism. The counts in the Status table are stated after that change: 66 met, 5 partial, 47 not met
 - [x] `make agent-check` passes
 - [x] `status: done` in this file

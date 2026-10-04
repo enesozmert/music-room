@@ -36,12 +36,15 @@ internal static class HubClients
     /// <param name="accessToken">The signed JWT, or null to connect anonymously.</param>
     /// <param name="withClientContext">False to omit platform, device and appVersion — ADR-0019's refusal.</param>
     /// <param name="path">Which hub to connect to. Defaults to the playlist hub.</param>
+    /// <param name="origin">An `Origin` header to send, for the handshake check ADR-0030 added. Null sends
+    /// none, which is the native client's case.</param>
     /// <returns>A connection that has not been started.</returns>
     internal static HubConnection Build(
         WebApplicationFactory<Program> factory,
         string? accessToken,
         bool withClientContext = true,
-        string? path = null)
+        string? path = null,
+        string? origin = null)
     {
         ArgumentNullException.ThrowIfNull(factory);
 
@@ -71,6 +74,13 @@ internal static class HubClients
             {
                 options.HttpMessageHandlerFactory = _ => factory.Server.CreateHandler();
                 options.Transports = HttpTransportType.LongPolling;
+
+                if (origin is not null)
+                {
+                    // A browser sets this itself; a test has to, because the handshake check is the one control
+                    // that behaves differently for a browser and for the native client (ADR-0030).
+                    options.Headers["Origin"] = origin;
+                }
             })
             .Build();
     }

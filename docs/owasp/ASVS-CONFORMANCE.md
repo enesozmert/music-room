@@ -95,9 +95,9 @@ The sentence that used to be here said no code existed. Eight slices later, this
 | | Count |
 |---|---|
 | Committed | **142** (62 L1 + 80 L2, recomputed from the vendored CSV) |
-| **Met**, with a named test, code path or configuration file | **63** |
+| **Met**, with a named test, code path or configuration file | **66** (63 at the pass, plus V6.2.2, V6.2.3 and V7.5.1, which SPEC-028 built) |
 | **Partial** — something exists, something named is missing | **5** |
-| **Not met** | **50**, of which 29 are V10 waiting on S8 and 3 are TLS waiting on a deployment |
+| **Not met** | **47**, of which 29 are V10 waiting on S8 and 3 are TLS waiting on a deployment |
 | **Not applicable**, with the reason stated | **24** |
 
 Four outcomes, and each row carries an artifact or a reason. A row closed by writing documentation says
@@ -146,8 +146,8 @@ builds a path from a submitted name. Profile imagery would land here and is not 
 | V6.1.2 | **not met** | no context-specific word list exists — **T-32** |
 | V6.1.3 | met, by documentation | two pathways: password (built) and OIDC (designed, S8 — [[ADR-0008-oidc-social-login]], [[ADR-0031-musicroom-as-openid-provider]]). Both are named in [[endpoint-inventory]] §1 and nothing else authenticates |
 | V6.2.1 | met | `RegisterCommandValidator`: minimum 12 characters, above the 8 required |
-| V6.2.2 | **not met** | there is no authenticated change-password endpoint. The reset flow is the only way to replace a password — **T-31** |
-| V6.2.3 | **not met** | same gap: no change endpoint, so no current-password check — **T-31** |
+| V6.2.2 | met | `PUT /me/password`, added by SPEC-028 after this pass opened **T-31** — `PasswordChangeEndpointTests.Change_WithTheCurrentPassword_Returns204AndReplacesItAsync` |
+| V6.2.3 | met | the endpoint takes the current password and verifies it before writing — `PasswordChangeEndpointTests.Change_WithTheWrongCurrentPassword_Returns422AndChangesNothingAsync` (SPEC-028) |
 | V6.2.4 | **not met** | no breached-password check at registration — **T-32** |
 | V6.2.5 | met | no composition rules: the validator constrains length and UTF-8 bytes only |
 | V6.2.6 | not applicable | server-side API; `type=password` is a client concern and `MusicRoomApp/` is empty |
@@ -184,10 +184,10 @@ builds a path from a submitted name. Profile imagery would land here and is not 
 | V7.3.2 | met | the absolute 30-day family lifetime, inherited by every rotation |
 | V7.4.1 | met | `SessionEndpointTests.Logout_ThenRotatingTheEndedSession_Returns401Async` |
 | V7.4.2 | partial | a deleted account's rows are soft-deleted behind a global query filter, so its sessions stop resolving — but no code path explicitly revokes the families, and no test asserts it |
-| V7.4.3 | met | `PasswordResetEndpointTests.Reset_WithTheIssuedToken_RevokesEveryRefreshTokenFamilyAsync` |
+| V7.4.3 | met | both password mechanisms revoke the other sessions: `PasswordResetEndpointTests.Reset_WithTheIssuedToken_RevokesEveryRefreshTokenFamilyAsync` and, since SPEC-028, `PasswordChangeEndpointTests.Change_RevokesTheOtherSessionsAndKeepsThisOneAsync` |
 | V7.4.4 | not applicable | a server-side API has no pages; logout is `DELETE /auth/sessions/current` |
 | V7.4.5 | **not met** | there is no administrator role and no administrative surface |
-| V7.5.1 | **not met** | no step-up re-authentication: `PATCH /me/profile` needs a valid access token and nothing more |
+| V7.5.1 | met | for the one sensitive attribute a user can change: `PUT /me/password` re-authenticates by requiring the current password, not only a token (SPEC-028, decision 3). `PATCH /me/profile` carries no credential and needs no step-up |
 | V7.5.2 | met | `SessionEndpointTests`: `GET /auth/sessions` lists them and `DELETE /auth/sessions/{sessionId}` ends one. The second factor the requirement mentions does not exist (V6.3.3) |
 | V7.6.1 | **not met** | S8 |
 | V7.6.2 | met | a session is created only by `POST /auth/sessions` with credentials; nothing creates one for an anonymous caller |
@@ -281,11 +281,15 @@ transport-agnostic, which is not the same as the requirement being met.
 
 ## What this evidence pass changed about the claim
 
-Three requirements moved from "presumed fine" to **named gaps**, each with a register row: there is no
+Three requirements moved from "presumed fine" to **named gaps**, each with a register row: there was no
 authenticated change-password endpoint (**T-31**), nothing screens a password against breached or
 context-specific words (**T-32**), and the logs are neither protected nor shipped (**T-33**). None is a
 regression; each is a committed requirement that was never built, and each is now written down where a
 reader will find it.
+
+**T-31 is already closed.** SPEC-028 built `PUT /me/password` the same day, which is what the pass was for:
+three rows — V6.2.2, V6.2.3 and V7.5.1 — moved to met, and V7.4.3 gained its second mechanism. The counts
+above are stated after that change, so the table and the register agree. T-32 and T-33 stay open.
 
 ## Related
 

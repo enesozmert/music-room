@@ -92,7 +92,8 @@ landed.
 | S5 | **complete**: playlists with their three gates, an `xmin` concurrency token and collaborators; tracks with a sparse ordering key, a guarded reorder and the twenty-way parallel move that proves it; `PlaylistHub` at `/hubs/playlists`, authorised on join, audited by ADR-0019's filter, broadcasting after the commit |
 | S6 | **complete**: the event aggregate with its three gates, the window, invitations and attendance; suggestions, votes, the vote-ordered queue counted from the rows, venue codes and ADR-0014's presence checks; `EventHub` at `/hubs/events`, sharing one broadcast pipeline and one audit filter with `PlaylistHub` |
 | S7 | **complete**: devices registered from the client headers; control delegation to a friend, guarded by the device row's `xmin`, with revoke and release; playback sessions with a server-chosen next track, an idempotent advance, an explicit jump and `NowPlayingChanged`; `ControlHub` telling both sides that control moved |
-| S9 | capacity measured — five Gatling scenarios under `tests/load/`, numbers in `docs/load/REPORT.md`: **100 concurrent writers and 200 readers on the declared machine**, the ceiling being PostgreSQL's connection count and not CPU (O22). That run found a live defect — the rate limiter ran before authentication, so the per-account vote limit was a per-address limit ([[ADR-0041-limiter-after-authentication]]). The ASVS evidence pass is done (SPEC-027): 63 of 142 committed requirements met with a named artifact, 5 partial, 50 not met — 29 of those are OIDC waiting on S8 — and 24 not applicable, plus three new gaps as T-31 to T-33. The hub limits and the handshake origin check are in review as SPEC-026. Remaining in S9: the re-measurement ADR-0030 asks for |
+| S9 | capacity measured — five Gatling scenarios under `tests/load/`, numbers in `docs/load/REPORT.md`: **100 concurrent writers and 200 readers on the declared machine**, the ceiling being PostgreSQL's connection count and not CPU (O22). That run found a live defect — the rate limiter ran before authentication, so the per-account vote limit was a per-address limit ([[ADR-0041-limiter-after-authentication]]). The realtime limits are built too (SPEC-026): 5 connections per account, 20 per address, 60 hub invocations a minute per connection, and the handshake `Origin` checked against `CORS_ALLOWED_ORIGINS`, which code reads for the first time — O21 closed. The ASVS evidence pass is done (SPEC-027): 66 of 142 committed requirements met with a named artifact, 5 partial, 47 not met — 29 of those are OIDC waiting on S8 — and 24 not applicable, plus three new gaps as T-31 to T-33, of which T-31 closed the same day through SPEC-028's `PUT /me/password`. Remaining in S9: the re-measurement ADR-0030 asks for |
+
 
 **No counts here on purpose.** `docs/specs/` is the authority for what is done, [[migrations-index]]
 for the schema history, and `make agent-check` for the test count — each drifted within a day of being
@@ -102,7 +103,7 @@ written down twice.
 
 - Remaining open: remote deployment target (O11), SignalR backplane (O8, deliberately deferred),
   fluent assertion library (O12), silent-controller recovery (O13), music preferences consumer (O14),
-  OpenTelemetry evidence (O16), self-hosted vault (O18), RLS policies (O20), hub call limits (O21),
+  OpenTelemetry evidence (O16), self-hosted vault (O18), RLS policies (O20),
   the Npgsql pool against `max_connections` (O22, opened by the load measurement). **O17 closed**
   2026-10-04 with the Brevo sender.
 - **Credentials received:** Brevo API key for mail (**spent — S1a is built**), YouTube and Supabase keys (unblocking S4). Facebook/Google OIDC credentials for S8 are partially pending.
