@@ -39,6 +39,9 @@ internal static class CredentialRateLimiterPolicies
     /// <summary>Spending a password reset token.</summary>
     internal const string PasswordResets = "credential-password-resets";
 
+    /// <summary>Changing a password while signed in — SPEC-028.</summary>
+    internal const string PasswordChanges = "credential-password-changes";
+
     /// <summary>Registers every credential policy and the shared rejection behaviour.</summary>
     /// <param name="services">The container being built.</param>
     /// <param name="configuration">Where the approved numbers may be overridden.</param>
@@ -64,6 +67,9 @@ internal static class CredentialRateLimiterPolicies
             limiter.AddPolicy(
                 PasswordResets,
                 context => PartitionByRemoteIp(context, options.PasswordResets));
+            limiter.AddPolicy(
+                PasswordChanges,
+                context => PartitionByRemoteIp(context, options.PasswordChanges));
 
             limiter.OnRejected = OnRejectedAsync;
         });

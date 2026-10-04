@@ -68,6 +68,47 @@
         }
       }
     },
+    "/api/v1/me/password": {
+      "post": {
+        "tags": [
+          "AccountPasswordEndpoints"
+        ],
+        "summary": "Change the caller's password",
+        "description": "Takes the current password as proof and replaces it. Every other session the account holds is revoked; the caller's own stays alive, because it is the session that just proved it holds the new credential. A wrong current password is 422, not 401: the token is fine.",
+        "operationId": "PostPasswordChange",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/me/control-grants": {
       "get": {
         "tags": [
@@ -2980,6 +3021,36 @@
   },
   "components": {
     "schemas": {
+      "ChangePasswordCommand": {
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "The password the caller is replacing. Proof that the person holding the\n            token also knows the credential, which is what ASVS V7.5.1 asks for before a sensitive attribute\n            changes."
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "The replacement, held to the same rules registration applies."
+          },
+          "auditAction": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "auditTargetType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "description": "Replaces the caller's password — `POST /api/v1/me/password`, SPEC-028."
+      },
       "CollaboratorCreation": {
         "required": [
           "userId",
@@ -4640,6 +4711,9 @@
     },
     {
       "name": "HealthEndpoints"
+    },
+    {
+      "name": "AccountPasswordEndpoints"
     },
     {
       "name": "DeviceControlEndpoints"

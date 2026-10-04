@@ -40,6 +40,16 @@ internal sealed class CredentialRateLimitOptions
     internal CredentialRateLimitWindow PasswordResets { get; init; } = new(30, TimeSpan.FromMinutes(5));
 
     /// <summary>
+    /// Changing a password while signed in: 10 per 5 minutes — SPEC-028.
+    /// </summary>
+    /// <remarks>
+    /// Tighter than sign-in's twenty, because this route needs a valid token to reach and a person changes a
+    /// password once, not twenty times. The per-account counter behind it is the half that bounds guessing the
+    /// current password; this bounds the address.
+    /// </remarks>
+    internal CredentialRateLimitWindow PasswordChanges { get; init; } = new(10, TimeSpan.FromMinutes(5));
+
+    /// <summary>
     /// Reads the options from configuration, falling back to the approved numbers value by value.
     /// </summary>
     /// <param name="configuration">The host's configuration.</param>
@@ -71,6 +81,10 @@ internal sealed class CredentialRateLimitOptions
                 configuration,
                 "RATE_LIMIT_PASSWORD_RESETS",
                 defaults.PasswordResets),
+            PasswordChanges = ReadWindow(
+                configuration,
+                "RATE_LIMIT_PASSWORD_CHANGES",
+                defaults.PasswordChanges),
         };
     }
 
