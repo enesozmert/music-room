@@ -183,6 +183,61 @@ attempts paying BCrypt at cost 12, as designed.
 `Retry-After` on the refusal is asserted functionally by `CredentialRateLimitingTests`, not here: a load
 assertion that only fires on a refused request would pass on a run where nothing was refused.
 
+## 5.6 The hub limits, re-measured — 2026-10-06 (SPEC-033)
+
+[[ADR-0030-hub-rate-limits-and-origin]] set three numbers on 2026-10-04 and said what they were: *"a starting
+point with a measurement behind the shape rather than the value"*, with *"the first run after this lands says
+whether 60 is generous or tight"*. SPEC-026 landed them; this is that run.
+
+**Machine: the one declared in §1** — Apple M5 Pro, 15 cores, 24 GiB, Docker VM 15 CPUs and 7.75 GiB, one API
+container and one PostgreSQL container, generator on the same machine. Every figure below was observed there,
+on the second run; the first was discarded as a warm-up and produced the same three counts.
+
+`make load SCENARIO=hub-limits` — `HubLimitProbeSimulation`, three probes, one per number.
+
+### What a realistic client is, before anything is measured
+
+ADR-0030's own words: *"a client that joins a group and then mostly listens"*. So: **one connection per hub it
+needs**, a join on entering a screen, a leave on leaving it, and otherwise listening. The three hubs are three
+separate connections — `/hubs/playlists`, `/hubs/events`, `/hubs/control` — which is the fact probe 3 turns on.
+
+| Probe | What it does | Observed, on the machine above |
+|---|---|---|
+| 1, paced client | enters a screen, stays 4 s, leaves, 1 s pause, twelve times | **24 invocations a minute, 0 refused** |
+| 2, unpaced client | the same invocations with the pauses removed, 90 attempts | **60 accepted, 30 refused** |
+| 3, multi-hub client | one account opening a connection per hub, then again, six attempts | **5 connections held, the 6th refused** |
+
+### Verdict per number
+
+| Number | Verdict | On what |
+|---|---|---|
+| **60 invocations per connection per minute** | **generous** | A realistic client reaches **24 a minute** — two and a half times under the limit. Probe 2 shows the limit binding exactly where it was set: the 61st invocation inside the window is refused, with `HubException` and the connection still open, which is the behaviour ADR-0030 asked for rather than a drop. Nothing a person does with one connection comes near it |
+| **20 concurrent connections per address** | **not reached by this measurement, and arithmetically tighter than it reads** | No probe filled it: the per-account ceiling refuses first, at 5. The arithmetic is the finding — at 3 connections per device, 20 per address is **6 devices** on one network, and the venue case ADR-0030 named is a room of people sharing one wifi |
+| **5 concurrent connections per account** | **wrong, for the reason the ADR itself gave** | See below. Probe 3 held 5 and was refused the 6th, and a single device costs **3** |
+
+### The ceiling counts connections; its rationale counted devices
+
+ADR-0030 justified five per account as *"a phone, a tablet and a reconnect in flight, with room to spare"*. That
+sentence counts **devices**. The ceiling counts **connections**, and probe 3 measured what one device actually
+opens: a connection on each of `/hubs/playlists`, `/hubs/events` and `/hubs/control` — **three**, all three
+accepted for the same account.
+
+So the number does not buy what its rationale says it buys:
+
+| What the ADR described | Connections it costs | Against a ceiling of 5 |
+|---|---|---|
+| one device | 3 | fits, with 2 spare |
+| a phone and a tablet | 6 | **refused** |
+| a phone, a tablet and a reconnect in flight | 7 to 9 | refused |
+
+Probe 3 is the evidence: six attempts for one account, five established, the sixth refused — at the hub filter
+rather than the handshake, which is SPEC-026's authoritative half of the ceiling doing its job. The limit works
+exactly as built. It is the value that does not match the intent.
+
+**This is not changed here.** ADR-0030 reserves it: *"Changing one is an amendment here, not a code review
+argument."* SPEC-033 therefore stops at `draft` with the figures above and a proposed value, and the amendment
+is the owner's.
+
 ## 6. The bottleneck, and the two defects this measurement found
 
 ### 6.1 The bottleneck: PostgreSQL connections, not CPU

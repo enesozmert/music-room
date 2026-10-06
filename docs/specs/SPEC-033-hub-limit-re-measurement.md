@@ -1,14 +1,52 @@
 ---
 id: SPEC-033
 title: The re-measurement ADR-0030 commissioned — is 60 invocations a minute generous or tight
-status: in-progress     # draft | approved | in-progress | done | blocked
-tier: A                 # A = routine, agent may self-approve if the gate is clean; B = human gate
+status: draft           # draft | approved | in-progress | done | blocked
+tier: B                 # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S9               # which DELIVERY-PLAN slice this belongs to
 requirements: [V.7, V.6]
 decisions: [ADR-0030, ADR-0018, ADR-0023]
 standards: [load-testing, signalr-realtime, testing]
-approved_by: agent      # all seven gate answers are no
-escalation:
+approved_by:            # Tier A on the gate; the measurement itself raised gate 1 — see escalation
+escalation: |
+  **The measurement ran and one number does not hold. Stopped at `draft` by decision 5, which is this spec's own
+  stop condition.** Nothing was changed: ADR-0030 reserves an amendment to itself.
+
+  Machine: the one `docs/load/REPORT.md` §1 declares — Apple M5 Pro, 15 cores, 24 GiB, Docker VM 15 CPUs and
+  7.75 GiB, one API container and one PostgreSQL container, generator on the same machine. Figures are from the
+  second run; the first was discarded as a warm-up and gave the same three counts. Full section:
+  `docs/load/REPORT.md` §5.6.
+
+  | Number | Verdict | Observed |
+  |---|---|---|
+  | 60 invocations per connection per minute | **generous** | a realistic client reaches **24 a minute**; the 61st inside the window is refused with `HubException`, connection still open |
+  | 20 concurrent connections per address | **not reached**, and tighter than it reads | the per-account ceiling refuses first; at 3 connections per device this is **6 devices** on one network |
+  | 5 concurrent connections per account | **wrong** | probe 3 held **5** and was refused the 6th; **one device costs 3** |
+
+  **What is wrong, and why it is the ADR's own reason rather than a rate.** The ADR justified five as *"a phone,
+  a tablet and a reconnect in flight, with room to spare"* — that counts **devices**. The ceiling counts
+  **connections**, and `PlaylistHub`, `EventHub` and `ControlHub` are three separate connections at three paths.
+  Probe 3 opened all three for one account and all three were accepted, so:
+
+  - one device costs **3** connections and fits, with two spare;
+  - a phone **and** a tablet cost **6** and the sixth is refused;
+  - the three-device case the rationale describes costs **7 to 9**.
+
+  The limiter is working exactly as SPEC-026 built it — the sixth attempt was refused at the hub filter, the
+  authoritative half of the ceiling. It is the value that does not match the intent.
+
+  **Proposed value: 10 concurrent connections per account.** Three devices at three hubs is 9, plus one for a
+  reconnect the server has not yet reaped — the "room to spare" the rationale asked for, at the connection
+  granularity the code actually counts. A second observation for the same amendment, not proposed as a number
+  here: at 3 per device, **20 per address is 6 devices**, and the venue case ADR-0030 named is a room sharing one
+  wifi.
+
+  Both rate verdicts are published regardless, per decision 6: §5.6 of the report carries them, so the
+  invocation measurement is not withheld because the ceiling escalated.
+
+  **What is needed:** an ADR-0030 amendment setting connections-per-account, and a decision on whether
+  connections-per-address should move with it. Then a one-line change to
+  `HubConnectionLimits.DefaultConnectionsPerUser` and its test, as its own unit.
 ---
 
 # Re-measuring the hub limits

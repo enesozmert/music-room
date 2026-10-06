@@ -104,12 +104,11 @@ public final class HubLimitProbeSimulation extends Simulation {
                     .queryParam("access_token", "#{token}")
                     .check(status().in(200, 429))
                     .check(status().saveAs("negotiateStatus"))
-                    .check(jmesPath("connectionToken").saveAs("connectionToken").optional()))
+                    .check(jmesPath("connectionToken").optional().saveAs("connectionToken")))
                 .doIf(session -> session.getInt("negotiateStatus") == 200).then(
-                    exec(ws("connect #{attempt}")
-                        .connect("#{hub}?access_token=#{token}&id=#{connectionToken}&" + CLIENT_CONTEXT)
-                        .wsName("hub-#{attempt}"))
-                        .exec(ws("handshake #{attempt}").wsName("hub-#{attempt}").sendText(HANDSHAKE)
+                    exec(ws("connect #{attempt}", "hub-#{attempt}")
+                        .connect("#{hub}?access_token=#{token}&id=#{connectionToken}&" + CLIENT_CONTEXT))
+                        .exec(ws("handshake #{attempt}", "hub-#{attempt}").sendText(HANDSHAKE)
                             .await(java.time.Duration.ofSeconds(10))
                             .on(ws.checkTextMessage("reply").check(regex("^\\{\\}.*").exists())))
                         .exec(session -> {
@@ -149,9 +148,20 @@ public final class HubLimitProbeSimulation extends Simulation {
         System.out.println("probe 2, unpaced client:  accepted " + UNPACED_ACCEPTED.sum()
             + ", refused " + UNPACED_REFUSED.sum()
             + " (" + UNPACED_ATTEMPTS + " attempted as fast as the client could)");
-        System.out.println("probe 3, multi-hub:       connections accepted " + CONNECTIONS_ACCEPTED.sum()
-            + ", refused " + CONNECTIONS_REFUSED.sum()
-            + " (" + CONNECTION_ATTEMPTS + " attempted for one account)");
+        long established = CONNECTIONS_ACCEPTED.sum();
+        long negotiateRefusals = CONNECTIONS_REFUSED.sum();
+
+        System.out.println("probe 3, multi-hub:       connections established " + established
+            + ", negotiate refusals " + negotiateRefusals
+            + ", attempted " + CONNECTION_ATTEMPTS + " for one account across /hubs/playlists, /hubs/events"
+            + " and /hubs/control");
+
+        // An attempt that is neither established nor refused at the negotiate was refused at the hub filter —
+        // `OnConnectedAsync` throwing, which SPEC-026 made the authoritative half of the ceiling. The count
+        // this probe reports is therefore "connections one account can hold", and the layer that said no is in
+        // the application log rather than here.
+        System.out.println("probe 3, unaccounted:     " + (CONNECTION_ATTEMPTS - established - negotiateRefusals)
+            + " (refused at the hub filter rather than the handshake)");
     }
 
     /**
