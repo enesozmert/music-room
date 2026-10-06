@@ -1,7 +1,7 @@
 ---
 id: SPEC-034
 title: One password rule, called three times — the unification SPEC-028 was credited with
-status: in-progress     # draft | approved | in-progress | done | blocked
+status: done            # draft | approved | in-progress | done | blocked
 tier: B                 # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S9               # which DELIVERY-PLAN slice this belongs to
 requirements: [V.1, V.6]
@@ -165,6 +165,26 @@ prevents it, and the existing suites are what would catch it.
    finding rather than edited to fit.
 5. `docs/SDD.md` §13.1, then close out.
 
+## What the build added to this plan
+
+**`PasswordRules` is public, where the walk said internal — and the walk was wrong for a reason worth keeping.**
+Every caller of the *rule* is in `MusicRoom.Application`, which is what the walk checked. The *numbers* have a
+caller outside it: `ResetPasswordCommandValidatorTests` reads the BCrypt byte ceiling to build its own case, and
+it lives in `MusicRoom.Application.Tests`. Making the class internal would have forced that test to hard-code 72,
+which is the duplication answer 4 exists to remove. The three constants it replaced were `public const` on two
+validators, so this exposes nothing new — it exposes it once instead of three times. The extension method stays
+internal.
+
+**One existing test file changed, by instruction, and nothing in it was weakened.**
+`ResetPasswordCommandValidatorTests.cs:93` now reads `PasswordRules.PasswordMaximumUtf8Bytes` where it read
+`ResetPasswordCommandValidator.PasswordMaximumUtf8Bytes`. Same assertion, same number, one reference moved —
+answer 4 named this edit in advance.
+
+**The three key assertions are genuinely the first of their kind**, and writing them turned up the shape of the
+gap: there was no helper for reading a `422` body anywhere, so each suite got a small `ValidationKeysAsync` that
+parses `errors` and returns its property names. Three copies of a four-line reader is the honest cost of not
+widening this unit into a shared test helper, and O26 is where that gets paid properly.
+
 ## Verification
 
 ```bash
@@ -183,10 +203,10 @@ make agent-check
 
 ## Done when
 
-- [ ] `PasswordRules` exists and all three validators call it
-- [ ] no duplicate password constant remains in the three validators
-- [ ] every message is byte-identical to the one it replaced
-- [ ] `make agent-check` passes; no existing assertion is weakened or rewritten, and the one moved constant reference is reported
-- [ ] the three `422` key assertions exist and are named as the first of their kind
-- [ ] the body-key gap is opened as an issue in `docs/SDD.md` §16 with its numbers
-- [ ] `status: done` in this file
+- [x] `PasswordRules` exists and all three validators call it
+- [x] no duplicate password constant remains in the three validators — `grep` for `PasswordMaximumUtf8Bytes` and `FitsInBCryptInput` under `Commands/` returns nothing
+- [x] every message is byte-identical to the one it replaced
+- [x] `make agent-check` passes; no existing assertion is weakened or rewritten, and the one moved constant reference is reported above
+- [x] the three `422` key assertions exist and are named as the first of their kind
+- [x] the body-key gap is opened as **O26** with its numbers
+- [x] `status: done` in this file

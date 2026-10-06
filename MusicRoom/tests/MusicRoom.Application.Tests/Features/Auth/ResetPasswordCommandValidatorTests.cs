@@ -1,5 +1,6 @@
 using System.Text;
 using FluentValidation.Results;
+using MusicRoom.Application.Features.Auth;
 using MusicRoom.Application.Features.Auth.Commands.ResetPassword;
 using Xunit;
 
@@ -89,7 +90,7 @@ public sealed class ResetPasswordCommandValidatorTests
     {
         // Arrange — 30 three-byte characters is 90 bytes in 30 characters.
         string multiByte = new('€', 30);
-        Assert.True(Encoding.UTF8.GetByteCount(multiByte) > ResetPasswordCommandValidator.PasswordMaximumUtf8Bytes);
+        Assert.True(Encoding.UTF8.GetByteCount(multiByte) > PasswordRules.PasswordMaximumUtf8Bytes);
 
         ResetPasswordCommand command = new(Token(), multiByte);
 

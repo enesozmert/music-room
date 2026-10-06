@@ -1,5 +1,5 @@
-using System.Text;
 using FluentValidation;
+using MusicRoom.Application.Features.Auth;
 
 namespace MusicRoom.Application.Features.Auth.Commands.ResetPassword;
 
@@ -18,31 +18,15 @@ public sealed class ResetPasswordCommandValidator : AbstractValidator<ResetPassw
     /// </summary>
     public const int TokenLength = 43;
 
-    /// <summary>BCrypt truncates its input here, silently, so the limit is rejected in validation.</summary>
-    public const int PasswordMaximumUtf8Bytes = 72;
-
     /// <summary>Declares the rules.</summary>
     public ResetPasswordCommandValidator()
     {
-        // NIST SP 800-63B asks verifiers to accept at least 64 characters; the upper bound is what
-        // keeps every accepted password inside BCrypt's input window.
-        const int passwordMinimumLength = 12;
-        const int passwordMaximumLength = 64;
-
         RuleFor(command => command.Token)
             .NotEmpty()
             .MaximumLength(TokenLength);
 
-        RuleFor(command => command.NewPassword)
-            .NotEmpty()
-            .MinimumLength(passwordMinimumLength)
-            .WithMessage($"Password must be at least {passwordMinimumLength} characters.")
-            .MaximumLength(passwordMaximumLength)
-            .WithMessage($"Password must be at most {passwordMaximumLength} characters.")
-            .Must(FitsInBCryptInput)
-            .WithMessage($"Password must be at most {PasswordMaximumUtf8Bytes} bytes when encoded as UTF-8.");
+        // The policy lives in PasswordRules — SPEC-034. Applied to this command's own property, so the `422`
+        // body stays keyed on `NewPassword`.
+        RuleFor(command => command.NewPassword).ChosenPassword();
     }
-
-    private static bool FitsInBCryptInput(string password) =>
-        password is not null && Encoding.UTF8.GetByteCount(password) <= PasswordMaximumUtf8Bytes;
 }
