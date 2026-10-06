@@ -205,15 +205,15 @@ separate connections — `/hubs/playlists`, `/hubs/events`, `/hubs/control` — 
 |---|---|---|
 | 1, paced client | enters a screen, stays 4 s, leaves, 1 s pause, twelve times | **24 invocations a minute, 0 refused** |
 | 2, unpaced client | the same invocations with the pauses removed, 90 attempts | **60 accepted, 30 refused** |
-| 3, multi-hub client | one account opening a connection per hub, then again, six attempts | **5 connections held, the 6th refused** |
+| 3, multi-hub client | one account opening a connection per hub, then again | **before the amendment: 5 held, the 6th refused. After: 12 held, the 13th refused** |
 
 ### Verdict per number
 
 | Number | Verdict | On what |
 |---|---|---|
 | **60 invocations per connection per minute** | **generous** | A realistic client reaches **24 a minute** — two and a half times under the limit. Probe 2 shows the limit binding exactly where it was set: the 61st invocation inside the window is refused, with `HubException` and the connection still open, which is the behaviour ADR-0030 asked for rather than a drop. Nothing a person does with one connection comes near it |
-| **20 concurrent connections per address** | **not reached by this measurement, and arithmetically tighter than it reads** | No probe filled it: the per-account ceiling refuses first, at 5. The arithmetic is the finding — at 3 connections per device, 20 per address is **6 devices** on one network, and the venue case ADR-0030 named is a room of people sharing one wifi |
-| **5 concurrent connections per account** | **wrong, for the reason the ADR itself gave** | See below. Probe 3 held 5 and was refused the 6th, and a single device costs **3** |
+| **20 concurrent connections per address** | **was tighter than it read — amended to 60** | No probe filled it: the per-account ceiling refuses first. The arithmetic was the finding — at 3 connections per device, 20 per address is **6 devices** on one network, and the venue case ADR-0030 named is a room of people sharing one wifi. 60 is twenty devices |
+| **5 concurrent connections per account** | **was wrong, for the reason the ADR itself gave — amended to 12** | Probe 3 held 5 and was refused the 6th, and a single device costs **3**. See below, and the re-run beneath it |
 
 ### The ceiling counts connections; its rationale counted devices
 
@@ -234,9 +234,29 @@ Probe 3 is the evidence: six attempts for one account, five established, the six
 rather than the handshake, which is SPEC-026's authoritative half of the ceiling doing its job. The limit works
 exactly as built. It is the value that does not match the intent.
 
-**This is not changed here.** ADR-0030 reserves it: *"Changing one is an amendment here, not a code review
-argument."* SPEC-033 therefore stops at `draft` with the figures above and a proposed value, and the amendment
-is the owner's.
+**The number was not changed by this measurement.** ADR-0030 reserves that: *"Changing one is an amendment here,
+not a code review argument."* SPEC-033 stopped at `draft` with the figures and a proposal; the owner amended the
+ADR on 2026-10-06 — **12 per account, 60 per address, the invocation limit unchanged** — and corrected the
+proposal while doing it. The proposal was 10, which stopped one connection short of its own reason:
+`ClientTimeoutInterval` is 60 seconds, so a phone that changes network drops all three connections at once and
+the server reaps none of them for up to a minute. It holds three stale and three new, so reconnect headroom has
+to be a **whole device** — 9 + 3 — or the ceiling refuses the reconnect it exists to allow.
+
+### The same probe, after the amendment
+
+Re-run on the same machine, against an API container rebuilt with the new defaults:
+
+| | Attempted | Established | Refused |
+|---|---|---|---|
+| before, ceiling 5 | 6 | **5** | the 6th |
+| after, ceiling 12 | 13 | **12** | the 13th |
+
+Both refusals came from the hub filter rather than the handshake, which is SPEC-026's authoritative half of the
+ceiling: the middleware reads a count it does not own, so a connection that races past it is stopped where the
+count lives. The rate probes were not re-run — nothing about them moved, and §5.6's 24 and 60 stand as measured.
+
+A changed default with no run behind it is what this unit exists to prevent, which is why both counts are here
+rather than only the new one.
 
 ## 6. The bottleneck, and the two defects this measurement found
 

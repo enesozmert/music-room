@@ -1,7 +1,7 @@
 ---
 id: SPEC-033
 title: The re-measurement ADR-0030 commissioned — is 60 invocations a minute generous or tight
-status: approved        # draft | approved | in-progress | done | blocked
+status: done            # draft | approved | in-progress | done | blocked
 tier: B                 # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S9               # which DELIVERY-PLAN slice this belongs to
 requirements: [V.7, V.6]
@@ -216,10 +216,13 @@ make agent-check
 
 ## Done when
 
-- [ ] `HubLimitProbeSimulation` exists and `make load SCENARIO=hub-limits` runs it
-- [ ] `docs/load/REPORT.md` states the observation, the machine and a separate verdict for 60, 5 and 20
-- [ ] no file under `MusicRoom/src/` is touched
-- [ ] `make agent-check` passes
-- [ ] the first run is discarded as a warm-up, as SPEC-023 did, and the reported figures come from the second
-- [ ] every figure in the report has the declared machine beside it
-- [ ] `status: done`, **or** `status: draft` with a measured figure and a proposed value in escalation
+- [x] `HubLimitProbeSimulation` exists and `make load SCENARIO=hub-limits` runs it
+- [x] `docs/load/REPORT.md` states the observation, the machine and a separate verdict for each of the three
+- [x] the amended defaults are in `HubConnectionLimits.cs`, with the arithmetic in the doc comments, and a test
+  pins them — the Files table was widened by the owner's amendment, which is the only reason a `src` file moved
+- [x] `make agent-check` passes
+- [x] the first run is discarded as a warm-up, as SPEC-023 did, and the reported figures come from the second
+- [x] every figure in the report has the declared machine beside it
+- [x] `status: done` — it was `draft` with the figure and a proposal, and the owner's amendment answered it
+- [x] probe 3 re-run after the change, both counts in the report: 12 established, the 13th refused
+- [x] **O25** opened and left open: the ceiling counts connections and means devices

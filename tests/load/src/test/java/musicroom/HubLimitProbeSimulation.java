@@ -53,8 +53,13 @@ public final class HubLimitProbeSimulation extends Simulation {
     /** How many invocations an unpaced client attempts. Above 60 on purpose: the point is where it stops. */
     private static final int UNPACED_ATTEMPTS = 90;
 
-    /** How many connections the multi-hub probe tries to hold. Above the ceiling of five, for the same reason. */
-    private static final int CONNECTION_ATTEMPTS = 6;
+    /**
+     * How many connections the multi-hub probe tries to hold.
+     *
+     * <p>Thirteen: one past the ceiling of twelve ADR-0030 set on 2026-10-06, for the same reason the first run
+     * attempted six against five — the measurement is where it stops, so it has to attempt one more than that.
+     */
+    private static final int CONNECTION_ATTEMPTS = 13;
 
     // Counters rather than Gatling request names, because what is being measured is a count per connection and
     // Gatling reports per request name. LoginBurstSimulation established the shape.

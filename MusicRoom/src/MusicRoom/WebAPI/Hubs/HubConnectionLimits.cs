@@ -20,11 +20,32 @@ public sealed record HubConnectionLimits(
     int InvocationsPerConnectionPerMinute,
     IReadOnlyList<string> AllowedOrigins)
 {
-    /// <summary>A phone, a tablet, and a dropped connection the server has not reaped yet.</summary>
-    public const int DefaultConnectionsPerUser = 5;
+    /// <summary>
+    /// Three devices, plus a whole device of reconnect headroom — ADR-0030 as amended 2026-10-06.
+    /// </summary>
+    /// <remarks>
+    /// **This counts connections, and a device is three of them.** `PlaylistHub`, `EventHub` and `ControlHub`
+    /// are separate SignalR connections at separate paths, which SPEC-033's probe 3 measured: one account opened
+    /// all three and all three were accepted. The first value, 5, was chosen as *"a phone, a tablet and a
+    /// reconnect in flight"* — that counts devices, so it bought one device and a spare, and refused a second
+    /// device's third connection.
+    /// <para>
+    /// 12 is 3 devices × 3 hubs, plus 3 for a reconnect. The headroom is a **whole device** because
+    /// <c>ClientTimeoutInterval</c> is 60 seconds: a phone that changes network drops all three at once and the
+    /// server reaps none of them for up to a minute, so it holds three stale and three new. Headroom of one or
+    /// two connections would refuse the reconnect this ceiling exists to allow.
+    /// </para>
+    /// </remarks>
+    public const int DefaultConnectionsPerUser = 12;
 
-    /// <summary>The venue case: a shared network at an event.</summary>
-    public const int DefaultConnectionsPerAddress = 20;
+    /// <summary>
+    /// The venue case: a shared network at an event — 20 devices at three connections each.
+    /// </summary>
+    /// <remarks>
+    /// Raised from 20 with the account ceiling, and for the same arithmetic: at three connections per device, 20
+    /// was **six devices** on one wifi, and a room of six is not the event ADR-0030's rationale described.
+    /// </remarks>
+    public const int DefaultConnectionsPerAddress = 60;
 
     /// <summary>One a second sustained, against a client that joins a group and then mostly listens.</summary>
     public const int DefaultInvocationsPerConnectionPerMinute = 60;
