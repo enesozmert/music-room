@@ -74,6 +74,63 @@ A test asserts, for at least one route per shape, that every key in `errors` is 
 in the request schema that route publishes. Not a list of expected strings — a property that a future
 route cannot quietly break.
 
+## Amended 2026-10-06, before this record landed — the mechanism, measured
+
+SPEC-037's Files-table walk implemented this decision and found four things the paragraphs above got
+wrong about **how**. The decision stands; its mechanism is replaced.
+
+**1. `WithName` does not set the key.** It sets the display name a message interpolates.
+`OverridePropertyName` sets the key. The two behave differently depending on the rule:
+
+- A **member-access** rule — `RuleFor(c => c.TimeToLiveSeconds).WithName("ttlSeconds")` — still
+  publishes `TimeToLiveSeconds`, because FluentValidation has a property path and ignores the display
+  name for the key. SPEC-036's passing assertions prove it: `TimeToLiveSeconds` and `GranteeUserId`
+  are the published keys today, with `WithName` already on both.
+- A **whole-command** rule — `RuleFor(c => licence(c)).WithName("presenceProof")` — has no property
+  path, so the override is the only name available and it becomes the key.
+
+So every camelCase key that exists today comes from a rule with no member expression, and the nine
+`WithName` calls in `EventLicenceRules` are **not** redundant: removing them would publish nine empty
+keys. The rule is therefore: the resolver for member-access rules, `OverridePropertyName` for
+whole-command rules, and `WithName` only where a message wants a different word than the key.
+
+**2. A global resolver cannot reach two of the names**, because the property and the field are spelled
+differently rather than cased differently:
+
+| Route | Validated property | Wire field |
+|---|---|---|
+| `GET /tracks` | `Query` | **`q`** |
+| `POST /events/{eventId}/event-codes` | `TimeToLiveSeconds` | **`ttlSeconds`** |
+
+Both take `OverridePropertyName`. These two are the cases that make the property test necessary rather
+than decorative: a convention cannot catch a name only the request schema knows.
+
+**3. `genres.count` is struck from this record's examples.** `PUT /me/music-preferences` publishes
+`genres` as an array of strings — `MusicPreferencesRequest` has `genres` and `artists` and no `count`
+— so the key fails this ADR's own criterion and would fail its own test. It is a CLR member leaking
+into a published contract: the rule reads `RuleFor(command => command.Genres.Count)`. It takes
+`OverridePropertyName("genres")`, and `artists` the same. `bio.value` is **not** the same case:
+`ProfileFieldRequestOfstring` really carries `value`, so that dotted path resolves and stays.
+
+The test is not weakened to match only a key's first segment. That would pass `genres.count` and the
+next `Something.Count` nobody noticed, which is the defect rather than the convention.
+
+**4. The one line goes in `ApplicationServiceRegistration.AddApplicationServices`**, not the
+composition root. `Program.cs` is at exactly S104's 300-line limit — issue O24 — and the registration
+already registers every validator, is called by the root exactly once, and has room. Still configured
+once and globally; a different file from the one this record first named.
+
+**The counts in this record were wrong too.** Measured from SPEC-036's assertions: 26 key assertions
+over 17 distinct keys, three of them already camelCase, so **14 distinct keys change across 21
+assertions**. A reviewer counts 21 edited expectations in the diff, not seventeen.
+
+**One hazard, recorded rather than solved.** `ValidatorOptions.Global` is process-wide static state.
+A validator constructed with `new` in a unit test sees the framework default; the same validator
+behind an endpoint sees ours. The property test runs through the application and cannot see that
+divergence. The implementing spec runs the Application suite **before** touching any expectation, and
+whatever fails there is the measurement. A divergence is fixed by making the suite use the same
+configuration, never by weakening an assertion.
+
 ## Consequences
 
 - Seventeen keys change from PascalCase to camelCase. Every one of them is asserted by SPEC-036's
