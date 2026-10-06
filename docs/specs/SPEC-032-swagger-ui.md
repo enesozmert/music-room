@@ -1,7 +1,7 @@
 ---
 id: SPEC-032
 title: Swagger UI over the document AddOpenApi() already serves, Development only
-status: approved        # draft | approved | in-progress | done | blocked
+status: done            # draft | approved | in-progress | done | blocked
 tier: B                 # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S3a              # which DELIVERY-PLAN slice this belongs to
 requirements: [V.4]
@@ -233,6 +233,25 @@ that is checked rather than guessed: `Core.Application` holds 1 source file (the
 4. `make agent-check`, with the OpenAPI drift guard as the load-bearing check.
 5. `docs/SDD.md` §9.1, the delivery plan, the project card.
 
+## What the build added to this plan
+
+**The first attempt was blocked, and the second needed one more trick than the resolution anticipated.** With
+the registration moved into `WebAPI/InteractiveDocumentation.cs`, CA1506 was satisfied — `Main` no longer names
+the UI middleware — but `Program.cs` still came to **301** code lines against S104's 300, because the call to
+the new class is a line the file did not have. Answer 5 forbids moving a second helper out, so the fix was to
+give the new class **both** registrations: `MapOpenApi()` moved there too, outside the Development branch, and
+the single `InteractiveDocumentation.Use(app)` call replaces the `app.MapOpenApi()` line the root already had.
+`Program.cs` is therefore at exactly 300 — no longer than before this unit — and the document is still
+registered unconditionally, which is what answer 3 protects.
+
+The cost is one naming imprecision worth stating: a class called `InteractiveDocumentation` now also registers
+the **non**-interactive document. The file name came from the Files table and the behaviour is documented on the
+method, so renaming it is a follow-up, not a silent fix.
+
+**The Production test host cannot use `TestMailSettings`**, exactly as answer 4 said: `MAIL_PROVIDER=logging` is
+refused outside Development by design. It sets `brevo` with a placeholder key and sender, and neither test
+issues a request that would send anything.
+
 ## Verification
 
 ```bash
@@ -252,8 +271,9 @@ make agent-check
 
 ## Done when
 
-- [ ] every file in the Files table exists and compiles, and nothing outside it is touched
-- [ ] the UI answers on Development and `404`s elsewhere, with tests for both
-- [ ] `docs/api/openapi.json` is byte-identical to its state before this unit
-- [ ] `make agent-check` passes
-- [ ] `status: done` in this file
+- [x] every file in the Files table exists and compiles, and nothing outside it is touched
+- [x] the UI answers on Development and `404`s elsewhere, with tests for both
+- [x] `docs/api/openapi.json` is byte-identical to its state before this unit
+- [x] `make agent-check` passes
+- [x] `status: done` in this file
+- [x] the chronic cap problem is recorded as **O24**, left open for an ADR — answer 6
