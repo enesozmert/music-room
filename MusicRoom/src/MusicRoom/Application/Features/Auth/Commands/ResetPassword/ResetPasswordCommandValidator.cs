@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Application.Features.Auth;
 
 namespace MusicRoom.Application.Features.Auth.Commands.ResetPassword;
@@ -19,7 +20,12 @@ public sealed class ResetPasswordCommandValidator : AbstractValidator<ResetPassw
     public const int TokenLength = 43;
 
     /// <summary>Declares the rules.</summary>
-    public ResetPasswordCommandValidator()
+    /// <param name="breachedPasswords">The bundled breached set, resolved by the container — SPEC-035.</param>
+    /// <remarks>
+    /// The context screen is not here: this command carries a token, not an account. Its handler reads the
+    /// account's words before the write — SPEC-035.
+    /// </remarks>
+    public ResetPasswordCommandValidator(IBreachedPasswordSet breachedPasswords)
     {
         RuleFor(command => command.Token)
             .NotEmpty()
@@ -27,6 +33,6 @@ public sealed class ResetPasswordCommandValidator : AbstractValidator<ResetPassw
 
         // The policy lives in PasswordRules — SPEC-034. Applied to this command's own property, so the `422`
         // body stays keyed on `NewPassword`.
-        RuleFor(command => command.NewPassword).ChosenPassword();
+        RuleFor(command => command.NewPassword).ChosenPassword(breachedPasswords);
     }
 }

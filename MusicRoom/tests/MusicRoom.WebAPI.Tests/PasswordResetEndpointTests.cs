@@ -8,6 +8,7 @@ using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Persistence.Contexts;
 using Testcontainers.PostgreSql;
 using Xunit;
+using MusicRoom.Application.Features.Auth;
 
 namespace MusicRoom.WebAPI.Tests;
 
@@ -247,19 +248,32 @@ public sealed class PasswordResetEndpointTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    /// <summary>A weak new password is refused with `422`, and the link survives for another try.</summary>
-    [Fact]
-    public async Task Reset_WithAWeakNewPassword_Returns422AndDoesNotSpendTheTokenAsync()
+    /// <summary>A new password this path refuses is `422`, and the link survives for another try.</summary>
+    /// <remarks>
+    /// Three refusals, one shape. The first is the length rule, the second the bundled breached set, and the
+    /// third the context screen — and the third is the one that proves SPEC-035's pre-read exists: this command
+    /// carries a token and no account, so the account's words come from a read the handler takes **before** the
+    /// write. Because every screen runs before the write, none of them costs the caller their only reset link.
+    /// <para>
+    /// A theory on the existing test rather than a test of its own: this file is at S104's 300-line limit, and
+    /// the assertions wanted were the ones already here — issue O27's sibling in the test project.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("short")]
+    [InlineData("i love you forever")]
+    [InlineData("weakchoice is mine")]
+    public async Task Reset_WithAWeakNewPassword_Returns422AndDoesNotSpendTheTokenAsync(string newPassword)
     {
-        // Arrange
+        ArgumentNullException.ThrowIfNull(newPassword);
+
+        // Arrange — the address local part is `weakchoice` once separators are removed.
         const string email = "weak-choice@example.com";
         await RegisterAndVerifyAsync(email);
         string token = await RequestResetAsync(email);
 
         // Act
-        using HttpResponseMessage refused = await PostAsync(
-            ResetsPath,
-            new { token, newPassword = "short" });
+        using HttpResponseMessage refused = await PostAsync(ResetsPath, new { token, newPassword });
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
@@ -268,9 +282,15 @@ public sealed class PasswordResetEndpointTests : IAsyncLifetime
         // into one shared rule, and this holds that rule to this command's own property name.
         Assert.Equal(["NewPassword"], await ValidationKeysAsync(refused));
 
-        using HttpResponseMessage retried = await PostAsync(
-            ResetsPath,
-            new { token, newPassword = NewPassword });
+        // Nothing echoes the submitted password — SPEC-035.
+        Assert.DoesNotContain(
+            newPassword,
+            await refused.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            StringComparison.Ordinal);
+
+        Assert.Equal(0, await CountConsumedResetTokensAsync(email));
+
+        using HttpResponseMessage retried = await PostAsync(ResetsPath, new { token, newPassword = NewPassword });
         Assert.Equal(HttpStatusCode.NoContent, retried.StatusCode);
     }
 

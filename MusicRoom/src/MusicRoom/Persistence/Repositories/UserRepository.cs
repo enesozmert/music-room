@@ -135,7 +135,8 @@ internal sealed class UserRepository : IUserRepository
             .Where(user => user.Email == email)
             // Projected in the database, so the hash arrives without the display name and the
             // address that would make an accidental log entry a profile.
-            .Select(user => new UserCredential(user.Id, user.PasswordHash, user.IsEmailVerified))
+            .Select(user => new UserCredential(
+                user.Id, user.PasswordHash, user.IsEmailVerified, user.Email, user.DisplayName))
             .SingleOrDefaultAsync(cancellationToken);
 
     /// <inheritdoc />
@@ -145,7 +146,8 @@ internal sealed class UserRepository : IUserRepository
             .Where(user => user.Id == userId)
             // Projected in the database, as the by-address read is, so the hash arrives without the display
             // name and the address that would make an accidental log entry a profile.
-            .Select(user => new UserCredential(user.Id, user.PasswordHash, user.IsEmailVerified))
+            .Select(user => new UserCredential(
+                user.Id, user.PasswordHash, user.IsEmailVerified, user.Email, user.DisplayName))
             .SingleOrDefaultAsync(cancellationToken);
 
     /// <inheritdoc />

@@ -1,6 +1,7 @@
 using System.Globalization;
 using FluentValidation;
 using MediatR;
+using MusicRoom.Application.Features.Auth;
 using MusicRoom.Application.Features.Auth.Commands.ChangePassword;
 using MusicRoom.WebAPI.RateLimiting;
 
@@ -62,6 +63,16 @@ public static class AccountPasswordEndpoints
             {
                 ChangePasswordOutcome.Changed => Results.NoContent(),
                 ChangePasswordOutcome.Throttled => Throttled(httpContext, result.RetryAfter),
+
+                // Keyed on `NewPassword`, like every other refusal of that field, and separate from the
+                // wrong-current-password answer below: one is about the password sent, the other about the
+                // password stored — SPEC-035.
+                ChangePasswordOutcome.RefusedByContext => Results.ValidationProblem(
+                    new Dictionary<string, string[]>(StringComparer.Ordinal)
+                    {
+                        [nameof(ChangePasswordCommand.NewPassword)] = [PasswordRules.ContextMessage],
+                    },
+                    statusCode: StatusCodes.Status422UnprocessableEntity),
                 _ => Results.Problem(
                     detail: RefusedDetail,
                     statusCode: StatusCodes.Status422UnprocessableEntity,

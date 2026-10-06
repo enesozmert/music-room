@@ -1,6 +1,7 @@
 using FluentValidation;
 using MediatR;
 using MusicRoom.Application.Abstractions.Security;
+using MusicRoom.Application.Features.Auth;
 using MusicRoom.Application.Features.Auth.Commands.RequestPasswordReset;
 using MusicRoom.Application.Features.Auth.Commands.ResetPassword;
 using MusicRoom.WebAPI.RateLimiting;
@@ -109,6 +110,10 @@ internal static class PasswordResetEndpoints
             ResetPasswordOutcome.Reset => Results.NoContent(),
             ResetPasswordOutcome.Expired => Results.StatusCode(StatusCodes.Status410Gone),
 
+            // The same shape a policy failure gets, keyed on the same property, because to a client this is one:
+            // the password it sent is not acceptable. The token it sent is still spendable — SPEC-035.
+            ResetPasswordOutcome.RefusedByContext => ContextRefusal(),
+
             // Unknown, malformed and already spent share this answer on purpose, exactly as email
             // verification does.
             _ => Results.BadRequest(),
@@ -124,6 +129,23 @@ internal static class PasswordResetEndpoints
     /// the rules are public. A message about the token would describe the shape of a credential, so the
     /// token failure is answered the way an unknown token is.
     /// </remarks>
+    /// <summary>
+    /// Answers the context screen's refusal in the shape a validation failure takes.
+    /// </summary>
+    /// <remarks>
+    /// Built here rather than thrown from the handler: a `ValidationException` inside a handler would be rolled
+    /// back together with the audit row recording the refusal, because the audit behaviour is fail-closed —
+    /// SPEC-009's lesson, and SPEC-035's acceptance criterion. The key is the property a client already reads
+    /// for this route, and the message never names the word that matched.
+    /// </remarks>
+    private static IResult ContextRefusal() =>
+        Results.ValidationProblem(
+            new Dictionary<string, string[]>(StringComparer.Ordinal)
+            {
+                [nameof(ResetPasswordCommand.NewPassword)] = [PasswordRules.ContextMessage],
+            },
+            statusCode: StatusCodes.Status422UnprocessableEntity);
+
     private static IResult PasswordRuleFailure(ValidationException exception)
     {
         Dictionary<string, string[]> errors = CredentialEndpointResults.ToErrors(exception);
