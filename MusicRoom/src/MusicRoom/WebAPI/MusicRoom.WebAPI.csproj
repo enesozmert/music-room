@@ -27,6 +27,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" />
+    <!-- ADR-0035. No Version attribute: Central Package Management pins it in
+         Directory.Packages.props, and a version here is NU1008. -->
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
     <!--
       Design-time only. `dotnet ef` resolves this package from the *startup* project, and
       PrivateAssets="all" on Persistence is precisely what stops it arriving here transitively —

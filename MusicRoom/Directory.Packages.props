@@ -25,6 +25,11 @@
     <!-- Beyond the ADR-0021 list, approved at the SPEC-001 gate: build-time emission of
          docs/api/openapi.json. Build-only, Microsoft-owned, no runtime code. -->
     <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.12" />
+    <!-- ADR-0035, owner requirement of 2026-10-01: the UI middleware **alone**, never the
+         Swashbuckle.AspNetCore metapackage, which also brings SwaggerGen — a second document
+         generator for one API. AddOpenApi() stays the only producer, and this package renders what
+         it produces. net10.0 is a target of 10.2.3 and its dependency group for it is empty. -->
+    <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
   </ItemGroup>
 
   <ItemGroup Label="Persistence — ADR-0021, ADR-0026">

@@ -87,9 +87,10 @@ public class Program
         app.UseAuthorization();
         app.UseMiddleware<ClientContextMiddleware>();
 
-        // openapi-documentation: the raw document is served in every environment. An interactive UI
-        // is a separate, Development-only concern, and it needs a UI package no ADR has chosen yet.
-        app.MapOpenApi();
+        // openapi-documentation: the document in every environment, the interactive page on a Development
+        // host only — ADR-0035. `MapOpenApi()` is outside that branch, inside the one call this root can
+        // afford: Program.cs is at S104's cap, and SPEC-032's answer 5 forbids moving anything else out.
+        InteractiveDocumentation.Use(app);
         app.MapHealthEndpoints();
         app.MapAuthEndpoints();
         app.MapProfileEndpoints();

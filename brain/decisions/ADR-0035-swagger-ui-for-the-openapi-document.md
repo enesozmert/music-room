@@ -47,6 +47,12 @@ being the contract the moment the two disagreed.
 The UI is registered inside the existing `app.Environment.IsDevelopment()` branch. The raw document
 keeps being served everywhere, as it is today.
 
+> **Amended 2026-10-06 by SPEC-032.** There was no such branch. The only `IsDevelopment()` call was
+> `builder.Environment.IsDevelopment()`, passed as a flag into `InfrastructureSetup`, so SPEC-032 created the
+> branch — in `WebAPI/InteractiveDocumentation.cs` rather than in `Program.cs`, which is at S104's line cap
+> (issue O24). `MapOpenApi()` moved into that file too and sits **outside** the branch, so the document still
+> answers in every environment, as this section requires.
+
 - An interactive, unauthenticated catalogue of every endpoint is an attack-surface map. It is also
   the one page an attacker would like most on a host that is not ours.
 - Nothing is lost: the audience for the UI is the two developers and the defence walkthrough, and
