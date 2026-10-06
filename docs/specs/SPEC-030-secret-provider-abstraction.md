@@ -1,7 +1,7 @@
 ---
 id: SPEC-030
 title: The secret provider abstraction, and the one implementation that exists today
-status: approved        # draft | approved | in-progress | done | blocked
+status: done            # draft | approved | in-progress | done | blocked
 tier: B                 # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S1b              # which DELIVERY-PLAN slice this belongs to
 requirements: [V.8, V.6]
@@ -36,7 +36,8 @@ escalation: |
      `Origin` against that list. The provider's blank-is-absent rule must not swallow it: either that read
      stays outside `Require`, or the provider distinguishes "absent" from "present and empty" and this read
      takes the second. Prove it with a test — a blank value still allows no origin, and the hub handshake
-     still answers `403`. `Program.cs` already says why in as many words: *"Unset" reading as "everything"
+     still answers `403`. **Evidenced by SPEC-031**, which carries that test: `HubLimitTests.cs` is not in this
+     spec's Files table, so the proof is its own unit rather than a widened table. `Program.cs` already says why in as many words: *"Unset" reading as "everything"
      is how a development convenience becomes a production hole.*
   2. **No variable is renamed and no guard message changes.** The three start-up refusals keep their exact
      text. A changed message means the unit went further than this spec, and that is a stop.
