@@ -40,6 +40,7 @@ LOAD_SIMULATION_vote-storm := musicroom.VoteStormSimulation
 LOAD_SIMULATION_reorder    := musicroom.PlaylistReorderSimulation
 LOAD_SIMULATION_fan-out    := musicroom.HubFanOutSimulation
 LOAD_SIMULATION_login      := musicroom.LoginBurstSimulation
+LOAD_SIMULATION_hub-limits := musicroom.HubLimitProbeSimulation
 
 load: ## run a Gatling scenario against the compose stack: make load SCENARIO=vote-storm
 	@test -d tests/load/seed/out || { \
