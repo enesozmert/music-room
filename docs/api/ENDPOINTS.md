@@ -28,6 +28,7 @@ Rules this document obeys: [[rest-api-design]] · [[openapi-documentation]] · [
 | Base path | `/api/v1` |
 | Format | JSON, `camelCase`, UTF-8, UTC ISO-8601 instants |
 | Errors | RFC 9457 `application/problem+json`, one shape, always with `traceId` |
+| Validation error keys | **The field name the caller sent**, in `camelCase`, matching the request schema in `openapi.json`, and **never empty** — [[ADR-0043-validation-error-key-naming]], SPEC-037. A `422` body is `{"errors":{"<field>":["<message>"]}}`, so a client can take a key and look it up in the body or query string it just sent: `newPassword`, `youtubeVideoId`, `q` on `GET /tracks`, `ttlSeconds` on the event-code route. A nested field keeps its dotted path (`bio.value`, `geofence.latitude`); an entry in an array carries its index (`genres[0]`). One resolver produces this for every validator, so it is a property of the API and not a habit per route — `ValidationKeyContractTests` asserts every key against this document |
 | Collections | `{ "items": [...], "page": 1, "pageSize": 20, "total": 137 }`, `pageSize` capped at 100 |
 | Ids in JSON | strings, always |
 | Auth | `Authorization: Bearer <access token>` |
@@ -73,7 +74,7 @@ Subject V.1, V.5. Rules: [[authentication-authorization]], [[social-oauth]].
 | DELETE | `/auth/sessions/current` | — | `204` | `401` | `auth` |
 | GET | `/auth/sessions` | — | `200` list | `401` | `self` |
 | DELETE | `/auth/sessions/{sessionId}` | — | `204` | `401`, `404` | `self` |
-| POST | `/auth/password-reset-requests` | `email` | `202` | `429` | `anon` |
+| POST | `/auth/password-reset-requests` | `email` | `202` | `422`, `429` | `anon` |
 | POST | `/auth/password-resets` | `token`, `newPassword` | `204` | `400`, `410`, `422`, `429` | `anon` |
 | POST | `/me/password` | `currentPassword`, `newPassword` | `204` | `401`, `422`, `429` | `auth` |
 | GET | `/auth/social-links` | — | `200` list | `401` | `self` |

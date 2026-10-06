@@ -40,6 +40,6 @@ public sealed class SendFriendRequestCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(
             result.Errors,
-            failure => failure.PropertyName == nameof(SendFriendRequestCommand.TargetUserId));
+            failure => failure.PropertyName == "targetUserId");
     }
 }

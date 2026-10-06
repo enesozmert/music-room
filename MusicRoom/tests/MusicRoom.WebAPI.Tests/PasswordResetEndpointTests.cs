@@ -118,7 +118,7 @@ public sealed class PasswordResetEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal(["Email"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["email"], await ValidationProblems.KeysAsync(response));
         Assert.Equal(before, _mail.ResetTokens.Count);
     }
 
@@ -301,7 +301,7 @@ public sealed class PasswordResetEndpointTests : IAsyncLifetime
 
         // The body's key is part of the contract: a client reads `errors.NewPassword`. SPEC-034 moved the policy
         // into one shared rule, and this holds that rule to this command's own property name.
-        Assert.Equal(["NewPassword"], await ValidationProblems.KeysAsync(refused));
+        Assert.Equal(["newPassword"], await ValidationProblems.KeysAsync(refused));
 
         // Nothing echoes the submitted password — SPEC-035.
         Assert.DoesNotContain(

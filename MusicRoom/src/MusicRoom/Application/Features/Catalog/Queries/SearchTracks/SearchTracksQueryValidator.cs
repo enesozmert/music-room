@@ -29,8 +29,11 @@ public sealed class SearchTracksQueryValidator : AbstractValidator<SearchTracksQ
     /// <summary>Builds the rules.</summary>
     public SearchTracksQueryValidator()
     {
+        // The client sends `q`, not `query` — the resolver camelCases a property name and cannot know a name only
+        // the request schema holds, so this route states it (ADR-0043 as amended, SPEC-037).
         RuleFor(query => query.Query)
             .NotEmpty()
+            .OverridePropertyName("q")
             .MinimumLength(MinimumQueryLength)
             .MaximumLength(MaximumQueryLength)
             .WithMessage(

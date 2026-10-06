@@ -317,7 +317,7 @@ public sealed class EventPresenceEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal(["TimeToLiveSeconds"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["ttlSeconds"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>A restricted event at the venue, open now, with one suggestion in it.</summary>

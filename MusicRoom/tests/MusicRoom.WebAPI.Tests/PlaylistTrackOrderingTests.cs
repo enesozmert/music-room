@@ -243,7 +243,7 @@ public sealed class PlaylistTrackOrderingTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal(["AfterTrackId"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["afterTrackId"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>

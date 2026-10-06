@@ -24,12 +24,17 @@ public sealed class ReplaceMusicPreferencesCommandValidator
         RuleFor(command => command.Genres).NotNull();
         RuleFor(command => command.Artists).NotNull();
 
+        // `Count` is a CLR member and `MusicPreferencesRequest` publishes no such field, so a resolved key would
+        // be `genres.count` — a key a client cannot look up in the body it sent. It names the array instead
+        // (ADR-0043 as amended, which struck `genres.count` from its own examples).
         RuleFor(command => command.Genres.Count)
             .LessThanOrEqualTo(MaximumEntries)
+            .OverridePropertyName("genres")
             .When(command => command.Genres is not null);
 
         RuleFor(command => command.Artists.Count)
             .LessThanOrEqualTo(MaximumEntries)
+            .OverridePropertyName("artists")
             .When(command => command.Artists is not null);
 
         RuleForEach(command => command.Genres)

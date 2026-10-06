@@ -175,7 +175,7 @@ public sealed class DeviceControlEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal(["GranteeUserId"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["granteeUserId"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>Only the owner delegates.</summary>

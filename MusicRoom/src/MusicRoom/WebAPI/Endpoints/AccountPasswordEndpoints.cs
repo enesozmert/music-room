@@ -70,7 +70,9 @@ public static class AccountPasswordEndpoints
                 ChangePasswordOutcome.RefusedByContext => Results.ValidationProblem(
                     new Dictionary<string, string[]>(StringComparer.Ordinal)
                     {
-                        [nameof(ChangePasswordCommand.NewPassword)] = [PasswordRules.ContextMessage],
+                        // The wire name, spelled out: this body is built here rather than by FluentValidation, so
+                        // the global key resolver never sees it — ADR-0043, SPEC-037.
+                        ["newPassword"] = [PasswordRules.ContextMessage],
                     },
                     statusCode: StatusCodes.Status422UnprocessableEntity),
                 _ => Results.Problem(

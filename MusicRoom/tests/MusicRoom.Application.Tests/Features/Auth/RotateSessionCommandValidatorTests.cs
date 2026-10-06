@@ -41,7 +41,7 @@ public sealed class RotateSessionCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(
             result.Errors,
-            failure => failure.PropertyName == nameof(RotateSessionCommand.RefreshToken));
+            failure => failure.PropertyName == "refreshToken");
     }
 
     /// <summary>A token longer than the generator can produce is refused rather than hashed.</summary>

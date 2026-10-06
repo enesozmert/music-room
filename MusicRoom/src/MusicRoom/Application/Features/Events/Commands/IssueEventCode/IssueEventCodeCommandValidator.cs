@@ -22,8 +22,11 @@ public sealed class IssueEventCodeCommandValidator : AbstractValidator<IssueEven
     {
         RuleFor(command => command.EventId).NotEmpty();
 
+        // `EventCodeRequest` publishes `ttlSeconds` while the command carries `TimeToLiveSeconds`, so the key is
+        // stated rather than resolved. `WithName` used to sit here and never moved the key — it names the word a
+        // message interpolates, which is the correction ADR-0043's amendment carries.
         RuleFor(command => command.TimeToLiveSeconds)
             .InclusiveBetween(MinimumTimeToLiveSeconds, MaximumTimeToLiveSeconds)
-            .WithName("ttlSeconds");
+            .OverridePropertyName("ttlSeconds");
     }
 }

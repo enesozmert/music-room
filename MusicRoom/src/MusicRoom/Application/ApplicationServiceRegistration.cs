@@ -6,6 +6,7 @@ using MusicRoom.Application.Features.Events.Presence;
 using MusicRoom.Application.Features.Playback;
 using MusicRoom.Application.Pipelines.Auditing;
 using MusicRoom.Application.Pipelines.Realtime;
+using MusicRoom.Application.Validation;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -41,6 +42,11 @@ public static class ApplicationServiceRegistration
             // no audit record — SPEC-008. This behaviour also owns the transaction the record commits in.
             configuration.AddOpenBehavior(typeof(AuditBehaviour<,>));
         });
+
+        // Once, globally: a validation error is keyed by the field the client sent — ADR-0043, SPEC-037. Here
+        // rather than in the composition root because `Program.cs` is at S104's 300-line limit (issue O24), and
+        // this is the method that already registers every validator, called by the root exactly once.
+        ValidatorOptions.Global.PropertyNameResolver = ValidationKeyNaming.Resolve;
 
         services.AddValidatorsFromAssembly(typeof(ApplicationServiceRegistration).Assembly);
 

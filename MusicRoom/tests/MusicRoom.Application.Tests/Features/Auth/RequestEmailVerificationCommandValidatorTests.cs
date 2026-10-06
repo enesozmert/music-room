@@ -27,7 +27,7 @@ public sealed class RequestEmailVerificationCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(
             result.Errors,
-            failure => failure.PropertyName == nameof(RequestEmailVerificationCommand.Email));
+            failure => failure.PropertyName == "email");
     }
 
     /// <summary>A value that is not an address is refused rather than looked up.</summary>
@@ -44,7 +44,7 @@ public sealed class RequestEmailVerificationCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(
             result.Errors,
-            failure => failure.PropertyName == nameof(RequestEmailVerificationCommand.Email));
+            failure => failure.PropertyName == "email");
     }
 
     /// <summary>
@@ -66,7 +66,7 @@ public sealed class RequestEmailVerificationCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(
             result.Errors,
-            failure => failure.PropertyName == nameof(RequestEmailVerificationCommand.Email));
+            failure => failure.PropertyName == "email");
     }
 
     /// <summary>
