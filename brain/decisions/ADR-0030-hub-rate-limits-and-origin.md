@@ -13,6 +13,32 @@ date: 2026-09-27
 > (issue O21), so the sentence about them belonging to the S5 spec no longer has a spec to live in.
 > They are here instead, and the work lands at S9.
 
+> **Amended again 2026-10-06: the account ceiling counts connections, not devices — 12 and 60.**
+> SPEC-033 measured what the previous amendment assumed. The rationale below justified five as *"a phone,
+> a tablet and a reconnect in flight"*, which counts **devices**; the code counts **connections**, and
+> `PlaylistHub`, `EventHub` and `ControlHub` are three of them at three paths. Probe 3 held three for one
+> device and was refused the sixth connection, so five was **one device and a spare** rather than the three
+> the sentence described. The limiter was right; the number did not match its own reason.
+>
+> | Limit | Was | Is | Arithmetic |
+> |---|---|---|---|
+> | Concurrent connections per account | 5 | **12** | 3 devices × 3 hubs = 9, plus one device's reconnect in flight = 3 |
+> | Concurrent connections per address | 20 | **60** | 20 devices × 3 hubs — the venue case the rationale named, at the granularity the code counts |
+> | Hub invocations per connection | 60 per minute | **60 per minute, unchanged** | measured at 24 a minute for a realistic client, so the headroom is 2.5× |
+>
+> The reconnect headroom is a whole device rather than one connection because `ClientTimeoutInterval` is
+> **60 seconds**: a phone that changes network drops all three connections at once and the server reaps
+> none of them for up to a minute, so it holds three stale and three new. One spare connection would refuse
+> the reconnect it exists to allow.
+>
+> The invocation limit stays because 24 a minute is what a realistic client reaches and a rejoin burst after
+> a reconnect is short and legitimate — lowering it would refuse the recovery, not an attack.
+>
+> **The deeper fix is not taken here.** The handshake already carries `X-Client-Device`, so the ceiling
+> could count devices and say what it means, instead of multiplying by the number of hubs every time one is
+> added — a fourth hub would silently make 12 three devices again. That is issue **O25**, and it is a
+> design change rather than a number.
+
 ## Context
 
 Realtime lands at slice S5. Three decisions already cover it and none of them covers abuse of the

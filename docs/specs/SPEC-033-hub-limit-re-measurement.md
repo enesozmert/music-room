@@ -1,13 +1,13 @@
 ---
 id: SPEC-033
 title: The re-measurement ADR-0030 commissioned — is 60 invocations a minute generous or tight
-status: draft           # draft | approved | in-progress | done | blocked
+status: approved        # draft | approved | in-progress | done | blocked
 tier: B                 # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S9               # which DELIVERY-PLAN slice this belongs to
 requirements: [V.7, V.6]
 decisions: [ADR-0030, ADR-0018, ADR-0023]
 standards: [load-testing, signalr-realtime, testing]
-approved_by:            # Tier A on the gate; the measurement itself raised gate 1 — see escalation
+approved_by: enesozmert # gate 1 answered by the owner on 2026-10-06 — see the escalation
 escalation: |
   **The measurement ran and one number does not hold. Stopped at `draft` by decision 5, which is this spec's own
   stop condition.** Nothing was changed: ADR-0030 reserves an amendment to itself.
@@ -47,6 +47,31 @@ escalation: |
   **What is needed:** an ADR-0030 amendment setting connections-per-account, and a decision on whether
   connections-per-address should move with it. Then a one-line change to
   `HubConnectionLimits.DefaultConnectionsPerUser` and its test, as its own unit.
+
+  **Owner's answer, 2026-10-06: the amendment is written and this unit carries the change.** ADR-0030 now says
+  12 per account and 60 per address, with the arithmetic beside each. Gate 1 therefore becomes a
+  human-answered **yes** — the ADR changed — and the Files table gains the three paths the new numbers need.
+  Folding the change in here rather than opening a second unit is what `load-testing` asks for: the change and
+  its measurement in one place, and the measurement is already in this branch.
+
+  Four answers, binding:
+
+  1. **12 per account, not the 10 you proposed.** Your arithmetic stopped one connection short of its own
+     reason. `ClientTimeoutInterval` is 60 seconds, so a phone that changes network drops all three
+     connections at once and the server reaps none of them for up to a minute: it holds three stale and three
+     new. Reconnect headroom is a whole device — 9 + 3 — or the ceiling refuses the reconnect it exists to
+     allow.
+  2. **60 per address.** Your second observation is right and it moves with the first: 20 was 6 devices on a
+     shared wifi, and the venue case is the one the rationale named explicitly. 20 devices × 3 hubs.
+  3. **60 invocations a minute stays.** 24 measured against 60 is 2.5× headroom, and the burst that would
+     touch it is a rejoin after a reconnect — refusing that refuses a recovery, not an attack.
+  4. **Re-run probe 3 after the change** and put both counts in the report: 12 accepted and the 13th refused.
+     A changed default with no run behind it is the thing this spec exists to prevent. Do not re-run the rate
+     probes; nothing about them moved.
+
+  Not in this unit, recorded instead: the ceiling counts connections and means devices, so a fourth hub would
+  make 12 three devices again. The handshake already carries `X-Client-Device`, so it could count what it
+  means. Open that as **O25** in `docs/SDD.md` §16 and leave it open — it is a design change, not a number.
 ---
 
 # Re-measuring the hub limits
@@ -90,7 +115,7 @@ its own verdict — generous, tight, or wrong — with the observation behind it
 
 | # | Question | Answer |
 |---|---|---|
-| 1 | new/changed ADR, or contradicts one? | **no** — it executes the clause ADR-0030 already wrote. If the measurement finds a number wrong, this spec goes back to `draft` and the amendment is the owner's, which is decision 1's whole point |
+| 1 | new/changed ADR, or contradicts one? | **yes, answered by the owner on 2026-10-06** — the measurement found a number wrong, the spec stopped at `draft` exactly as decision 1 required, and the owner amended ADR-0030 to 12 per account and 60 per address. The amendment is in the Files table below |
 | 2 | new or upgraded dependency? | no — Gatling 3.11.5 and the `gatling-maven-plugin` are already pinned in `tests/load/pom.xml`, which is outside `MusicRoom.sln` |
 | 3 | schema change beyond this spec, or destructive migration? | no — no migration. The existing `seed.sh` writes rows to a throwaway database and this unit does not change it |
 | 4 | changes `docs/api/ENDPOINTS.md`? | no |
@@ -98,7 +123,8 @@ its own verdict — generous, tight, or wrong — with the observation behind it
 | 6 | lowers a severity, deletes or skips a test? | no |
 | 7 | touches or copies from `reference/`? | no |
 
-All seven are no, so this is Tier A: `status: approved`, `approved_by: agent`.
+Six are no and gate 1 is a yes the owner answered, so this is Tier B: `status: approved`,
+`approved_by: enesozmert`.
 
 ## Files
 
@@ -110,6 +136,9 @@ All seven are no, so this is Tier A: `status: approved`, `approved_by: agent`.
 | `docs/SDD.md` | change — §13.3's realtime table gains the measured figures beside the decided ones; §16's V.7 row says the re-measurement happened |
 | `docs/DELIVERY-PLAN.md` | change — S9 |
 | `brain/projects/musicroom-backend.md` | change — S9 |
+| `brain/decisions/ADR-0030-hub-rate-limits-and-origin.md` | change — the amendment: 12 per account, 60 per address, the invocation limit unchanged, with the arithmetic and the `ClientTimeoutInterval` reasoning |
+| `MusicRoom/src/MusicRoom/WebAPI/Hubs/HubConnectionLimits.cs` | change — `DefaultConnectionsPerUser` 5 to 12, `DefaultConnectionsPerAddress` 20 to 60, and the doc comments that state the arithmetic |
+| `MusicRoom/tests/MusicRoom.WebAPI.Tests/HubLimitTests.cs` | change — the ceiling tests carry the new numbers; the suite proves the ceiling refuses, and at which count |
 | `docs/specs/SPEC-033-hub-limit-re-measurement.md` | change — status transitions |
 
 ### The Files table walk
