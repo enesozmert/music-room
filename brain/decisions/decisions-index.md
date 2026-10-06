@@ -50,6 +50,6 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0040-pull-requests-need-not-be-up-to-date]] | A pull request need not be up to date with `main` to merge | Accepted | landed |
 | [[ADR-0041-limiter-after-authentication]] | The rate limiter runs after authentication, so a per-account limit is per account | Accepted | landed |
 | [[ADR-0042-breached-and-context-password-screening]] | A chosen password is screened against a bundled breached set and a context word list, with no outbound call | Accepted | built by SPEC-035, T-32 closed. Amended twice: the unification came first (SPEC-034), and the "two homes" rationale was replaced after SPEC-035 measured that neither non-register handler reaches the account |
-| [[ADR-0043-validation-error-key-naming]] | A validation error is keyed by the field name the client sent, camelCase, never empty | Accepted | not built, O28 |
+| [[ADR-0043-validation-error-key-naming]] | A validation error is keyed by the field name the client sent, camelCase, never empty | Accepted | built by SPEC-037, O28 closed. Amended before landing: `WithName` names a message and `OverridePropertyName` names a key, two routes' fields are spelled differently from their properties, and `genres.count` was struck as a defect |
 
 Related: [[MEMORY]] · [[system-overview]] · [[standards-router]]

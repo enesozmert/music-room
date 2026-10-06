@@ -11,6 +11,14 @@ namespace MusicRoom.Application.Features.Events;
 /// One place, because the two routes must refuse the same things: a mode that is accepted at creation and
 /// rejected on update — or the reverse — is a way to reach a state neither route meant to allow.
 /// SPEC-017 decision 3 is the rule with teeth.
+/// <para>
+/// **Keys, since SPEC-037.** A rule declared over the whole licence or the whole metadata has no member path, so
+/// FluentValidation has no name for it and the key is whatever the rule overrides it with — `presenceProof`,
+/// `geofence`, `licence`, `endsAtUtc`. `OverridePropertyName` rather than `WithName`, which sets only the word a
+/// message interpolates and leaves the key alone (ADR-0043 as amended). The member-access rules beside them need
+/// nothing: `ValidationKeyNaming` already resolves `Geofence.Latitude` to `geofence.latitude` and `Name` to
+/// `name`, which is why five `WithName` calls left this file without any key moving.
+/// </para>
 /// </remarks>
 public static class EventLicenceRules
 {
@@ -42,7 +50,7 @@ public static class EventLicenceRules
         // proof configured would check nothing while reading, to an evaluator, as though it checked something.
         validator.RuleFor(command => licence(command))
             .Must(value => value.Licence != LicenceMode.LocationAndTimeRestricted || value.Proof is not null)
-            .WithName("presenceProof")
+            .OverridePropertyName("presenceProof")
             .WithMessage(
                 "A LocationAndTimeRestricted event must say which presence proof it requires: Geofence, "
                 + "EventCode or Both.");
@@ -51,30 +59,27 @@ public static class EventLicenceRules
         validator.RuleFor(command => licence(command))
             .Must(value => value.Proof is not (PresenceProof.Geofence or PresenceProof.Both)
                 || value.Geofence is not null)
-            .WithName("geofence")
+            .OverridePropertyName("geofence")
             .WithMessage("A geofence proof requires a centre and a radius.");
 
         // And a policy on a mode that checks nothing is a policy nobody will ever read.
         validator.RuleFor(command => licence(command))
             .Must(value => value.Licence == LicenceMode.LocationAndTimeRestricted
                 || (value.Proof is null && value.Geofence is null))
-            .WithName("licence")
+            .OverridePropertyName("licence")
             .WithMessage(
                 "A presence policy belongs to the LocationAndTimeRestricted licence and to no other.");
 
         validator.When(command => licence(command).Geofence is not null, () =>
         {
             validator.RuleFor(command => licence(command).Geofence!.Latitude)
-                .InclusiveBetween(-90m, 90m)
-                .WithName("geofence.latitude");
+                .InclusiveBetween(-90m, 90m);
 
             validator.RuleFor(command => licence(command).Geofence!.Longitude)
-                .InclusiveBetween(-180m, 180m)
-                .WithName("geofence.longitude");
+                .InclusiveBetween(-180m, 180m);
 
             validator.RuleFor(command => licence(command).Geofence!.RadiusMetres)
-                .InclusiveBetween(MinimumRadiusMetres, MaximumRadiusMetres)
-                .WithName("geofence.radiusMetres");
+                .InclusiveBetween(MinimumRadiusMetres, MaximumRadiusMetres);
         });
     }
 
@@ -91,16 +96,15 @@ public static class EventLicenceRules
 
         validator.RuleFor(command => metadata(command).Name)
             .NotEmpty()
-            .MaximumLength(MaximumNameLength)
-            .WithName("name");
+            .MaximumLength(MaximumNameLength);
 
-        validator.RuleFor(command => metadata(command).StartsAtUtc).NotEmpty().WithName("startsAtUtc");
+        validator.RuleFor(command => metadata(command).StartsAtUtc).NotEmpty();
 
         // Decision 4. An event that ends before it starts has no window at all, and the licence mode that
         // depends on one would then be unenforceable rather than merely unconfigured.
         validator.RuleFor(command => metadata(command))
             .Must(value => value.EndsAtUtc > value.StartsAtUtc)
-            .WithName("endsAtUtc")
+            .OverridePropertyName("endsAtUtc")
             .WithMessage("endsAtUtc must be after startsAtUtc.");
     }
 

@@ -18,8 +18,12 @@ public sealed class MoveTrackCommandValidator : AbstractValidator<MoveTrackComma
         RuleFor(command => command.PlaylistId).NotEmpty();
         RuleFor(command => command.PlaylistTrackId).NotEmpty();
 
+        // A whole-command rule has no member path, so without this the key would be the empty string and the
+        // message would reach a client it cannot route to a field — ADR-0043, the defect O28 named. It keys on
+        // the first of the two fields it is about, which is the one a client would highlight.
         RuleFor(command => command)
             .Must(command => command.AfterTrackId is null ^ command.BeforeTrackId is null)
+            .OverridePropertyName("afterTrackId")
             .WithMessage("Send exactly one of afterTrackId or beforeTrackId.");
 
         RuleFor(command => command.AfterTrackId)

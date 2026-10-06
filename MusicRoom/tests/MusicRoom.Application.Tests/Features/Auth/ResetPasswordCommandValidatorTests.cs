@@ -45,7 +45,7 @@ public sealed class ResetPasswordCommandValidatorTests
 
         // Assert
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, failure => failure.PropertyName == nameof(ResetPasswordCommand.Token));
+        Assert.Contains(result.Errors, failure => failure.PropertyName == "token");
     }
 
     /// <summary>A token longer than the generator produces is refused rather than hashed.</summary>
@@ -79,7 +79,7 @@ public sealed class ResetPasswordCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(
             result.Errors,
-            failure => failure.PropertyName == nameof(ResetPasswordCommand.NewPassword));
+            failure => failure.PropertyName == "newPassword");
     }
 
     /// <summary>
@@ -118,7 +118,7 @@ public sealed class ResetPasswordCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(
             result.Errors,
-            failure => failure.PropertyName == nameof(ResetPasswordCommand.NewPassword)
+            failure => failure.PropertyName == "newPassword"
                 && failure.ErrorMessage == PasswordRules.BreachedMessage);
     }
 }

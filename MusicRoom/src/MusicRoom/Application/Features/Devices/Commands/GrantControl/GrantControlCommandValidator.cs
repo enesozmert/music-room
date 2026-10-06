@@ -15,6 +15,8 @@ public sealed class GrantControlCommandValidator : AbstractValidator<GrantContro
     public GrantControlCommandValidator()
     {
         RuleFor(command => command.DeviceId).NotEmpty();
-        RuleFor(command => command.GranteeUserId).NotEmpty().WithName("granteeUserId");
+        // The resolver produces `granteeUserId` from the property, so no override is needed here — the
+        // `WithName` that used to sit on this rule never moved the key anyway (ADR-0043 as amended).
+        RuleFor(command => command.GranteeUserId).NotEmpty();
     }
 }

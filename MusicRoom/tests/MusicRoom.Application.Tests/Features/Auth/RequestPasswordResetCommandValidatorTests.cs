@@ -40,7 +40,7 @@ public sealed class RequestPasswordResetCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(
             result.Errors,
-            failure => failure.PropertyName == nameof(RequestPasswordResetCommand.Email));
+            failure => failure.PropertyName == "email");
     }
 
     /// <summary>Something that is not an address is refused before anything is written.</summary>

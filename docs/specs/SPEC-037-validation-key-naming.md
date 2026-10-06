@@ -1,7 +1,7 @@
 ---
 id: SPEC-037
 title: A validation error key is the field the client sent, resolved once and held by a property test
-status: in-progress     # draft | approved | in-progress | done | blocked
+status: done            # draft | approved | in-progress | done | blocked
 tier: B                 # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S9               # which DELIVERY-PLAN slice this belongs to
 requirements: [V.6]
@@ -249,6 +249,32 @@ rather than assuming them.
    removing one and seeing it fail before putting it back.
 6. Documents: ENDPOINTS §Conventions and the `422` row, SDD §17's O28, the ADR amendment, the index row.
 
+## What the run changed
+
+Four things the spec did not predict, each measured while running:
+
+1. **The Application suite was green because it was diverged, not because it agreed.** Before any expectation
+   moved, all **132** tests passed with the resolver live in production code — because those tests construct
+   validators with `new` and never call `AddApplicationServices`, so they saw FluentValidation's default
+   resolver. The fix is configuration, as the ADR's amendment requires: a `[ModuleInitializer]` in
+   `ValidationKeyConfiguration` applies the production resolver to the test assembly. With it disabled, **21 of
+   132 fail**; with it on, 0 do. That is the proof the 19 rewritten expectations now assert something.
+2. **Nine test files changed in `MusicRoom.Application.Tests`, not two.** The Files table said "any
+   `PropertyName` expectation the resolver moves" against two files; the measurement is 20 `PropertyName`
+   assertions across nine files, 19 of which were `nameof(...)` and now read the wire name. The twentieth is a
+   case-insensitive `Contains("grantee")` and needed nothing.
+3. **Two `422` bodies are built by hand in `WebAPI` and never pass through the resolver.** The context-screen
+   refusals SPEC-035 added key their dictionaries with `nameof(...NewPassword)`, so they published
+   `NewPassword` after every validator had moved to `newPassword`. Caught by the suite, not by reading. Both are
+   now spelled as wire names with the reason in a comment — two production files the Files table did not list:
+   `WebAPI/Endpoints/AccountPasswordEndpoints.cs` and `WebAPI/Endpoints/PasswordResetEndpoints.cs`.
+4. **Five `WithName` calls left `EventLicenceRules` and four became `OverridePropertyName`.** The spec said nine
+   would become overrides. Only the four whole-command rules need one — `presenceProof`, `geofence`, `licence`,
+   `endsAtUtc`. The other five sat on member-access rules, where the resolver already produces the same name, so
+   they were removed rather than converted. `GrantControlCommandValidator`'s `WithName("granteeUserId")` went for
+   the same reason, and `IssueEventCodeCommandValidator`'s became an override because `ttlSeconds` is a name the
+   resolver cannot reach.
+
 ## Verification
 
 ```bash
@@ -268,8 +294,8 @@ make agent-check
 
 ## Done when
 
-- [ ] every file in the Files table exists and compiles
-- [ ] every command under Verification passes
-- [ ] OWASP checklists walked for the surface touched; unfixed findings in the threat register
-- [ ] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
-- [ ] `status: done` in this file
+- [x] every file in the Files table exists and compiles
+- [x] every command under Verification passes
+- [x] OWASP checklists walked for the surface touched; unfixed findings in the threat register
+- [x] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
+- [x] `status: done` in this file

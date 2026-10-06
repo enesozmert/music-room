@@ -176,7 +176,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
 
         // The body's key is part of the contract: a client reads `errors.Password`. SPEC-034 moved the policy
         // into one shared rule, and this is what holds that rule to this command's own property name.
-        Assert.Equal(["Password"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["password"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>
@@ -207,7 +207,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal(0, await CountUsersAsync(email));
-        Assert.Equal(["Password"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["password"], await ValidationProblems.KeysAsync(response));
         Assert.Contains(
             PasswordRules.BreachedMessage,
             await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
@@ -244,7 +244,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal(0, await CountUsersAsync(email));
-        Assert.Equal(["Password"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["password"], await ValidationProblems.KeysAsync(response));
 
         string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Contains(PasswordRules.ContextMessage, body, StringComparison.Ordinal);

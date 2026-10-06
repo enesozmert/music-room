@@ -24,7 +24,7 @@ public sealed class VerifyEmailCommandValidatorTests
 
         // Assert
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, failure => failure.PropertyName == nameof(VerifyEmailCommand.Token));
+        Assert.Contains(result.Errors, failure => failure.PropertyName == "token");
     }
 
     /// <summary>
@@ -42,7 +42,7 @@ public sealed class VerifyEmailCommandValidatorTests
 
         // Assert
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, failure => failure.PropertyName == nameof(VerifyEmailCommand.Token));
+        Assert.Contains(result.Errors, failure => failure.PropertyName == "token");
     }
 
     /// <summary>

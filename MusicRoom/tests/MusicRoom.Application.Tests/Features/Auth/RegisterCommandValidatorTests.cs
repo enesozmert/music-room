@@ -38,7 +38,7 @@ public sealed class RegisterCommandValidatorTests
 
         // Assert
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, failure => failure.PropertyName == nameof(RegisterCommand.Password));
+        Assert.Contains(result.Errors, failure => failure.PropertyName == "password");
     }
 
     /// <summary>A password over the ADR-0007 upper bound is refused.</summary>
@@ -53,7 +53,7 @@ public sealed class RegisterCommandValidatorTests
 
         // Assert
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, failure => failure.PropertyName == nameof(RegisterCommand.Password));
+        Assert.Contains(result.Errors, failure => failure.PropertyName == "password");
     }
 
     /// <summary>
@@ -76,7 +76,7 @@ public sealed class RegisterCommandValidatorTests
 
         // Assert
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, failure => failure.PropertyName == nameof(RegisterCommand.Password));
+        Assert.Contains(result.Errors, failure => failure.PropertyName == "password");
     }
 
     /// <summary>A malformed address is refused — subject V.1 input validation.</summary>
@@ -91,7 +91,7 @@ public sealed class RegisterCommandValidatorTests
 
         // Assert
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, failure => failure.PropertyName == nameof(RegisterCommand.Email));
+        Assert.Contains(result.Errors, failure => failure.PropertyName == "email");
     }
 
     /// <summary>A password in the breached set is refused, keyed on this command's own property.</summary>
@@ -109,7 +109,7 @@ public sealed class RegisterCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(
             result.Errors,
-            failure => failure.PropertyName == nameof(RegisterCommand.Password)
+            failure => failure.PropertyName == "password"
                 && failure.ErrorMessage == PasswordRules.BreachedMessage);
     }
 
@@ -160,7 +160,7 @@ public sealed class RegisterCommandValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(
             result.Errors,
-            failure => failure.PropertyName == nameof(RegisterCommand.Password)
+            failure => failure.PropertyName == "password"
                 && failure.ErrorMessage == PasswordRules.ContextMessage);
     }
 

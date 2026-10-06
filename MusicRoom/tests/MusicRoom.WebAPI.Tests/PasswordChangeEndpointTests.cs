@@ -137,7 +137,7 @@ public sealed class PasswordChangeEndpointTests : IAsyncLifetime
 
         // The body's key is part of the contract: a client reads `errors.NewPassword`. SPEC-034 moved the policy
         // into one shared rule, and this holds that rule to this command's own property name.
-        Assert.Equal(["NewPassword"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["newPassword"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>
@@ -173,7 +173,7 @@ public sealed class PasswordChangeEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal(["NewPassword"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["newPassword"], await ValidationProblems.KeysAsync(response));
 
         // Nothing was written: the old password still signs in and the new one does not.
         Assert.Equal(

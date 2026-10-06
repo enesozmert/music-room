@@ -42,7 +42,7 @@ public sealed class LoginCommandValidatorTests
 
         // Assert
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, failure => failure.PropertyName == nameof(LoginCommand.Email));
+        Assert.Contains(result.Errors, failure => failure.PropertyName == "email");
     }
 
     /// <summary>An empty password never reaches the hasher.</summary>
@@ -57,7 +57,7 @@ public sealed class LoginCommandValidatorTests
 
         // Assert
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, failure => failure.PropertyName == nameof(LoginCommand.Password));
+        Assert.Contains(result.Errors, failure => failure.PropertyName == "password");
     }
 
     /// <summary>

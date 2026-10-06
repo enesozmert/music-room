@@ -108,7 +108,7 @@ public sealed class PlaylistEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal(["Licence"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["licence"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>A rename to an empty name is `422` keyed on `Name` — SPEC-036.</summary>
@@ -127,7 +127,7 @@ public sealed class PlaylistEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal(["Name"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["name"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>
@@ -154,7 +154,7 @@ public sealed class PlaylistEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal(["Licence"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["licence"], await ValidationProblems.KeysAsync(response));
     }
     /// <summary>The token is stable while the row is unchanged.</summary>
     [Fact]

@@ -271,7 +271,7 @@ public sealed class ProfileEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal(["Genres.Count"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["genres"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>A bio past the cap is `422` keyed on `Bio.Value` — SPEC-036.</summary>
@@ -300,7 +300,7 @@ public sealed class ProfileEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal(["Bio.Value"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["bio.value"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>An authenticated mutation is audited, named and attributed — SPEC-009 and SPEC-010.</summary>

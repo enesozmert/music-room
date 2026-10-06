@@ -92,7 +92,7 @@ public sealed class FriendRequestEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-        Assert.Equal(["TargetUserId"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(["targetUserId"], await ValidationProblems.KeysAsync(response));
     }
     /// <summary>A user cannot befriend themselves.</summary>
     [Fact]
