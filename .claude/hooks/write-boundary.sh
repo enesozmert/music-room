@@ -18,9 +18,15 @@ case "$path" in
     echo "reference/ is read-only study material. Read the pattern, then write your own under MusicRoom/. AGENTS.md, subject IV.1." >&2
     exit 2
     ;;
-  */.env|.env)
-    echo ".env holds secrets and is never read, written or committed. Change .env.example instead, and name the key rather than its value." >&2
-    exit 2
+  */.env|.env|*/.env.*|.env.*)
+    case "$path" in
+      */.env.example|.env.example)
+        ;;
+      *)
+        echo "A .env file holds secrets and is never read, written or committed — .env, and .env.prod and every other suffix the owner keeps for a deployment. Change .env.example instead, and name the key rather than its value." >&2
+        exit 2
+        ;;
+    esac
     ;;
   *.pdf)
     echo "PDFs are generated artifacts. Markdown is the source of truth: edit the .md, then run docs/build-pdf.sh." >&2

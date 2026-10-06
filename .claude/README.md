@@ -41,7 +41,8 @@ Three rules have no legitimate exception, so they are enforced mechanically rath
 guardrail paragraph the model has to remember:
 
 1. `reference/` is read-only — subject IV.1.
-2. `.env` is never written. `.env.example` is.
+2. **No `.env` file is written** — `.env`, and `.env.prod` or any other suffix the owner keeps for a
+   deployment. `.env.example` is the one exception, because it names keys and never values.
 3. A `.pdf` is a generated artifact. Edit the Markdown, then run `docs/build-pdf.sh`.
 
 Everything else stays a matter of judgement and review. A hook that blocks too much gets disabled,
