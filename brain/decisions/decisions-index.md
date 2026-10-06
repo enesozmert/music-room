@@ -49,5 +49,6 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0039-queue-broadcast-payloads]] | An `EventHub` payload carries the authoritative value, not a row version | Accepted | landed |
 | [[ADR-0040-pull-requests-need-not-be-up-to-date]] | A pull request need not be up to date with `main` to merge | Accepted | landed |
 | [[ADR-0041-limiter-after-authentication]] | The rate limiter runs after authentication, so a per-account limit is per account | Accepted | landed |
+| [[ADR-0042-breached-and-context-password-screening]] | A chosen password is screened against a bundled breached set and a context word list, with no outbound call | Accepted | not built, T-32 |
 
 Related: [[MEMORY]] · [[system-overview]] · [[standards-router]]
