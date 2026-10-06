@@ -197,6 +197,7 @@ public sealed class VerificationRequestEndpointTests : IAsyncLifetime
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal(sentBefore, _mail.Tokens.Count);
+        Assert.Equal(["Email"], await ValidationProblems.KeysAsync(response));
     }
 
     private async Task<string> RegisterAndCaptureTokenAsync(string email)

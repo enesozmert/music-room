@@ -1,6 +1,6 @@
 ---
 kind: lessons-index
-updated: 2026-09-23
+updated: 2026-10-06
 ---
 
 # Lessons
@@ -59,6 +59,7 @@ A lesson earns a line here only if it would otherwise be rediscovered the expens
 | L-046 | **SignalR's `StartAsync` returns before the server has joined the connection to its groups.** The handshake response is written before `OnConnectedAsync` is dispatched, so a listener that only awaits `StartAsync` races the broadcast it waits for: `ControlHubTests.Revoke_ReachesThePreviousControllerAsync` timed out on CI while the same commit passed in another run. Every other broadcast suite was already safe by accident — it invokes the hub's own join method, which is a round trip and therefore a fence. `ControlHub` has no invocable method by design, so the fence has to be built: a test-host-only `IHubFilter` that signals after `next`, which is after the hub's own `OnConnectedAsync`. Fence on the server's work, not on the client's call. | observed 2026-10-04, PR #72 |
 | L-047 | **A provider key has a type, and the wrong type fails as authentication rather than as configuration.** `MAIL_API_KEY` held Brevo's SMTP key (`xsmtpsib-`); `BrevoMailService` calls the REST API at `POST /v3/smtp/email`, which answered `401`. Nothing was misconfigured in the sense any guard could check — the key was present, non-empty and valid, for a different protocol. The guard that caught the empty `MAIL_FROM` could not catch this, because a key's type is not a property of the string. Twenty minutes went to it. `.env.example` now names the prefix and the panel page; a start-up check on the prefix would be cheaper still. | observed 2026-10-04, SPEC-024's manual verification |
 | L-004 | `reference/` is read-only. It is there to learn the structure from, not to copy from. Backend code is written under `MusicRoom/` only. Copying a file across drags net6-era packages in and breaks subject IV.1 (no third-party source in the repo). | team decision, 2026-09-23 |
+| L-048 | **A bundled list's normalisation has to match the list, not the input.** The breached-password set SPEC-035 embedded has **no entry containing a space**, while **14,700** of its 46,146 entries are a run of words — `iloveyouforever`, `thisismypassword`. A screen comparing only the password as submitted would refuse nothing a person types as a passphrase, and would pass every test written against the same normalisation it got wrong. Measure the list before writing the comparison. | SPEC-035, 2026-10-06 |
 
 ## How to add one
 

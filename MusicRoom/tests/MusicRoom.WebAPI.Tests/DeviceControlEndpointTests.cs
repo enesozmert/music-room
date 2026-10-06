@@ -155,6 +155,29 @@ public sealed class DeviceControlEndpointTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
+    /// <summary>A grant with no grantee is `422` keyed on `GranteeUserId` — SPEC-036.</summary>
+    /// <remarks>
+    /// Distinct from the refusal above, which is the **handler** declining to grant control to a stranger and
+    /// carries no `errors` dictionary at all. This one is the validator, and its key is what a client reads.
+    /// </remarks>
+    [Fact]
+    public async Task GrantControl_WithNoGrantee_Returns422KeyedOnGranteeUserIdAsync()
+    {
+        // Arrange
+        (HttpClient owner, _) = await SignInAsync("control-empty-grantee@example.com");
+
+        using HttpClient a = owner;
+        Guid deviceId = await DeviceRequests.RegisterAsync(a);
+
+        // Act
+        using HttpResponseMessage response = await DeviceRequests.GrantAsync(
+            a, deviceId, Guid.Empty, await DeviceRequests.ETagAsync(a, deviceId));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["GranteeUserId"], await ValidationProblems.KeysAsync(response));
+    }
+
     /// <summary>Only the owner delegates.</summary>
     [Fact]
     public async Task GrantControl_AsANonOwner_Returns404Async()

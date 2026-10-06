@@ -176,7 +176,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
 
         // The body's key is part of the contract: a client reads `errors.Password`. SPEC-034 moved the policy
         // into one shared rule, and this is what holds that rule to this command's own property name.
-        Assert.Equal(["Password"], await ValidationKeysAsync(response));
+        Assert.Equal(["Password"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>
@@ -207,7 +207,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal(0, await CountUsersAsync(email));
-        Assert.Equal(["Password"], await ValidationKeysAsync(response));
+        Assert.Equal(["Password"], await ValidationProblems.KeysAsync(response));
         Assert.Contains(
             PasswordRules.BreachedMessage,
             await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
@@ -244,7 +244,7 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal(0, await CountUsersAsync(email));
-        Assert.Equal(["Password"], await ValidationKeysAsync(response));
+        Assert.Equal(["Password"], await ValidationProblems.KeysAsync(response));
 
         string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Contains(PasswordRules.ContextMessage, body, StringComparison.Ordinal);
@@ -267,29 +267,6 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
         return await context.Users
             .AsNoTracking()
             .SingleAsync(user => user.Email == email, TestContext.Current.CancellationToken);
-    }
-
-
-    /// <summary>
-    /// The property name a `422` keys its `errors` dictionary on.
-    /// </summary>
-    /// <remarks>
-    /// Added by SPEC-034, and it is the **first assertion of its kind in this repository**: 37 assertions check
-    /// `HttpStatusCode.UnprocessableEntity` and none checked the body, so a refactor that renamed a validated
-    /// property would have changed a published response shape with nothing failing. The key is the property
-    /// FluentValidation reported against, which `CredentialEndpointResults.ToErrors` groups by — so this is what
-    /// pins the shared password rule to the property each command exposes rather than to one name of its own.
-    /// </remarks>
-    private static async Task<string[]> ValidationKeysAsync(HttpResponseMessage response)
-    {
-        using System.IO.Stream body = await response.Content.ReadAsStreamAsync(
-            TestContext.Current.CancellationToken);
-
-        using System.Text.Json.JsonDocument document = await System.Text.Json.JsonDocument.ParseAsync(
-            body,
-            cancellationToken: TestContext.Current.CancellationToken);
-
-        return [.. document.RootElement.GetProperty("errors").EnumerateObject().Select(field => field.Name)];
     }
     private async Task<int> CountUsersAsync(string email)
     {

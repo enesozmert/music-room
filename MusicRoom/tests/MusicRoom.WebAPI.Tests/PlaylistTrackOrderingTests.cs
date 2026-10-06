@@ -216,6 +216,36 @@ public sealed class PlaylistTrackOrderingTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
+    /// <summary>Moving a track after itself is `422` keyed on `AfterTrackId` — SPEC-036.</summary>
+    /// <remarks>
+    /// This is the route's covered key, and it is this rule rather than the two above it on purpose. Both of those
+    /// fail the **cross-property** rule, which `MoveTrackCommandValidator` declares as
+    /// `RuleFor(command => command)` with no `WithName`, so FluentValidation reports it against the empty property
+    /// name and the published body is `{"errors":{"":[…]}}`. Asserting an empty key would cement a shape no client
+    /// can read; renaming it is a contract change. Recorded as issue **O28** for the owner — SPEC-036 out of scope.
+    /// </remarks>
+    [Fact]
+    public async Task MoveTrack_AfterItself_Returns422KeyedOnAfterTrackIdAsync()
+    {
+        // Arrange
+        using HttpClient a = await SignInAsync("move-onto-itself@example.com");
+        Guid playlistId = await PlaylistEndpointTests.CreateAsync(a, "Circular");
+
+        Guid only = await TrackRequests.AddAsync(a, playlistId, "aaaaaaaaaaa");
+
+        // Act
+        using HttpResponseMessage response = await TrackRequests.PatchTrackAsync(
+            a,
+            playlistId,
+            only,
+            new { afterTrackId = only },
+            await TrackRequests.ETagAsync(a, playlistId));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["AfterTrackId"], await ValidationProblems.KeysAsync(response));
+    }
+
     /// <summary>
     /// Eleven inserts into the same gap exhaust it, force the renumber, and leave the order intact.
     /// </summary>
