@@ -87,9 +87,23 @@ public class Program
         app.UseAuthorization();
         app.UseMiddleware<ClientContextMiddleware>();
 
-        // openapi-documentation: the raw document is served in every environment. An interactive UI
-        // is a separate, Development-only concern, and it needs a UI package no ADR has chosen yet.
+        // openapi-documentation: the raw document is served in every environment, and stays outside the
+        // branch below — SPEC-032's third binding answer. An interactive UI is a separate,
+        // Development-only concern, and ADR-0035 chose the package for it on 2026-10-01.
         app.MapOpenApi();
+
+        if (app.Environment.IsDevelopment())
+        {
+            // Development only, because an interactive, unauthenticated catalogue of every endpoint is an
+            // attack-surface map — ADR-0035, and API8 in docs/owasp/API-TOP10-CHECKLIST.md calls a
+            // documentation UI shipped to production the textbook misconfiguration. The audience is two
+            // developers and the defence walkthrough, and both run the local stack.
+            //
+            // Pointed at the document `MapOpenApi()` above already serves: one API, one generator, one
+            // document. `SwaggerGen` is deliberately absent, so there is nothing here that could describe
+            // the API a second time and drift from the committed docs/api/openapi.json.
+            app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "MusicRoom v1"));
+        }
         app.MapHealthEndpoints();
         app.MapAuthEndpoints();
         app.MapProfileEndpoints();

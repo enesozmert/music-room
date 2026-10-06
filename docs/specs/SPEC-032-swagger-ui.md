@@ -53,6 +53,48 @@ escalation: |
      test may issue a request that sends mail, because no suite reaches a provider or spends its quota (T-19).
      `MailProviderStartupTests` sidesteps this by resolving services instead of serving requests; this unit
      cannot, because it fetches two paths over HTTP.
+
+  **BLOCKED 2026-10-06: the Files table cannot hold this unit, and the two rules that say so contradict each
+  other's remedy.**
+
+  `MusicRoom/src/MusicRoom/WebAPI/Program.cs` is the only source file the table authorises, and on `main` it
+  sits at **exactly 300 code lines against S104's cap of 300**. The unit needs four more — the
+  `if (app.Environment.IsDevelopment())` the owner's second answer asked me to create, the `UseSwaggerUI` call
+  inside it, and the braces. The build then fails twice:
+
+  ```
+  error S104: This file has 304 lines, which is greater than 300 authorized. Split it into smaller files.
+  error CA1506: 'Main', '22' farklı ad alanından '42' farklı türe bağlı. ... '41' düzeyinin altına düşürün.
+  ```
+
+  S104's remedy is *"split it into smaller files"*. CA1506's is to move the registration out of `Main` into its
+  own class — which is how `ApiServices`, `RealtimeServices`, `Observability` and `InfrastructureSetup` already
+  exist. Both remedies need a **new file under `WebAPI`**, and the Files table authorises none. Putting the new
+  class inside `Program.cs` satisfies CA1506 and makes S104 worse, because it adds lines to a file already over
+  the cap.
+
+  Fix cycles attempted:
+
+  1. Moved the `OpenApiDocumentPath` constant out of the wrong class and inlined the path at the call site, to
+     be sure neither error was an artefact of my own slip. Remeasured: still 304 lines and still 42 coupled
+     types, so both are structural rather than incidental.
+  2. and 3. not attempted, because every remaining fix is one the run forbids: widening the Files table with a
+     new `WebAPI` file, extracting existing code out of `Program.cs` into a new file (the same widening),
+     lowering S104 or CA1506 in `SonarLint.xml` / `.editorconfig`, or suppressing either with a pragma.
+
+  **The owner's decision, not mine.** Three resolutions, each a one-line change to this spec's Files table:
+
+  - add `MusicRoom/src/MusicRoom/WebAPI/InteractiveDocumentation.cs` — a static class holding the document path
+    and a `UseOnDevelopmentOnly(WebApplication)` method. This is the shape the four existing pipeline helpers
+    use, it fixes CA1506 by construction, and it leaves `Program.cs` one line **shorter** than it is on `main`
+    if the call replaces the comment block it displaces;
+  - or add that file **and** move one existing helper class out of `Program.cs` into it, which buys S104
+    headroom for the next unit as well — `Program.cs` has been at or near the cap for three units running;
+  - or decide that S104's 300 is the wrong number for a composition root and raise it in `SonarLint.xml`, which
+    is a standards change and therefore an ADR, not a spec decision.
+
+  Nothing is pushed. The branch `feat/spec-032-swagger-ui` carries the package pin, the package reference and
+  the pipeline edit as a `wip(spec-032)` commit, so the next cycle resumes from a clean tree.
 ---
 
 # Swagger UI
