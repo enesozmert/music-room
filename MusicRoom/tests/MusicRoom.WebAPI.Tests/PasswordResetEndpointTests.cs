@@ -264,6 +264,10 @@ public sealed class PasswordResetEndpointTests : IAsyncLifetime
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
 
+        // The body's key is part of the contract: a client reads `errors.NewPassword`. SPEC-034 moved the policy
+        // into one shared rule, and this holds that rule to this command's own property name.
+        Assert.Equal(["NewPassword"], await ValidationKeysAsync(refused));
+
         using HttpResponseMessage retried = await PostAsync(
             ResetsPath,
             new { token, newPassword = NewPassword });
@@ -309,6 +313,27 @@ public sealed class PasswordResetEndpointTests : IAsyncLifetime
         }
     }
 
+
+    /// <summary>
+    /// The property name a `422` keys its `errors` dictionary on.
+    /// </summary>
+    /// <remarks>
+    /// Added by SPEC-034, and among the first assertions of their kind in this repository: 37 assertions check
+    /// `HttpStatusCode.UnprocessableEntity` and none checked the body, so a refactor that renamed a validated
+    /// property would have changed a published response shape with nothing failing. This path's key is
+    /// `NewPassword`, which is the property this command exposes — not the shared rule's idea of a name.
+    /// </remarks>
+    private static async Task<string[]> ValidationKeysAsync(HttpResponseMessage response)
+    {
+        using System.IO.Stream body = await response.Content.ReadAsStreamAsync(
+            TestContext.Current.CancellationToken);
+
+        using System.Text.Json.JsonDocument document = await System.Text.Json.JsonDocument.ParseAsync(
+            body,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        return [.. document.RootElement.GetProperty("errors").EnumerateObject().Select(field => field.Name)];
+    }
     private async Task RegisterAndVerifyAsync(string email)
     {
         int before = _mail.Tokens.Count;

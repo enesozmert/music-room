@@ -172,6 +172,10 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal(0, await CountUsersAsync(email));
+
+        // The body's key is part of the contract: a client reads `errors.Password`. SPEC-034 moved the policy
+        // into one shared rule, and this is what holds that rule to this command's own property name.
+        Assert.Equal(["Password"], await ValidationKeysAsync(response));
     }
 
     private static Task<HttpResponseMessage> PostRegistrationAsync(HttpClient client, string email) =>
@@ -190,6 +194,28 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
             .SingleAsync(user => user.Email == email, TestContext.Current.CancellationToken);
     }
 
+
+    /// <summary>
+    /// The property name a `422` keys its `errors` dictionary on.
+    /// </summary>
+    /// <remarks>
+    /// Added by SPEC-034, and it is the **first assertion of its kind in this repository**: 37 assertions check
+    /// `HttpStatusCode.UnprocessableEntity` and none checked the body, so a refactor that renamed a validated
+    /// property would have changed a published response shape with nothing failing. The key is the property
+    /// FluentValidation reported against, which `CredentialEndpointResults.ToErrors` groups by — so this is what
+    /// pins the shared password rule to the property each command exposes rather than to one name of its own.
+    /// </remarks>
+    private static async Task<string[]> ValidationKeysAsync(HttpResponseMessage response)
+    {
+        using System.IO.Stream body = await response.Content.ReadAsStreamAsync(
+            TestContext.Current.CancellationToken);
+
+        using System.Text.Json.JsonDocument document = await System.Text.Json.JsonDocument.ParseAsync(
+            body,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        return [.. document.RootElement.GetProperty("errors").EnumerateObject().Select(field => field.Name)];
+    }
     private async Task<int> CountUsersAsync(string email)
     {
         using IServiceScope scope = _factory.Services.CreateScope();
