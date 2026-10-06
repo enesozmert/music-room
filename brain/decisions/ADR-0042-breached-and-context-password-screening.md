@@ -57,7 +57,14 @@ sentence belongs in `docs/owasp/ASVS-CONFORMANCE.md` next to the outcome rather 
 
 ### The bundled set
 
-- **At most 100 000 entries**, the most common passwords from a public list, one per line, lowercase, LF.
+- **Filtered to the passwords this system could actually accept.** The policy requires 12 characters, so every
+  shorter entry in a common-password list is unreachable — `123456` and `password` can never be a password here.
+  The bundled file carries only entries of 12 characters or more, and the spec that adds it records the source,
+  the raw count **and** the retained count. If the retained count is a few thousand rather than a hundred
+  thousand, that is a fact about the screen's reach and it goes in `docs/owasp/ASVS-CONFORMANCE.md` beside the
+  outcome. Prefer a source that includes passphrases, because `correct horse battery` is the shape that gets
+  past a length rule.
+- **At most 100 000 entries** after filtering, one per line, lowercase, LF.
 - **An embedded resource** in `MusicRoom.Infrastructure`, not a file read from disk at start-up: a file is a
   deployment step that can be forgotten, and a missing screen that boots is worse than a boot that refuses.
 - **Loaded once into a case-insensitive set** behind an abstraction the Application layer names. One hash
@@ -77,8 +84,23 @@ sentence belongs in `docs/owasp/ASVS-CONFORMANCE.md` next to the outcome rather 
 ### Where it applies, and what it answers
 
 - **Every path that chooses a password**: register, password reset, and the authenticated change SPEC-028
-  added. One rule in one place — SPEC-028 established "one password policy, one validator" and this extends
-  that validator rather than adding a second.
+  added.
+
+> **Corrected 2026-10-06, before this record landed.** The sentence here said SPEC-028 had established
+> "one password policy, one validator" and that this extends it. SPEC-033's successor measured the code and
+> that is not the state of it: `RegisterCommandValidator`, `ResetPasswordCommandValidator` and
+> `ChangePasswordCommandValidator` each declare the 12-character minimum, the 64-character maximum and the
+> 72-byte ceiling separately. SPEC-028 applied the same policy; it did not share it. So the unification is
+> **its own unit and lands first** — behaviour-preserving, provable by the suites that already exist — and the
+> screens go into the shared rule afterwards. Adding a screen to three validators would have been the third
+> copy of a rule that is already duplicated twice.
+
+- **Two homes, because the two screens need different things.** The breached screen is pure — a password and a
+  set — and belongs in the shared rule every path calls. The context screen needs the account: only register
+  carries the address and display name in its command, while reset carries a token and change carries two
+  passwords, so those paths read the context words from the row their handler already loads. A validator
+  cannot reach that row, and SPEC-028's wrong-current-password answer shows a handler can already answer
+  `422`.
 - The refusal is **`422`**, the answer those paths already give an unacceptable password, with a message that
   says which screen refused and **never echoes the password** or any part of it.
 - Login is **not** screened. A password already on an account must still be able to sign in; forcing a
