@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Persistence.Contexts;
 using MusicRoom.WebAPI.Hubs;
+using MusicRoom.WebAPI.Middleware;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -209,6 +211,58 @@ public sealed class HubLimitTests : IAsyncLifetime
             () => connection.StartAsync(TestContext.Current.CancellationToken));
     }
 
+    /// <summary>A blank `CORS_ALLOWED_ORIGINS` is an empty list, so the negotiate answers `403`.</summary>
+    /// <remarks>
+    /// SPEC-030 made `EnvSecretProvider` treat a blank value as absent, and this is the one read where absent
+    /// must not become "unset, so allow anything": `ReadOrigins` splits `Read(...) ?? string.Empty` with
+    /// `RemoveEmptyEntries`, which yields no origins and therefore admits none. `Program.cs` says why — *"Unset"
+    /// reading as "everything" is how a development convenience becomes a production hole.*
+    /// <para>
+    /// Asserted against the negotiate response rather than through a `HubConnection`, because a client throw
+    /// proves only that the handshake failed. The status code is the contract: `403` is "not you, ever" and
+    /// `429` is "not now" (SPEC-026 decision 2), and a test that accepts any exception would pass if the
+    /// refusal silently became the other one.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Negotiate_WithABlankOriginList_Answers403Async()
+    {
+        // Arrange — configured, and configured to allow nothing.
+        await using WebApplicationFactory<Program> factory = CreateFactory(
+            ("CORS_ALLOWED_ORIGINS", string.Empty));
+
+        string token = await TokenAsync(factory, "hub-origin-blank@example.com");
+        using HttpClient client = factory.CreateClient();
+
+        // Act
+        using HttpResponseMessage refused = await NegotiateAsync(client, token, AllowedOrigin);
+
+        // Assert — the origin an allowed list would admit is refused by an empty one.
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+    }
+
+    /// <summary>The same negotiate, against a list that names the origin, is accepted — the control.</summary>
+    /// <remarks>
+    /// Without it the test above would pass for the wrong reason: a negotiate that always answered `403`, for
+    /// a missing token or a missing client context, would look like a working origin check.
+    /// </remarks>
+    [Fact]
+    public async Task Negotiate_FromAListedOrigin_IsAcceptedAsync()
+    {
+        // Arrange
+        await using WebApplicationFactory<Program> factory = CreateFactory(
+            ("CORS_ALLOWED_ORIGINS", AllowedOrigin));
+
+        string token = await TokenAsync(factory, "hub-origin-listed@example.com");
+        using HttpClient client = factory.CreateClient();
+
+        // Act
+        using HttpResponseMessage accepted = await NegotiateAsync(client, token, AllowedOrigin);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+    }
+
     /// <summary>
     /// A handshake with no `Origin` connects, which is the native client ADR-0030 deliberately admits.
     /// </summary>
@@ -232,6 +286,33 @@ public sealed class HubLimitTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HubConnectionState.Connected, connection.State);
+    }
+
+    /// <summary>The `POST .../negotiate` that opens a hub connection, carrying what the middleware demands.</summary>
+    /// <param name="client">A plain HTTP client on the test host.</param>
+    /// <param name="token">The signed JWT, in the query string as SPEC-016 decision 4 narrowed it to.</param>
+    /// <param name="origin">The `Origin` header a browser would send.</param>
+    /// <returns>The negotiate response, status code included.</returns>
+    private static async Task<HttpResponseMessage> NegotiateAsync(
+        HttpClient client,
+        string token,
+        string origin)
+    {
+        string query = string.Join(
+            '&',
+            $"negotiateVersion=1",
+            $"access_token={Uri.EscapeDataString(token)}",
+            $"{HubClientContext.PlatformQuery}={HubClients.Platform}",
+            $"{HubClientContext.DeviceQuery}={HubClients.Device}",
+            $"{HubClientContext.AppVersionQuery}={HubClients.AppVersion}");
+
+        using HttpRequestMessage request = new(
+            HttpMethod.Post,
+            $"{PlaylistHub.Path}{ClientContextMiddleware.NegotiateSegment}?{query}");
+
+        request.Headers.Add("Origin", origin);
+
+        return await client.SendAsync(request, TestContext.Current.CancellationToken);
     }
 
     private async Task<string> TokenAsync(WebApplicationFactory<Program> factory, string email)
