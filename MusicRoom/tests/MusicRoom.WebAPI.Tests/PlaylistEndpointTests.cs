@@ -108,6 +108,53 @@ public sealed class PlaylistEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["Licence"], await ValidationProblems.KeysAsync(response));
+    }
+
+    /// <summary>A rename to an empty name is `422` keyed on `Name` — SPEC-036.</summary>
+    [Fact]
+    public async Task Patch_WithAnEmptyName_Returns422KeyedOnNameAsync()
+    {
+        // Arrange
+        (HttpClient owner, _) = await TestBearer.SignInAsync(_factory, _mail, "playlist-empty-rename@example.com");
+
+        using HttpClient a = owner;
+        Guid playlistId = await CreateAsync(a, "Named");
+
+        // Act
+        using HttpResponseMessage response = await PatchAsync(
+            a, playlistId, string.Empty, await ETagAsync(a, playlistId));
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["Name"], await ValidationProblems.KeysAsync(response));
+    }
+
+    /// <summary>
+    /// Setting the location-and-time licence on a playlist is `422` keyed on `Licence` — SPEC-036.
+    /// </summary>
+    /// <remarks>
+    /// A playlist has no venue and no window, so the mode is for events only — ADR-0014. The create route proves
+    /// the rule; this proves the licence route is wired to the same one.
+    /// </remarks>
+    [Fact]
+    public async Task PutLicence_WithTheLocationAndTimeLicence_Returns422KeyedOnLicenceAsync()
+    {
+        // Arrange
+        (HttpClient owner, _) = await TestBearer.SignInAsync(_factory, _mail, "playlist-licence-mode@example.com");
+
+        using HttpClient a = owner;
+        Guid playlistId = await CreateAsync(a, "Communal");
+
+        // Act
+        using HttpResponseMessage response = await a.PutAsJsonAsync(
+            $"{PlaylistsPath}/{playlistId}/licence",
+            new { visibility = Visibility.Public, licence = LicenceMode.LocationAndTimeRestricted },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["Licence"], await ValidationProblems.KeysAsync(response));
     }
     /// <summary>The token is stable while the row is unchanged.</summary>
     [Fact]

@@ -108,6 +108,7 @@ public sealed class EventSuggestionEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["YoutubeVideoId"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>A caller the licence does not admit is refused with `404`.</summary>

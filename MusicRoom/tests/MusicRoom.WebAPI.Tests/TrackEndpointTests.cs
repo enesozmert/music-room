@@ -134,6 +134,7 @@ public sealed class TrackEndpointTests : IAsyncLifetime
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Null(_catalog.LastQuery);
+        Assert.Equal(["Query"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>A page size above the cap is `422` — an unbounded list is OWASP API4.</summary>
@@ -150,6 +151,7 @@ public sealed class TrackEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["PageSize"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>One video resolves to `200`.</summary>

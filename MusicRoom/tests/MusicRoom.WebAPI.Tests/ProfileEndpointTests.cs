@@ -271,6 +271,36 @@ public sealed class ProfileEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["Genres.Count"], await ValidationProblems.KeysAsync(response));
+    }
+
+    /// <summary>A bio past the cap is `422` keyed on `Bio.Value` — SPEC-036.</summary>
+    /// <remarks>
+    /// A deterministic refusal, deliberately: the other `422` in this suite accepts `400` **or** `422` because it
+    /// sends a field with no visibility tier, which the binder may reject first. A key assertion needs one answer.
+    /// The key is the path the rule names — `RuleFor(command => command.Bio!.Value)` — which is the same dotted
+    /// shape `Genres.Count` has, and a client reads it as given.
+    /// </remarks>
+    [Fact]
+    public async Task UpdateProfile_WithATooLongBio_Returns422KeyedOnBioValueAsync()
+    {
+        // Arrange
+        (HttpClient client, _) = await TestBearer.SignInAsync(_factory, _mail, "profile-long-bio@example.com");
+
+        using HttpClient authenticated = client;
+
+        // Act
+        using HttpResponseMessage response = await authenticated.PatchAsJsonAsync(
+            ProfilePath,
+            new
+            {
+                bio = new { value = new string('b', 513), visibility = ProfileFieldVisibility.Public },
+            },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["Bio.Value"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>An authenticated mutation is audited, named and attributed — SPEC-009 and SPEC-010.</summary>

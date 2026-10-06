@@ -101,6 +101,27 @@ public sealed class PasswordResetEndpointTests : IAsyncLifetime
         Assert.Equal(afterKnown, _mail.ResetTokens.Count);
     }
 
+    /// <summary>A malformed address is `422` keyed on `Email`, and still sends nothing — SPEC-036.</summary>
+    /// <remarks>
+    /// The route answers `202` for every address that is a valid address, so this is the only refusal it has, and
+    /// the key is the only part of the body a client can act on. `docs/api/ENDPOINTS.md` does not list this `422`,
+    /// which is recorded as issue **O28** rather than patched here.
+    /// </remarks>
+    [Fact]
+    public async Task RequestReset_WithAMalformedAddress_Returns422KeyedOnEmailAsync()
+    {
+        // Arrange
+        int before = _mail.ResetTokens.Count;
+
+        // Act
+        using HttpResponseMessage response = await PostAsync(RequestsPath, new { email = "not-an-address" });
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["Email"], await ValidationProblems.KeysAsync(response));
+        Assert.Equal(before, _mail.ResetTokens.Count);
+    }
+
     /// <summary>Exactly one reset link is live at a time — the SPEC-004 rule, applied here.</summary>
     [Fact]
     public async Task Request_Twice_SupersedesTheFirstTokenAsync()
@@ -280,7 +301,7 @@ public sealed class PasswordResetEndpointTests : IAsyncLifetime
 
         // The body's key is part of the contract: a client reads `errors.NewPassword`. SPEC-034 moved the policy
         // into one shared rule, and this holds that rule to this command's own property name.
-        Assert.Equal(["NewPassword"], await ValidationKeysAsync(refused));
+        Assert.Equal(["NewPassword"], await ValidationProblems.KeysAsync(refused));
 
         // Nothing echoes the submitted password — SPEC-035.
         Assert.DoesNotContain(
@@ -331,28 +352,6 @@ public sealed class PasswordResetEndpointTests : IAsyncLifetime
                 response.Dispose();
             }
         }
-    }
-
-
-    /// <summary>
-    /// The property name a `422` keys its `errors` dictionary on.
-    /// </summary>
-    /// <remarks>
-    /// Added by SPEC-034, and among the first assertions of their kind in this repository: 37 assertions check
-    /// `HttpStatusCode.UnprocessableEntity` and none checked the body, so a refactor that renamed a validated
-    /// property would have changed a published response shape with nothing failing. This path's key is
-    /// `NewPassword`, which is the property this command exposes — not the shared rule's idea of a name.
-    /// </remarks>
-    private static async Task<string[]> ValidationKeysAsync(HttpResponseMessage response)
-    {
-        using System.IO.Stream body = await response.Content.ReadAsStreamAsync(
-            TestContext.Current.CancellationToken);
-
-        using System.Text.Json.JsonDocument document = await System.Text.Json.JsonDocument.ParseAsync(
-            body,
-            cancellationToken: TestContext.Current.CancellationToken);
-
-        return [.. document.RootElement.GetProperty("errors").EnumerateObject().Select(field => field.Name)];
     }
     private async Task RegisterAndVerifyAsync(string email)
     {

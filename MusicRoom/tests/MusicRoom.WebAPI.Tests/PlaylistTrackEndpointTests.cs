@@ -181,6 +181,7 @@ public sealed class PlaylistTrackEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["YoutubeVideoId"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>A playlist the caller may not see answers `404`, never `403` — SPEC-014's rule.</summary>

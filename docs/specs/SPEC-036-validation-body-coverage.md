@@ -1,7 +1,7 @@
 ---
 id: SPEC-036
 title: Put a test behind the 422 body — one shared reader, one key assertion per route
-status: in-progress     # draft | approved | in-progress | done | blocked
+status: done            # draft | approved | in-progress | done | blocked
 tier: A                 # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S9               # which DELIVERY-PLAN slice this belongs to
 requirements: [V.6]
@@ -15,8 +15,8 @@ escalation:             # which gate tripped, if status went back to draft
 
 ## Goal
 
-After this, the `errors` dictionary of a `422` is a tested contract on **19 of the 20 routes that publish
-one**, and the twentieth is named here with its reason. Today three routes assert their keys — the ones
+After this, the `errors` dictionary of a `422` is a tested contract on **all 20 routes that publish one**.
+The spec was written expecting nineteen, and §"What the run changed" says why the twentieth came in. Today three routes assert their keys — the ones
 SPEC-034 and SPEC-035 touched — and the other seventeen publish `{"errors":{"<PropertyName>":[…]}}` to
 clients with nothing holding the name in place. `CredentialEndpointResults.ToErrors` groups failures by the
 property FluentValidation reported against, so renaming a validated property changes a response shape clients
@@ -88,24 +88,38 @@ validation-`422` test anywhere and gets a minimal one.
 | `PATCH /playlists/{playlistId}` | `Name` | `PlaylistEndpointTests` | new |
 | `PUT /playlists/{playlistId}/licence` | `Licence` | `PlaylistEndpointTests` | new |
 | `POST /playlists/{playlistId}/tracks` | `YoutubeVideoId` | `PlaylistTrackEndpointTests` | add |
-| `PATCH /playlists/{playlistId}/tracks/{playlistTrackId}` | `AfterTrackId`, `BeforeTrackId` | `PlaylistTrackOrderingTests` | add — two tests |
-| `PATCH /me/profile` | `Bio` | `ProfileEndpointTests` | new — a deterministic failure, because the existing assertion there accepts `400` **or** `422` |
-| `PUT /me/music-preferences` | `Genres` | `ProfileEndpointTests` | add |
+| `PATCH /playlists/{playlistId}/tracks/{playlistTrackId}` | `AfterTrackId` | `PlaylistTrackOrderingTests` | new — the self-move rule, not the cross-property one, see §"What the run changed" |
+| `PATCH /me/profile` | `Bio.Value` | `ProfileEndpointTests` | new — a deterministic failure, because the existing assertion there accepts `400` **or** `422` |
+| `PUT /me/music-preferences` | `Genres.Count` | `ProfileEndpointTests` | add |
 | `GET /tracks` | `Query`, `PageSize` | `TrackEndpointTests` | add — two tests |
-| `POST /auth/password-reset-requests` | `Email` | — | **left uncovered**, see below |
+| `POST /auth/password-reset-requests` | `Email` | `PasswordResetEndpointTests` | new — **covered after all**, see §"What the run changed" |
 
 **Nineteen of twenty.** Nine routes gain an assertion on a test that already exists, seven gain a minimal
 test, three are already done.
 
+### What the run changed
+
+Three things the spec got wrong, each found by running rather than by reading:
+
+1. **`POST /auth/password-reset-requests` is covered.** The spec left it out because
+   `PasswordResetEndpointTests` was at 293 of 300 lines and the test "does not fit even after the shared reader
+   frees its private copy". Measured after the fact: the reader freed **nine** lines, the suite dropped to 284,
+   and the test costs nine. The file is back at **293** and the route has its assertion. The spec's arithmetic
+   was an estimate where it should have been a measurement, so coverage is **20 of 20**.
+2. **`PATCH /playlists/{id}/tracks/{trackId}` is covered through the self-move rule, not the two tests the
+   spec named.** `MoveTrackCommandValidator` declares its "exactly one neighbour" rule as
+   `RuleFor(command => command)` with no `WithName`, so FluentValidation reports it against the **empty**
+   property name and the published body is `{"errors":{"":["Send exactly one of afterTrackId or
+   beforeTrackId."]}}`. Asserting an empty key would cement a shape no client can read, and renaming it is a
+   contract change this unit may not make — constraint 3. So the route is covered by a new test on
+   `AfterTrackId`, a key a client can act on, and the empty key goes to **O28** for the owner.
+3. **Two keys are dotted paths**, not the property names the spec predicted: `Genres.Count` from
+   `RuleFor(command => command.Genres.Count)` and `Bio.Value` from `RuleFor(command => command.Bio!.Value)`.
+   Asserted as the code reports them. The shape is the same one `geofence.latitude` already has, so it is a
+   convention rather than a defect — which is why it joins O28 as an observation and not an escalation.
+
 ### What stays uncovered, and why
 
-- **`POST /auth/password-reset-requests`.** Its validator rejects a malformed address and the route declares
-  `ProducesValidationProblem`, so the key is `Email` and the assertion would be one line. Its only suite,
-  `PasswordResetEndpointTests`, is at **293 code lines of S104's 300** — issue **O27** — and the test this
-  route needs does not fit even after the shared reader frees its private copy. A new file for one assertion
-  would duplicate a container, a factory and five helpers. The same validator shape on the same key is proven
-  one route over, by `VerificationRequestEndpointTests`, so what is lost is the proof that *this* route is
-  wired to *that* validator. Named rather than quietly skipped, and it belongs to whichever unit pays O27 off.
 - **Every handler-produced `422`.** `Change_WithTheWrongCurrentPassword`, `GrantControl_ToAStranger`, the
   eight presence refusals in `EventPresenceEndpointTests`, `ListRequests_WithAnUnknownDirection`,
   `List_WithAnUnknownScope`, and the concurrency suites' `422` counts. These answer `Results.Problem` with no
@@ -116,7 +130,8 @@ test, three are already done.
 
 Both are O27's, and both are already measured:
 
-- `PasswordResetEndpointTests.cs` at **293 of 300** — which is why the route above stays uncovered.
+- `PasswordResetEndpointTests.cs` at **293 of 300** before this unit, 284 once the shared reader replaced its
+  private copy, and 293 again with its new test. No new file was needed, and no severity moved.
 - `AuditRecordEndpointTests.cs` at **295 of 300** — not touched by this unit, recorded so the next one knows.
 
 `DeviceControlEndpointTests.cs` at 272 is the largest file this unit adds a test to; it lands at about 286.
@@ -128,7 +143,7 @@ If any suite would cross 300, the answer is a new file, never a raised severity.
 |---|---|
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/ValidationProblems.cs` | create — the one body reader, `internal static`, beside `EventRequests.cs` which exists for the same reason |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/RegistrationEndpointTests.cs` | change — delete the private reader, call the shared one |
-| `MusicRoom/tests/MusicRoom.WebAPI.Tests/PasswordResetEndpointTests.cs` | change — the same |
+| `MusicRoom/tests/MusicRoom.WebAPI.Tests/PasswordResetEndpointTests.cs` | change — the shared reader, **and** a new test for `POST /auth/password-reset-requests` |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/PasswordChangeEndpointTests.cs` | change — the same |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/VerificationRequestEndpointTests.cs` | change — add: `Email` |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/EventEndpointTests.cs` | change — add three keys, and two new tests: `PATCH /events/{id}` and `PUT /events/{id}/licence` |
@@ -138,8 +153,8 @@ If any suite would cross 300, the answer is a new file, never a raised severity.
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/FriendRequestEndpointTests.cs` | change — new test: `TargetUserId` |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/PlaylistEndpointTests.cs` | change — add `Licence`, and two new tests: rename and set-licence |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/PlaylistTrackEndpointTests.cs` | change — add: `YoutubeVideoId` |
-| `MusicRoom/tests/MusicRoom.WebAPI.Tests/PlaylistTrackOrderingTests.cs` | change — add: `AfterTrackId`, `BeforeTrackId` |
-| `MusicRoom/tests/MusicRoom.WebAPI.Tests/ProfileEndpointTests.cs` | change — add `Genres`, and one new test for `PATCH /me/profile` |
+| `MusicRoom/tests/MusicRoom.WebAPI.Tests/PlaylistTrackOrderingTests.cs` | change — new test: `AfterTrackId` |
+| `MusicRoom/tests/MusicRoom.WebAPI.Tests/ProfileEndpointTests.cs` | change — add `Genres.Count`, and one new test for `PATCH /me/profile` |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/TrackEndpointTests.cs` | change — add: `Query`, `PageSize` |
 | `docs/SDD.md` | change — §17: **O26 closed**, **O28 opened** (key casing, and the ENDPOINTS table gap) |
 | `brain/lessons/lessons-index.md` | change — **L-048**: a bundled list's normalisation has to match the list, not the input |
@@ -203,8 +218,8 @@ make agent-check
 
 ## Done when
 
-- [ ] every file in the Files table exists and compiles
-- [ ] every command under Verification passes
-- [ ] OWASP checklists walked for the surface touched; unfixed findings in the threat register
-- [ ] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
-- [ ] `status: done` in this file
+- [x] every file in the Files table exists and compiles
+- [x] every command under Verification passes
+- [x] OWASP checklists walked for the surface touched; unfixed findings in the threat register
+- [x] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
+- [x] `status: done` in this file

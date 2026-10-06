@@ -73,6 +73,27 @@ public sealed class FriendRequestEndpointTests : IAsyncLifetime
         // Assert
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
+
+    /// <summary>A request with no target is `422` keyed on `TargetUserId` — SPEC-036.</summary>
+    /// <remarks>
+    /// The other `422` in this suite is a query-parse refusal on the list route, which answers no `errors`
+    /// dictionary. This is the send route's own validator.
+    /// </remarks>
+    [Fact]
+    public async Task SendRequest_WithNoTarget_Returns422KeyedOnTargetUserIdAsync()
+    {
+        // Arrange
+        (HttpClient alice, _) = await SignInAsync("alice-no-target@example.com");
+
+        using HttpClient a = alice;
+
+        // Act
+        using HttpResponseMessage response = await SendRequestAsync(a, Guid.Empty);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["TargetUserId"], await ValidationProblems.KeysAsync(response));
+    }
     /// <summary>A user cannot befriend themselves.</summary>
     [Fact]
     public async Task SendRequest_ToSelf_Returns409Async()

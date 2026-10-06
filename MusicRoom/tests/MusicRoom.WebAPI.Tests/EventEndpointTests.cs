@@ -104,6 +104,7 @@ public sealed class EventEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["endsAtUtc"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>
@@ -131,6 +132,7 @@ public sealed class EventEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["presenceProof"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>A geofence proof with no centre is refused for the same reason, one level down.</summary>
@@ -157,6 +159,65 @@ public sealed class EventEndpointTests : IAsyncLifetime
 
         // Assert
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["geofence"], await ValidationProblems.KeysAsync(response));
+    }
+
+    /// <summary>An update that ends before it starts is `422` keyed on `endsAtUtc` — SPEC-036.</summary>
+    /// <remarks>
+    /// The create route proves the same rule above. This proves the **update** route is wired to it, which is what
+    /// sharing `EventLicenceRules` between the two is supposed to guarantee.
+    /// </remarks>
+    [Fact]
+    public async Task Patch_WithAnEndBeforeTheStart_Returns422KeyedOnEndsAtUtcAsync()
+    {
+        // Arrange
+        (HttpClient owner, _) = await TestBearer.SignInAsync(_factory, _mail, "event-patch-backwards@example.com");
+
+        using HttpClient a = owner;
+        Guid eventId = await EventRequests.CreateAsync(a, "Forwards");
+        string etag = await EventRequests.ETagAsync(a, eventId);
+
+        using HttpRequestMessage request = new(HttpMethod.Patch, $"{EventRequests.EventsPath}/{eventId}")
+        {
+            Content = JsonContent.Create(
+                new { name = "Backwards", startsAtUtc = EventRequests.Ends, endsAtUtc = EventRequests.Starts }),
+        };
+
+        request.Headers.IfMatch.Add(new System.Net.Http.Headers.EntityTagHeaderValue(etag));
+
+        // Act
+        using HttpResponseMessage response = await a.SendAsync(request, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["endsAtUtc"], await ValidationProblems.KeysAsync(response));
+    }
+
+    /// <summary>
+    /// Setting the restricted licence with no presence policy is `422` keyed on `presenceProof` — SPEC-036.
+    /// </summary>
+    /// <remarks>
+    /// `PUT /events/{eventId}/licence` had **no `422` test anywhere** before this one, while publishing an
+    /// `errors` body from the same shared rules the create route uses.
+    /// </remarks>
+    [Fact]
+    public async Task PutLicence_WithTheRestrictedLicenceAndNoPolicy_Returns422KeyedOnPresenceProofAsync()
+    {
+        // Arrange
+        (HttpClient owner, _) = await TestBearer.SignInAsync(_factory, _mail, "event-licence-nopolicy@example.com");
+
+        using HttpClient a = owner;
+        Guid eventId = await EventRequests.CreateAsync(a, "Venue");
+
+        // Act
+        using HttpResponseMessage response = await a.PutAsJsonAsync(
+            $"{EventRequests.EventsPath}/{eventId}/licence",
+            new { visibility = Visibility.Public, licence = LicenceMode.LocationAndTimeRestricted },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["presenceProof"], await ValidationProblems.KeysAsync(response));
     }
 
     /// <summary>A full geofence policy is stored and read back, not silently dropped.</summary>
