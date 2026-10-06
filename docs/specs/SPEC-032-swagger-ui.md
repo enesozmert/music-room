@@ -95,6 +95,24 @@ escalation: |
 
   Nothing is pushed. The branch `feat/spec-032-swagger-ui` carries the package pin, the package reference and
   the pipeline edit as a `wip(spec-032)` commit, so the next cycle resumes from a clean tree.
+
+  **Owner's answer, 2026-10-06, second round: the first resolution.** Add
+  `MusicRoom/src/MusicRoom/WebAPI/InteractiveDocumentation.cs`, the shape the four existing pipeline helpers
+  use. It fixes CA1506 by construction, it leaves `Program.cs` no longer than it is on `main`, and it keeps the
+  unit the size it was approved at. Stopping was right: every fix you had left was a forbidden one.
+
+  Two answers more, binding like the first four:
+
+  5. **Do not touch S104 or CA1506, and do not move an existing helper out of `Program.cs` in this unit.**
+     Raising a cap to fit a change is the move `.editorconfig` exists to prevent, and it would be an ADR in any
+     case. Moving a second class is a refactor this spec was not approved for, and it would put an unrelated
+     diff in the same pull request. Only the new file and the call that uses it.
+  6. **Record the chronic part, because it is the real finding.** `Program.cs` has been at or near S104's cap
+     for three units running, which means the next unit hits this wall too. Add one issue row to
+     `docs/SDD.md` §16 — already in the Files table — as the next free `O` number: *the composition root is at
+     the file-size cap, so every unit that touches the pipeline pays an extraction first.* State the options
+     there, including that 300 may be the wrong number for a composition root, and leave it open. An ADR
+     decides that, not this spec.
 ---
 
 # Swagger UI
@@ -150,7 +168,9 @@ binding — and the status is now `approved`.
 |---|---|
 | `MusicRoom/Directory.Packages.props` | change — `<PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />`, the only place a version appears |
 | `MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj` | change — `<PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />`, **no** `Version` attribute |
-| `MusicRoom/src/MusicRoom/WebAPI/Program.cs` | change — a Development-only branch around `app.UseSwaggerUI(...)`, beside `app.MapOpenApi()` |
+| `MusicRoom/src/MusicRoom/WebAPI/InteractiveDocumentation.cs` | create — the document path and
+`UseOnDevelopmentOnly(WebApplication)`, so the registration's types leave `Main` (owner's answer 5) |
+| `MusicRoom/src/MusicRoom/WebAPI/Program.cs` | change — a Development-only branch around the call, beside `app.MapOpenApi()`, which stays outside it |
 | `MusicRoom/tests/MusicRoom.WebAPI.Tests/SwaggerUiEndpointTests.cs` | create — the four answers: the page on Development, `404` elsewhere, and the document still served in both |
 | `docs/SDD.md` | change — §9.1: the document has a renderer, Development only, one generator still |
 | `docs/DELIVERY-PLAN.md` | change — S3a |
