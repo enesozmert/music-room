@@ -50,6 +50,24 @@ public sealed class HubLimitTests : IAsyncLifetime
     public async ValueTask DisposeAsync() => await _database.DisposeAsync();
 
     /// <summary>
+    /// The numbers a host runs with when nothing overrides them — ADR-0030 as amended 2026-10-06.
+    /// </summary>
+    /// <remarks>
+    /// Every other test here overrides the ceilings, because each is about a behaviour rather than a value. That
+    /// left the values themselves untested, so SPEC-033 changed two of them and nothing failed. This is the test
+    /// that would have failed: the ceiling counts **connections**, and a device is three of them — one per hub —
+    /// so 12 is three devices plus a whole device of reconnect headroom, and 60 per address is twenty devices.
+    /// </remarks>
+    [Fact]
+    public void Defaults_AreTheNumbersTheDecisionStates()
+    {
+        Assert.Equal(12, HubConnectionLimits.DefaultConnectionsPerUser);
+        Assert.Equal(60, HubConnectionLimits.DefaultConnectionsPerAddress);
+        Assert.Equal(60, HubConnectionLimits.DefaultInvocationsPerConnectionPerMinute);
+        Assert.Equal(TimeSpan.FromMinutes(1), HubConnectionLimits.InvocationWindow);
+    }
+
+    /// <summary>
     /// One account may hold the ceiling and not one more — the per-user half of ADR-0030's ceiling.
     /// </summary>
     [Fact]
