@@ -1,6 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <!-- SPEC-035, ADR-0042. The breached-password set is compiled in rather than read from disk: a file beside
+         the binary is a deployment step somebody can forget, and a missing screen that boots is worse than a
+         boot that refuses. Data, not a dependency — nothing is added to Directory.Packages.props. -->
+    <EmbeddedResource Include="Security/breached-passwords.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../Application/MusicRoom.Application.csproj" />
     <ProjectReference Include="../../corePackages/Core.Security/Core.Security.csproj" />
   </ItemGroup>

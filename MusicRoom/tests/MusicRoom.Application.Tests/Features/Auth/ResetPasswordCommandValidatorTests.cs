@@ -16,7 +16,8 @@ public sealed class ResetPasswordCommandValidatorTests
     // underscore prefix on private fields, and a const is a field to that rule.
     internal const string NewPassword = "a brand new passphrase";
 
-    private readonly ResetPasswordCommandValidator _validator = new();
+    private readonly ResetPasswordCommandValidator _validator =
+        new(new StubBreachedPasswordSet(RegisterCommandValidatorTests.BreachedPassword));
 
     /// <summary>A token of the issued shape and a policy-compliant password pass.</summary>
     [Fact]
@@ -102,4 +103,22 @@ public sealed class ResetPasswordCommandValidatorTests
     }
 
     private static string Token() => new('t', ResetPasswordCommandValidator.TokenLength);
+
+    /// <summary>The breached screen reaches this path too, keyed on its own property — SPEC-035.</summary>
+    [Fact]
+    public void Validate_APasswordInTheBreachedSet_Fails()
+    {
+        // Arrange
+        ResetPasswordCommand command = new(Token(), RegisterCommandValidatorTests.BreachedPassword);
+
+        // Act
+        ValidationResult result = _validator.Validate(command);
+
+        // Assert
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
+            failure => failure.PropertyName == nameof(ResetPasswordCommand.NewPassword)
+                && failure.ErrorMessage == PasswordRules.BreachedMessage);
+    }
 }

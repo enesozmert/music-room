@@ -116,6 +116,14 @@ replacement passes.
   well-behaved client its session had ended and send it into a refresh-then-retry loop over a typo. There is
   nothing to hide either — the caller already knows which account this is — so the message says which check
   failed.
+- **A password that was accepted yesterday can be refused today** (SPEC-035). Every route that chooses a
+  password — `/auth/registrations`, `/auth/password-resets` and `/me/password` — now screens it against a set of
+  known breached passwords bundled with the application and against the caller's own words: the project name, the
+  address local part and the display name, matched by containment at four characters or more. The answer is the
+  `422` those routes already give an unacceptable password, keyed `Password` on register and `NewPassword` on the
+  other two, with a message that names the screen and never the password or the word that matched. **Signing in
+  is not screened:** a password already on an account still works, so no client needs to handle a forced
+  rotation. A refused reset does **not** spend the token, so the same link can be used again.
 - **A change ends every *other* session; the caller's own survives**, because it is the session that just
   proved it holds the new credential. A reset cannot prove that and still revokes every family (ASVS V7.4.3).
   The route carries both halves of the credential limit, a per-IP policy and the per-account counter, so a

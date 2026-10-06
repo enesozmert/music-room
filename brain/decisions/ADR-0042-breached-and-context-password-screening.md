@@ -95,6 +95,14 @@ sentence belongs in `docs/owasp/ASVS-CONFORMANCE.md` next to the outcome rather 
 > screens go into the shared rule afterwards. Adding a screen to three validators would have been the third
 > copy of a rule that is already duplicated twice.
 
+> **Corrected 2026-10-06 by SPEC-035's measurement.** The "two homes" paragraph said reset and change read the
+> context words from the row their handler already loads. Neither does. `ResetPasswordCommandHandler` reads
+> nothing — `TryResetPasswordAsync` spends the token and replaces the hash in one transaction, with no read
+> before the write — and `ChangePasswordCommandHandler`'s `UserCredential` carries only `UserId`, `PasswordHash`
+> and `IsEmailVerified`. The access token carries neither value either. The conclusion stands and the reason is
+> replaced: the context screen belongs where the account can be reached, which means a pre-read on the reset path
+> and two more projected columns on the change path.
+
 - **Two homes, because the two screens need different things.** The breached screen is pure — a password and a
   set — and belongs in the shared rule every path calls. The context screen needs the account: only register
   carries the address and display name in its command, while reset carries a token and change carries two

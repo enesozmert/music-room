@@ -18,11 +18,14 @@ internal sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswor
 {
     private readonly IUserRepository _users;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IPasswordContextReader _passwordContext;
     private readonly IAuditContext _audit;
 
-    /// <summary>Takes the write path, the hasher and the audit context.</summary>
+    /// <summary>Takes the write path, the hasher, the context read and the audit context.</summary>
     /// <param name="users">The account write path.</param>
     /// <param name="passwordHasher">The password hasher — ADR-0007.</param>
+    /// <param name="passwordContext">The account's own words, which this path has no other way to reach —
+    /// SPEC-035.</param>
     /// <param name="audit">Where this handler states what became of the attempt — SPEC-009.</param>
     /// <remarks>
     /// Public on an internal type: MediatR activates the handler through a public constructor only.
@@ -30,10 +33,12 @@ internal sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswor
     public ResetPasswordCommandHandler(
         IUserRepository users,
         IPasswordHasher passwordHasher,
+        IPasswordContextReader passwordContext,
         IAuditContext audit)
     {
         _users = users;
         _passwordHasher = passwordHasher;
+        _passwordContext = passwordContext;
         _audit = audit;
     }
 
@@ -50,13 +55,30 @@ internal sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswor
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        string tokenHash = OpaqueTokenHash.Of(request.Token);
+
+        // Before the write, and before BCrypt: a password refused here leaves the token spendable, so the
+        // caller can follow the same link again with a different passphrase — SPEC-035, ADR-0042. A token that
+        // matches no account screens against the project's own words alone, and the write path below still
+        // decides what an unknown, spent or expired token answers.
+        PasswordContextWords? context = await _passwordContext
+            .FindByPasswordResetTokenAsync(tokenHash, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (PasswordContext.ContainsAContextWord(request.NewPassword, context?.Email, context?.DisplayName))
+        {
+            _audit.SetOutcome(AuditOutcome.Refused);
+
+            return ResetPasswordOutcome.RefusedByContext;
+        }
+
         // Hashed before the write path is asked anything, so the transaction holds no locks while
         // BCrypt runs for a quarter of a second.
         string newPasswordHash = _passwordHasher.Hash(request.NewPassword);
 
         PasswordResetResult result = await _users
             .TryResetPasswordAsync(
-                OpaqueTokenHash.Of(request.Token),
+                tokenHash,
                 newPasswordHash,
                 DateTime.UtcNow,
                 cancellationToken)

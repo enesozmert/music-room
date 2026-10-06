@@ -1,7 +1,7 @@
 ---
 id: SPEC-035
 title: Screen a chosen password against a bundled breached set and the caller's own context words
-status: in-progress     # draft | approved | in-progress | done | blocked
+status: done            # draft | approved | in-progress | done | blocked
 tier: B                 # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S9               # which DELIVERY-PLAN slice this belongs to
 requirements: [V.1, V.6]
@@ -380,8 +380,8 @@ make agent-check
 
 ## Done when
 
-- [ ] every file in the Files table exists and compiles
-- [ ] every command under Verification passes
-- [ ] OWASP checklists walked for the surface touched; unfixed findings in the threat register
-- [ ] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
-- [ ] `status: done` in this file
+- [x] every file in the Files table exists and compiles
+- [x] every command under Verification passes
+- [x] OWASP checklists walked for the surface touched; unfixed findings in the threat register
+- [x] `docs/SDD.md` §16 updated honestly, if this changed a requirement's status
+- [x] `status: done` in this file

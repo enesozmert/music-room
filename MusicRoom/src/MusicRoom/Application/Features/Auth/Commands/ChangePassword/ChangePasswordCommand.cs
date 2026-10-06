@@ -43,6 +43,16 @@ public sealed record ChangePasswordResult(ChangePasswordOutcome Outcome, TimeSpa
     /// <returns>A refused result.</returns>
     public static ChangePasswordResult Refused() => new(ChangePasswordOutcome.Refused, TimeSpan.Zero);
 
+    /// <summary>The chosen password contains one of the account's own words, or the application's.</summary>
+    /// <returns>A refused-by-context result.</returns>
+    /// <remarks>
+    /// Separate from <see cref="Refused"/> so the endpoint can answer with the `errors` body a client reads,
+    /// keyed on `NewPassword`: a wrong **current** password is not a validation failure of the new one, and the
+    /// two must not share a message — SPEC-035.
+    /// </remarks>
+    public static ChangePasswordResult RefusedByContext() =>
+        new(ChangePasswordOutcome.RefusedByContext, TimeSpan.Zero);
+
     /// <summary>The account is out of attempts.</summary>
     /// <param name="retryAfter">How long the caller must wait.</param>
     /// <returns>A throttled result.</returns>
@@ -51,7 +61,7 @@ public sealed record ChangePasswordResult(ChangePasswordOutcome Outcome, TimeSpa
 }
 
 /// <summary>
-/// The three answers a change attempt can give.
+/// The four answers a change attempt can give.
 /// </summary>
 public enum ChangePasswordOutcome
 {
@@ -69,4 +79,14 @@ public enum ChangePasswordOutcome
 
     /// <summary>Too many attempts — `429` with `Retry-After`.</summary>
     Throttled = 2,
+
+    /// <summary>
+    /// The new password contains one of the account's own words, or the application's — `422`, and nothing is
+    /// written.
+    /// </summary>
+    /// <remarks>
+    /// A returned value and never an exception: the audit behaviour is fail-closed and shares the handler's
+    /// transaction, so a throw would roll back the row that records the refusal — SPEC-009, SPEC-035.
+    /// </remarks>
+    RefusedByContext = 3,
 }

@@ -95,6 +95,16 @@ internal sealed class ChangePasswordCommandHandler
             return ChangePasswordResult.Refused();
         }
 
+        // After the current password is proven and before anything is written: this is an authenticated caller
+        // choosing a new password, and the words come from the row already read rather than from a sixth
+        // constructor dependency S107 would refuse — SPEC-035, ADR-0042 as corrected.
+        if (ChosenFromContext(request.NewPassword, credential))
+        {
+            _audit.SetOutcome(AuditOutcome.Refused);
+
+            return ChangePasswordResult.RefusedByContext();
+        }
+
         // Hashed before the write path is asked anything, so the transaction holds no locks while BCrypt runs
         // for a quarter of a second.
         string newPasswordHash = _passwordHasher.Hash(request.NewPassword);
@@ -118,6 +128,16 @@ internal sealed class ChangePasswordCommandHandler
 
         return ChangePasswordResult.Changed();
     }
+
+    /// <summary>
+    /// Whether the new password carries one of this account's own words — SPEC-035.
+    /// </summary>
+    /// <remarks>
+    /// A method of its own because <c>Handle</c> is at S138's 40-line limit with the screen inlined. The limit
+    /// is the reason, and a named predicate reads better than the call it replaced.
+    /// </remarks>
+    private static bool ChosenFromContext(string newPassword, UserCredential credential) =>
+        PasswordContext.ContainsAContextWord(newPassword, credential.Email, credential.DisplayName);
 
     private static InvalidOperationException NoCaller() =>
         new("ChangePasswordCommand reached its handler without an authenticated caller and a session id. "

@@ -212,8 +212,23 @@ public sealed record PasswordResetResult(ResetPasswordOutcome Outcome, Guid? Use
 /// <param name="PasswordHash">The stored BCrypt string the candidate is checked against.</param>
 /// <param name="IsEmailVerified">False until the address is proven. An unverified account cannot use
 /// the services — SDD §11.1.</param>
+/// <param name="Email">The address, which the context screen reads the local part of — SPEC-035.</param>
+/// <param name="DisplayName">The name other users see, screened for the same reason.</param>
 /// <remarks>
 /// Declared beside the interface rather than in its own file: it exists only as that method's return
 /// value, and SPEC-005's Files table is the contract for what this change may create.
+/// <para>
+/// **Why two columns a login does not need.** SPEC-035 screens a chosen password against the caller's own words,
+/// and the change path has no other way to reach them: the access token carries `sub`, `sid` and `jti` and
+/// nothing else, by design, and `ChangePasswordCommandHandler`'s constructor is at S107's five-parameter limit,
+/// so a sixth dependency for a context reader would not compile under `-warnaserror`. Two more projected columns
+/// cost nothing at a call site. The login path receives both and uses neither — it was given the address it is
+/// looking the account up by.
+/// </para>
 /// </remarks>
-public sealed record UserCredential(Guid UserId, string PasswordHash, bool IsEmailVerified);
+public sealed record UserCredential(
+    Guid UserId,
+    string PasswordHash,
+    bool IsEmailVerified,
+    string Email,
+    string DisplayName);

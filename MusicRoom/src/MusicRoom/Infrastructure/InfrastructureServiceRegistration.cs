@@ -44,6 +44,11 @@ public static class InfrastructureServiceRegistration
 
         services.AddSingleton<IPasswordHasher>(_ => new BCryptPasswordHasher(options.BCryptWorkFactor));
 
+        // Singleton because the set is read from an embedded resource once: 46,146 entries into a
+        // case-insensitive hash set at start-up, one lookup per password choice, nothing per request —
+        // SPEC-035, ADR-0042. A build without the resource throws here rather than screening nothing.
+        services.AddSingleton<IBreachedPasswordSet>(_ => new BundledBreachedPasswordSet());
+
         // Singleton: the signing credentials are built once and the issuer holds no request state.
         services.AddSingleton<IAccessTokenIssuer>(_ => new JwtAccessTokenIssuer(options.Jwt));
 

@@ -95,9 +95,9 @@ The sentence that used to be here said no code existed. Eight slices later, this
 | | Count |
 |---|---|
 | Committed | **142** (62 L1 + 80 L2, recomputed from the vendored CSV) |
-| **Met**, with a named test, code path or configuration file | **66** (63 at the pass, plus V6.2.2, V6.2.3 and V7.5.1, which SPEC-028 built) |
+| **Met**, with a named test, code path or configuration file | **70** (63 at the pass; plus V6.2.2, V6.2.3 and V7.5.1, which SPEC-028 built; plus V6.1.2, V6.2.4, V6.2.11 and V6.2.12, which SPEC-035 built) |
 | **Partial** — something exists, something named is missing | **5** |
-| **Not met** | **47**, of which 29 are V10 waiting on S8 and 3 are TLS waiting on a deployment |
+| **Not met** | **43**, of which 29 are V10 waiting on S8 and 3 are TLS waiting on a deployment |
 | **Not applicable**, with the reason stated | **24** |
 
 Four outcomes, and each row carries an artifact or a reason. A row closed by writing documentation says
@@ -143,20 +143,20 @@ builds a path from a submitted name. Profile imagery would land here and is not 
 | Req | Outcome | Evidence |
 |---|---|---|
 | V6.1.1 | met, by documentation | [[sdd]] §13.3: the per-IP and per-account numbers and the `429` with `Retry-After`. The realtime ceilings of [[ADR-0030-hub-rate-limits-and-origin]] are documented there too and are **in review, not on `main`** as this is written (SPEC-026) |
-| V6.1.2 | **not met** | no context-specific word list exists — **T-32** |
+| V6.1.2 | met | `PasswordContext`: the project's own words — `musicroom`, `music room`, `musicroomapp` — plus the address local part and the display name, lowercased with separators removed, matched by containment at four characters or more (SPEC-035, [[ADR-0042-breached-and-context-password-screening]]). `PasswordContextTests` |
 | V6.1.3 | met, by documentation | two pathways: password (built) and OIDC (designed, S8 — [[ADR-0008-oidc-social-login]], [[ADR-0031-musicroom-as-openid-provider]]). Both are named in [[endpoint-inventory]] §1 and nothing else authenticates |
 | V6.2.1 | met | `RegisterCommandValidator`: minimum 12 characters, above the 8 required |
 | V6.2.2 | met | `PUT /me/password`, added by SPEC-028 after this pass opened **T-31** — `PasswordChangeEndpointTests.Change_WithTheCurrentPassword_Returns204AndReplacesItAsync` |
 | V6.2.3 | met | the endpoint takes the current password and verifies it before writing — `PasswordChangeEndpointTests.Change_WithTheWrongCurrentPassword_Returns422AndChangesNothingAsync` (SPEC-028) |
-| V6.2.4 | **not met** | no breached-password check at registration — **T-32** |
+| V6.2.4 | met | the shared password rule consults a breached set on register, reset and change — `RegisterCommandValidatorTests.Validate_APasswordInTheBreachedSet_Fails`, `RegistrationEndpointTests.Post_ABreachedPassword_Returns422AndCreatesNoRowAsync`. **The set's reach, stated rather than implied:** 46,146 entries, filtered from 999,999 in SecLists `xato-net-10-million-passwords-1000000.txt` at commit `c205c36a445bff37f8e58a9ec829105cd4975c58` (MIT). The filter is the policy: a 12-character minimum makes every shorter entry unreachable here, so the retained 4.6% is the only part of a common-password list this system could ever accept. It is a snapshot, it is smaller than HIBP's hundreds of millions, and it does not learn about tomorrow's breach — the requirement is met with a weaker set than the best available, by the decision in [[ADR-0042-breached-and-context-password-screening]] |
 | V6.2.5 | met | no composition rules: the validator constrains length and UTF-8 bytes only |
 | V6.2.6 | not applicable | server-side API; `type=password` is a client concern and `MusicRoomApp/` is empty |
 | V6.2.7 | not applicable | the same — nothing server-side can block paste |
 | V6.2.8 | met | the password is hashed exactly as received. `RegisterCommandHandler` trims and lower-cases the **email** and the display name, and never touches the password |
 | V6.2.9 | met | the maximum is 64 characters, so a 64-character password is accepted; the 72-byte ceiling is BCrypt's own truncation point, stated in the validator |
 | V6.2.10 | met | no rotation is forced: nothing expires a password, and [[sdd]] §13.1 says so (NIST SP 800-63B) |
-| V6.2.11 | **not met** | the list in V6.1.2 does not exist, so nothing uses it — **T-32** |
-| V6.2.12 | **not met** | no breached-password set is consulted — **T-32** |
+| V6.2.11 | met | every path that chooses a password uses the list: register in its validator, reset and change in their handlers — `RegistrationEndpointTests.Post_APasswordCarryingAContextWord_Returns422AndCreatesNoRowAsync`, `PasswordResetEndpointTests.Reset_WithAWeakNewPassword_Returns422AndDoesNotSpendTheTokenAsync`, `PasswordChangeEndpointTests.Change_WithANewPasswordCarryingTheAccountsWords_LeavesARefusedAuditRowAsync`. Login is **not** screened, deliberately — a password already on an account must still sign in |
+| V6.2.12 | met | the same bundled set as V6.2.4, consulted on all three paths, with the same 46,146-of-999,999 reach and the same honest limit: a snapshot, not a live service. No outbound request is made — `BundledBreachedPasswordSetTests` proves the resource is embedded, that it holds exactly 46,146 entries and that a build without it refuses to start |
 | V6.3.1 | met | `CredentialRateLimitingTests` and `CredentialAttemptLimiterTests`: per-IP policies per endpoint, a per-account counter with a doubling penalty, and `429` with `Retry-After` |
 | V6.3.2 | met | no account is seeded. The only way a row enters `users` is registration, and `SchemaConventionTests` holds the model; the load seed writes rows against a throwaway database and is outside the solution |
 | V6.3.3 | **not met** | no second factor. Single-factor password authentication only |

@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Application.Features.Auth;
 
 namespace MusicRoom.Application.Features.Auth.Commands.ChangePassword;
@@ -18,14 +19,19 @@ namespace MusicRoom.Application.Features.Auth.Commands.ChangePassword;
 public sealed class ChangePasswordCommandValidator : AbstractValidator<ChangePasswordCommand>
 {
     /// <summary>Declares the rules.</summary>
-    public ChangePasswordCommandValidator()
+    /// <param name="breachedPasswords">The bundled breached set, resolved by the container — SPEC-035.</param>
+    /// <remarks>
+    /// The context screen is not here: this command carries two passwords and no account. Its handler already
+    /// loads the row and screens from it — SPEC-035.
+    /// </remarks>
+    public ChangePasswordCommandValidator(IBreachedPasswordSet breachedPasswords)
     {
         RuleFor(command => command.CurrentPassword)
             .NotEmpty();
 
         // The policy lives in PasswordRules — SPEC-034. Applied to this command's own property, so the `422`
         // body stays keyed on `NewPassword`.
-        RuleFor(command => command.NewPassword).ChosenPassword();
+        RuleFor(command => command.NewPassword).ChosenPassword(breachedPasswords);
 
         // A change that changes nothing is refused here rather than written: it would revoke every other
         // session for no reason, which is a surprising amount of damage for a no-op.

@@ -9,6 +9,7 @@ using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Persistence.Contexts;
 using Testcontainers.PostgreSql;
 using Xunit;
+using MusicRoom.Application.Features.Auth;
 
 namespace MusicRoom.WebAPI.Tests;
 
@@ -137,6 +138,88 @@ public sealed class PasswordChangeEndpointTests : IAsyncLifetime
         // The body's key is part of the contract: a client reads `errors.NewPassword`. SPEC-034 moved the policy
         // into one shared rule, and this holds that rule to this command's own property name.
         Assert.Equal(["NewPassword"], await ValidationKeysAsync(response));
+    }
+
+    /// <summary>
+    /// A breached or context-carrying new password is `422`, nothing is written, and the refusal leaves an audit
+    /// row — ADR-0042, and SPEC-035's acceptance criterion that a refusal is a value and never an exception.
+    /// </summary>
+    /// <remarks>
+    /// The audit assertion is the load-bearing one. The audit behaviour is fail-closed and shares this handler's
+    /// transaction, so a refusal thrown as a `ValidationException` would answer `422` correctly and roll its own
+    /// record back — the trap SPEC-009 paid for. The row is how this test knows which shape was used.
+    /// <para>
+    /// The second case carries the account's address local part, which this path can only know by reading the
+    /// row: the access token carries `sub`, `sid` and `jti` and nothing else.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("i love you forever")]
+    [InlineData("passwordchangescreened too")]
+    public async Task Change_WithAScreenedNewPassword_Returns422AndWritesAnAuditRowAsync(string newPassword)
+    {
+        ArgumentNullException.ThrowIfNull(newPassword);
+
+        // Arrange — the account's local part is `passwordchangescreened` once separators are removed.
+        (HttpClient client, _) = await TestBearer.SignInAsync(
+            _factory, _mail, "password-change-screened@example.com");
+        using HttpClient caller = client;
+
+        // Act
+        using HttpResponseMessage response = await caller.PostAsJsonAsync(
+            Path,
+            new { currentPassword = LoginEndpointTests.AccountPassword, newPassword },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(["NewPassword"], await ValidationKeysAsync(response));
+
+        // Nothing was written: the old password still signs in and the new one does not.
+        Assert.Equal(
+            HttpStatusCode.OK,
+            await SignInStatusAsync("password-change-screened@example.com", LoginEndpointTests.AccountPassword));
+        Assert.Equal(
+            HttpStatusCode.Unauthorized,
+            await SignInStatusAsync("password-change-screened@example.com", newPassword));
+
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.DoesNotContain(newPassword, body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The context screen's refusal reaches the audit log, which is what proves it is a returned value.
+    /// </summary>
+    /// <remarks>
+    /// A separate test from the one above because it counts rows, and a `[Theory]` would count the other case's
+    /// row too.
+    /// </remarks>
+    [Fact]
+    public async Task Change_WithANewPasswordCarryingTheAccountsWords_LeavesARefusedAuditRowAsync()
+    {
+        // Arrange
+        (HttpClient client, _) = await TestBearer.SignInAsync(
+            _factory, _mail, "password-change-context@example.com");
+        using HttpClient caller = client;
+
+        // Act
+        using HttpResponseMessage refused = await caller.PostAsJsonAsync(
+            Path,
+            new
+            {
+                currentPassword = LoginEndpointTests.AccountPassword,
+                newPassword = "passwordchangecontext here",
+            },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, refused.StatusCode);
+        Assert.Contains(
+            PasswordRules.ContextMessage,
+            await refused.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            StringComparison.Ordinal);
+        Assert.Equal(1, await AuditCountAsync("refused"));
+        Assert.Equal(0, await AuditCountAsync("completed"));
     }
 
     /// <summary>Both outcomes leave an audit row, and the action names the change — subject V.6.</summary>

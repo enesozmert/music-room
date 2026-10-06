@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using MusicRoom.Application.Features.Auth;
 using MusicRoom.Domain.Entities;
 using MusicRoom.Persistence.Contexts;
 using Testcontainers.PostgreSql;
@@ -176,6 +177,80 @@ public sealed class RegistrationEndpointTests : IAsyncLifetime
         // The body's key is part of the contract: a client reads `errors.Password`. SPEC-034 moved the policy
         // into one shared rule, and this is what holds that rule to this command's own property name.
         Assert.Equal(["Password"], await ValidationKeysAsync(response));
+    }
+
+    /// <summary>
+    /// A password in the bundled breached set is refused, whether or not the caller typed the separators —
+    /// ASVS V6.2.4 and V6.2.12, ADR-0042.
+    /// </summary>
+    /// <remarks>
+    /// Both forms, because the measurement SPEC-035 recorded says no entry in the set contains a space while
+    /// 14,700 of them are a run of words. The second case is the one a person would actually type.
+    /// </remarks>
+    [Theory]
+    [InlineData("iloveyouforever")]
+    [InlineData("i love you forever")]
+    public async Task Post_ABreachedPassword_Returns422AndCreatesNoRowAsync(string password)
+    {
+        ArgumentNullException.ThrowIfNull(password);
+
+        // Arrange
+        string email = $"breached-{password.Length}@example.com";
+        using HttpClient client = _factory.CreateAuditedClient();
+
+        // Act
+        using HttpResponseMessage response = await client.PostAsJsonAsync(
+            RegistrationsPath,
+            new { email, password, displayName = "Player One" },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(0, await CountUsersAsync(email));
+        Assert.Equal(["Password"], await ValidationKeysAsync(response));
+        Assert.Contains(
+            PasswordRules.BreachedMessage,
+            await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A password carrying the application's name, the address local part or the display name is refused —
+    /// ASVS V6.1.2 and V6.2.11.
+    /// </summary>
+    /// <remarks>
+    /// `musicroom2026` is the case ADR-0042's register row named, and containment rather than equality is what
+    /// catches it. The message says which screen refused and never which word matched: naming it would confirm a
+    /// display name to whoever sent the request.
+    /// </remarks>
+    [Theory]
+    [InlineData("musicroom2026 ok")]
+    [InlineData("player one forever")]
+    [InlineData("contextual is my name")]
+    public async Task Post_APasswordCarryingAContextWord_Returns422AndCreatesNoRowAsync(string password)
+    {
+        ArgumentNullException.ThrowIfNull(password);
+
+        // Arrange — the third case is caught by the address local part rather than by a fixed word.
+        const string email = "contextual@example.com";
+        using HttpClient client = _factory.CreateAuditedClient();
+
+        // Act
+        using HttpResponseMessage response = await client.PostAsJsonAsync(
+            RegistrationsPath,
+            new { email, password, displayName = "Player One" },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(0, await CountUsersAsync(email));
+        Assert.Equal(["Password"], await ValidationKeysAsync(response));
+
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Contains(PasswordRules.ContextMessage, body, StringComparison.Ordinal);
+
+        // Nothing echoes the submitted password — SPEC-035, and the never-logged list.
+        Assert.DoesNotContain(password, body, StringComparison.Ordinal);
     }
 
     private static Task<HttpResponseMessage> PostRegistrationAsync(HttpClient client, string email) =>
