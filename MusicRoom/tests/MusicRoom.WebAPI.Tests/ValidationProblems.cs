@@ -40,6 +40,37 @@ internal static class ValidationProblems
         return [.. document.RootElement.GetProperty("errors").EnumerateObject().Select(field => field.Name)];
     }
 
+    /// <summary>The codes the response reported against each key — ADR-0045.</summary>
+    /// <param name="response">The `422` being read.</param>
+    /// <returns>The `codes` member, key by key, in the order the body lists it.</returns>
+    /// <remarks>
+    /// Read separately from <see cref="KeysAsync" /> so a test can assert the two agree. They are built by one
+    /// function in one pass, and this is what proves it stayed that way.
+    /// </remarks>
+    internal static async Task<Dictionary<string, string[]>> CodesAsync(HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+
+        using JsonDocument document = await ReadAsync(response);
+
+        return document.RootElement.GetProperty("codes").EnumerateObject().ToDictionary(
+            field => field.Name,
+            field => field.Value.EnumerateArray().Select(code => code.GetString()!).ToArray(),
+            StringComparer.Ordinal);
+    }
+
+    /// <summary>The single `code` a handler refusal carries, which has no field to key on — ADR-0045.</summary>
+    /// <param name="response">The `422` being read.</param>
+    /// <returns>The code.</returns>
+    internal static async Task<string> CodeAsync(HttpResponseMessage response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+
+        using JsonDocument document = await ReadAsync(response);
+
+        return document.RootElement.GetProperty("code").GetString()!;
+    }
+
     /// <summary>The messages the response reported against one key.</summary>
     /// <param name="response">The `422` being read.</param>
     /// <param name="key">The property name, exactly as the body spells it.</param>
@@ -64,11 +95,18 @@ internal static class ValidationProblems
         ];
     }
 
+    /// <summary>Parses the body, leaving it readable again.</summary>
+    /// <remarks>
+    /// As a string rather than as a stream: a `422` is read twice by any test that asserts the keys and the
+    /// codes beside them, and a consumed stream answers the second read with
+    /// `ObjectDisposedException: Cannot access a closed Stream`. Buffering is what makes the two assertions
+    /// independent — SPEC-038.
+    /// </remarks>
     private static async Task<JsonDocument> ReadAsync(HttpResponseMessage response)
     {
-        using Stream body = await response.Content.ReadAsStreamAsync(TestContext.Current.CancellationToken);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
-        return await JsonDocument.ParseAsync(body, cancellationToken: TestContext.Current.CancellationToken);
+        return JsonDocument.Parse(body);
     }
 
     /// <summary>

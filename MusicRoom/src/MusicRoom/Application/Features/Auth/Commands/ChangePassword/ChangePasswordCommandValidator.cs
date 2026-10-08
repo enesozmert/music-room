@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Application.Features.Auth;
 
@@ -27,7 +28,7 @@ public sealed class ChangePasswordCommandValidator : AbstractValidator<ChangePas
     public ChangePasswordCommandValidator(IBreachedPasswordSet breachedPasswords)
     {
         RuleFor(command => command.CurrentPassword)
-            .NotEmpty();
+            .NotEmpty().WithErrorCode(ValidationCodes.CurrentPasswordRequired);
 
         // The policy lives in PasswordRules — SPEC-034. Applied to this command's own property, so the `422`
         // body stays keyed on `NewPassword`.
@@ -38,6 +39,7 @@ public sealed class ChangePasswordCommandValidator : AbstractValidator<ChangePas
         RuleFor(command => command.NewPassword)
             .Must((command, newPassword) =>
                 !string.Equals(newPassword, command.CurrentPassword, StringComparison.Ordinal))
-            .WithMessage("The new password must differ from the current one.");
+            .WithMessage("The new password must differ from the current one.")
+            .WithErrorCode(ValidationCodes.PasswordUnchanged);
     }
 }

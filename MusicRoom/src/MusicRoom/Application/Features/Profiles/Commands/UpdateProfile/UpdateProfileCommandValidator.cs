@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Profiles.Commands.UpdateProfile;
 
@@ -29,20 +30,21 @@ public sealed class UpdateProfileCommandValidator : AbstractValidator<UpdateProf
     public UpdateProfileCommandValidator()
     {
         RuleFor(command => command.RealName!.Value)
-            .MaximumLength(RealNameMaximumLength)
+            .MaximumLength(RealNameMaximumLength).WithErrorCode(ValidationCodes.RealNameTooLong)
             .When(command => command.RealName?.Value is not null);
 
         RuleFor(command => command.Bio!.Value)
-            .MaximumLength(BioMaximumLength)
+            .MaximumLength(BioMaximumLength).WithErrorCode(ValidationCodes.BioTooLong)
             .When(command => command.Bio?.Value is not null);
 
         RuleFor(command => command.Location!.Value)
-            .MaximumLength(LocationMaximumLength)
+            .MaximumLength(LocationMaximumLength).WithErrorCode(ValidationCodes.LocationTooLong)
             .When(command => command.Location?.Value is not null);
 
         // A date of birth in the future is not a typo worth storing, and one before 1900 is a bad parse.
         RuleFor(command => command.BirthDate!.Value)
             .InclusiveBetween(new DateOnly(1900, 1, 1), DateOnly.FromDateTime(DateTime.UtcNow))
+            .WithErrorCode(ValidationCodes.BirthDateOutOfRange)
             .When(command => command.BirthDate?.Value is not null);
     }
 }

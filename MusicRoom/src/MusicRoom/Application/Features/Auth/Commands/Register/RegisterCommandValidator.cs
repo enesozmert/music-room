@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 using MusicRoom.Application.Abstractions.Security;
 
 namespace MusicRoom.Application.Features.Auth.Commands.Register;
@@ -27,9 +28,9 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
         const int displayNameMaximumLength = 64;
 
         RuleFor(command => command.Email)
-            .NotEmpty()
-            .MaximumLength(emailMaximumLength)
-            .EmailAddress();
+            .NotEmpty().WithErrorCode(ValidationCodes.EmailRequired)
+            .MaximumLength(emailMaximumLength).WithErrorCode(ValidationCodes.EmailTooLong)
+            .EmailAddress().WithErrorCode(ValidationCodes.EmailInvalid);
 
         // The policy lives in PasswordRules — SPEC-034. Applied to this command's own property, so the `422`
         // body stays keyed on `Password`.
@@ -41,10 +42,11 @@ public sealed class RegisterCommandValidator : AbstractValidator<RegisterCommand
         RuleFor(command => command.Password)
             .Must((command, password) =>
                 !PasswordContext.ContainsAContextWord(password, command.Email, command.DisplayName))
-            .WithMessage(PasswordRules.ContextMessage);
+            .WithMessage(PasswordRules.ContextMessage)
+            .WithErrorCode(ValidationCodes.PasswordContextWord);
 
         RuleFor(command => command.DisplayName)
-            .NotEmpty()
-            .MaximumLength(displayNameMaximumLength);
+            .NotEmpty().WithErrorCode(ValidationCodes.DisplayNameRequired)
+            .MaximumLength(displayNameMaximumLength).WithErrorCode(ValidationCodes.DisplayNameTooLong);
     }
 }

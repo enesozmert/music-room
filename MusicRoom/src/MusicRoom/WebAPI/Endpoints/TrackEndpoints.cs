@@ -99,9 +99,7 @@ public static class TrackEndpoints
         {
             // Mapped here, as on every other route: the validation behaviour throws, and the transport decides
             // what that means. A blank query must be `422` and not a hundred quota units spent on nothing.
-            return Results.ValidationProblem(
-                CredentialEndpointResults.ToErrors(exception),
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+            return CredentialEndpointResults.Invalid(exception);
         }
     }
 

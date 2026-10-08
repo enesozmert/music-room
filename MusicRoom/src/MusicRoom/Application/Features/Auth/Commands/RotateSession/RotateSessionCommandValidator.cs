@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Auth.Commands.RotateSession;
 
@@ -21,6 +22,6 @@ public sealed class RotateSessionCommandValidator : AbstractValidator<RotateSess
     /// <summary>Declares the rules.</summary>
     public RotateSessionCommandValidator() =>
         RuleFor(command => command.RefreshToken)
-            .NotEmpty()
-            .MaximumLength(RefreshTokenLength);
+            .NotEmpty().WithErrorCode(ValidationCodes.RefreshTokenRequired)
+            .MaximumLength(RefreshTokenLength).WithErrorCode(ValidationCodes.RefreshTokenTooLong);
 }

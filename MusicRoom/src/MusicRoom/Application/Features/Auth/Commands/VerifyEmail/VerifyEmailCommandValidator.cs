@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Auth.Commands.VerifyEmail;
 
@@ -20,6 +21,6 @@ public sealed class VerifyEmailCommandValidator : AbstractValidator<VerifyEmailC
     /// <summary>Declares the rules.</summary>
     public VerifyEmailCommandValidator() =>
         RuleFor(command => command.Token)
-            .NotEmpty()
-            .MaximumLength(TokenLength);
+            .NotEmpty().WithErrorCode(ValidationCodes.TokenRequired)
+            .MaximumLength(TokenLength).WithErrorCode(ValidationCodes.TokenTooLong);
 }

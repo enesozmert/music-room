@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Application.Features.Auth;
 
@@ -28,8 +29,8 @@ public sealed class ResetPasswordCommandValidator : AbstractValidator<ResetPassw
     public ResetPasswordCommandValidator(IBreachedPasswordSet breachedPasswords)
     {
         RuleFor(command => command.Token)
-            .NotEmpty()
-            .MaximumLength(TokenLength);
+            .NotEmpty().WithErrorCode(ValidationCodes.TokenRequired)
+            .MaximumLength(TokenLength).WithErrorCode(ValidationCodes.TokenTooLong);
 
         // The policy lives in PasswordRules — SPEC-034. Applied to this command's own property, so the `422`
         // body stays keyed on `NewPassword`.

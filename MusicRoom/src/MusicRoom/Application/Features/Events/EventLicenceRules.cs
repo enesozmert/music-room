@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 using MusicRoom.Application.Abstractions.Persistence;
 using MusicRoom.Domain.Common;
 
@@ -43,14 +44,15 @@ public static class EventLicenceRules
         ArgumentNullException.ThrowIfNull(validator);
         ArgumentNullException.ThrowIfNull(licence);
 
-        validator.RuleFor(command => licence(command).Visibility).IsInEnum();
-        validator.RuleFor(command => licence(command).Licence).IsInEnum();
+        validator.RuleFor(command => licence(command).Visibility).IsInEnum().WithErrorCode(ValidationCodes.VisibilityUnknown);
+        validator.RuleFor(command => licence(command).Licence).IsInEnum().WithErrorCode(ValidationCodes.LicenceUnknown);
 
         // Decision 3. A licence that says "only people present at a given place during a given time" with no
         // proof configured would check nothing while reading, to an evaluator, as though it checked something.
         validator.RuleFor(command => licence(command))
             .Must(value => value.Licence != LicenceMode.LocationAndTimeRestricted || value.Proof is not null)
             .OverridePropertyName("presenceProof")
+            .WithErrorCode(ValidationCodes.PresenceProofRequired)
             .WithMessage(
                 "A LocationAndTimeRestricted event must say which presence proof it requires: Geofence, "
                 + "EventCode or Both.");
@@ -60,6 +62,7 @@ public static class EventLicenceRules
             .Must(value => value.Proof is not (PresenceProof.Geofence or PresenceProof.Both)
                 || value.Geofence is not null)
             .OverridePropertyName("geofence")
+            .WithErrorCode(ValidationCodes.GeofenceRequired)
             .WithMessage("A geofence proof requires a centre and a radius.");
 
         // And a policy on a mode that checks nothing is a policy nobody will ever read.
@@ -67,19 +70,21 @@ public static class EventLicenceRules
             .Must(value => value.Licence == LicenceMode.LocationAndTimeRestricted
                 || (value.Proof is null && value.Geofence is null))
             .OverridePropertyName("licence")
+            .WithErrorCode(ValidationCodes.LicenceNotAllowed)
             .WithMessage(
                 "A presence policy belongs to the LocationAndTimeRestricted licence and to no other.");
 
         validator.When(command => licence(command).Geofence is not null, () =>
         {
             validator.RuleFor(command => licence(command).Geofence!.Latitude)
-                .InclusiveBetween(-90m, 90m);
+                .InclusiveBetween(-90m, 90m).WithErrorCode(ValidationCodes.GeofenceLatitudeOutOfRange);
 
             validator.RuleFor(command => licence(command).Geofence!.Longitude)
-                .InclusiveBetween(-180m, 180m);
+                .InclusiveBetween(-180m, 180m).WithErrorCode(ValidationCodes.GeofenceLongitudeOutOfRange);
 
             validator.RuleFor(command => licence(command).Geofence!.RadiusMetres)
-                .InclusiveBetween(MinimumRadiusMetres, MaximumRadiusMetres);
+                .InclusiveBetween(MinimumRadiusMetres, MaximumRadiusMetres)
+                .WithErrorCode(ValidationCodes.GeofenceRadiusOutOfRange);
         });
     }
 
@@ -95,16 +100,17 @@ public static class EventLicenceRules
         ArgumentNullException.ThrowIfNull(metadata);
 
         validator.RuleFor(command => metadata(command).Name)
-            .NotEmpty()
-            .MaximumLength(MaximumNameLength);
+            .NotEmpty().WithErrorCode(ValidationCodes.NameRequired)
+            .MaximumLength(MaximumNameLength).WithErrorCode(ValidationCodes.NameTooLong);
 
-        validator.RuleFor(command => metadata(command).StartsAtUtc).NotEmpty();
+        validator.RuleFor(command => metadata(command).StartsAtUtc).NotEmpty().WithErrorCode(ValidationCodes.StartsAtRequired);
 
         // Decision 4. An event that ends before it starts has no window at all, and the licence mode that
         // depends on one would then be unenforceable rather than merely unconfigured.
         validator.RuleFor(command => metadata(command))
             .Must(value => value.EndsAtUtc > value.StartsAtUtc)
             .OverridePropertyName("endsAtUtc")
+            .WithErrorCode(ValidationCodes.EndsAtBeforeStart)
             .WithMessage("endsAtUtc must be after startsAtUtc.");
     }
 

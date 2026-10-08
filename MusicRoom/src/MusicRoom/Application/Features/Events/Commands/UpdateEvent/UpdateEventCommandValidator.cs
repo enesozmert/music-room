@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Events.Commands.UpdateEvent;
 
@@ -14,7 +15,7 @@ public sealed class UpdateEventCommandValidator : AbstractValidator<UpdateEventC
     /// <summary>Declares the rules.</summary>
     public UpdateEventCommandValidator()
     {
-        RuleFor(command => command.EventId).NotEmpty();
+        RuleFor(command => command.EventId).NotEmpty().WithErrorCode(ValidationCodes.EventRequired);
 
         EventLicenceRules.AddWindowRules(this, command => command.Metadata);
     }

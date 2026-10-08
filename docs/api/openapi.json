@@ -3688,6 +3688,19 @@
                 "type": "string"
               }
             }
+          },
+          "codes": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "The stable code for each message in `errors`, under the same keys and in the same order — ADR-0045. A client switches on these and renders `errors`."
           }
         }
       },

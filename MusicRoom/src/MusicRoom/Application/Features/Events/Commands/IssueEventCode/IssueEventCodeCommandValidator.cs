@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Events.Commands.IssueEventCode;
 
@@ -20,13 +21,14 @@ public sealed class IssueEventCodeCommandValidator : AbstractValidator<IssueEven
     /// <summary>Declares the rules.</summary>
     public IssueEventCodeCommandValidator()
     {
-        RuleFor(command => command.EventId).NotEmpty();
+        RuleFor(command => command.EventId).NotEmpty().WithErrorCode(ValidationCodes.EventRequired);
 
         // `EventCodeRequest` publishes `ttlSeconds` while the command carries `TimeToLiveSeconds`, so the key is
         // stated rather than resolved. `WithName` used to sit here and never moved the key — it names the word a
         // message interpolates, which is the correction ADR-0043's amendment carries.
         RuleFor(command => command.TimeToLiveSeconds)
             .InclusiveBetween(MinimumTimeToLiveSeconds, MaximumTimeToLiveSeconds)
+            .WithErrorCode(ValidationCodes.TimeToLiveOutOfRange)
             .OverridePropertyName("ttlSeconds");
     }
 }

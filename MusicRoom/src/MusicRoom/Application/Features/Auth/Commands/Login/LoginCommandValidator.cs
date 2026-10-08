@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Auth.Commands.Login;
 
@@ -23,11 +24,11 @@ public sealed class LoginCommandValidator : AbstractValidator<LoginCommand>
     public LoginCommandValidator()
     {
         RuleFor(command => command.Email)
-            .NotEmpty()
-            .MaximumLength(EmailMaximumLength);
+            .NotEmpty().WithErrorCode(ValidationCodes.EmailRequired)
+            .MaximumLength(EmailMaximumLength).WithErrorCode(ValidationCodes.EmailTooLong);
 
         RuleFor(command => command.Password)
-            .NotEmpty()
-            .MaximumLength(PasswordMaximumLength);
+            .NotEmpty().WithErrorCode(ValidationCodes.PasswordRequired)
+            .MaximumLength(PasswordMaximumLength).WithErrorCode(ValidationCodes.PasswordTooLong);
     }
 }

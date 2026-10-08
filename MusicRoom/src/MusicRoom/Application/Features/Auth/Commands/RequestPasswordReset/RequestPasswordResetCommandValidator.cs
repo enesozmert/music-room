@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Auth.Commands.RequestPasswordReset;
 
@@ -17,7 +18,7 @@ public sealed class RequestPasswordResetCommandValidator : AbstractValidator<Req
     /// <summary>Declares the rules.</summary>
     public RequestPasswordResetCommandValidator() =>
         RuleFor(command => command.Email)
-            .NotEmpty()
-            .MaximumLength(EmailMaximumLength)
-            .EmailAddress();
+            .NotEmpty().WithErrorCode(ValidationCodes.EmailRequired)
+            .MaximumLength(EmailMaximumLength).WithErrorCode(ValidationCodes.EmailTooLong)
+            .EmailAddress().WithErrorCode(ValidationCodes.EmailInvalid);
 }

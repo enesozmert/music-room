@@ -59,5 +59,53 @@ internal static class CredentialEndpointResults
                 StringComparer.Ordinal);
     }
 
+    /// <summary>
+    /// The whole `422` answer for a validation failure: the messages, and the codes beside them — ADR-0045.
+    /// </summary>
+    /// <param name="exception">The failure MediatR's validation behaviour threw.</param>
+    /// <returns>A `422` carrying `errors` and the `codes` extension.</returns>
+    /// <remarks>
+    /// **One function, one pass, two dictionaries.** They are grouped from the same failure list in the same
+    /// order, so `errors["newPassword"][0]` and `codes["newPassword"][0]` describe the same refusal. Two
+    /// builders in two places would disagree the first time one was edited, which is the reason ADR-0045 names
+    /// this constraint rather than leaving it to care.
+    /// </remarks>
+    internal static IResult Invalid(ValidationException exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+
+        List<IGrouping<string, ValidationFailure>> grouped = [.. exception.Errors
+            .GroupBy(failure => failure.PropertyName, StringComparer.Ordinal)];
+
+        Dictionary<string, string[]> errors = grouped.ToDictionary(
+            group => group.Key,
+            group => group.Select(ErrorMessage).ToArray(),
+            StringComparer.Ordinal);
+
+        Dictionary<string, string[]> codes = grouped.ToDictionary(
+            group => group.Key,
+            group => group.Select(failure => failure.ErrorCode).ToArray(),
+            StringComparer.Ordinal);
+
+        return Results.ValidationProblem(
+            errors,
+            statusCode: StatusCodes.Status422UnprocessableEntity,
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["codes"] = codes });
+    }
+
+    /// <summary>
+    /// A refusal a handler decided, which has no field to key on — ADR-0045.
+    /// </summary>
+    /// <param name="code">The code from <see cref="MusicRoom.Application.Validation.ValidationCodes"/>.</param>
+    /// <param name="title">The short English title.</param>
+    /// <param name="detail">The English detail, for a developer rather than an end user.</param>
+    /// <returns>A `422` carrying the single `code` extension.</returns>
+    internal static IResult Refused(string code, string title, string detail) =>
+        Results.Problem(
+            detail: detail,
+            statusCode: StatusCodes.Status422UnprocessableEntity,
+            title: title,
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = code });
+
     private static string ErrorMessage(ValidationFailure failure) => failure.ErrorMessage;
 }
