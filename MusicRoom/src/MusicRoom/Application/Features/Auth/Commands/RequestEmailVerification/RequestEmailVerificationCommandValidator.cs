@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Auth.Commands.RequestEmailVerification;
 
@@ -22,7 +23,7 @@ public sealed class RequestEmailVerificationCommandValidator
     /// <summary>Declares the rules.</summary>
     public RequestEmailVerificationCommandValidator() =>
         RuleFor(command => command.Email)
-            .NotEmpty()
-            .MaximumLength(EmailMaximumLength)
-            .EmailAddress();
+            .NotEmpty().WithErrorCode(ValidationCodes.EmailRequired)
+            .MaximumLength(EmailMaximumLength).WithErrorCode(ValidationCodes.EmailTooLong)
+            .EmailAddress().WithErrorCode(ValidationCodes.EmailInvalid);
 }

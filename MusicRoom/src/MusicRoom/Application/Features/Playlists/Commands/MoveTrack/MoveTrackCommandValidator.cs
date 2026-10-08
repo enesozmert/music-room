@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Playlists.Commands.MoveTrack;
 
@@ -15,8 +16,8 @@ public sealed class MoveTrackCommandValidator : AbstractValidator<MoveTrackComma
     /// <summary>Declares the rules.</summary>
     public MoveTrackCommandValidator()
     {
-        RuleFor(command => command.PlaylistId).NotEmpty();
-        RuleFor(command => command.PlaylistTrackId).NotEmpty();
+        RuleFor(command => command.PlaylistId).NotEmpty().WithErrorCode(ValidationCodes.PlaylistRequired);
+        RuleFor(command => command.PlaylistTrackId).NotEmpty().WithErrorCode(ValidationCodes.PlaylistTrackRequired);
 
         // A whole-command rule has no member path, so without this the key would be the empty string and the
         // message would reach a client it cannot route to a field — ADR-0043, the defect O28 named. It keys on
@@ -24,14 +25,17 @@ public sealed class MoveTrackCommandValidator : AbstractValidator<MoveTrackComma
         RuleFor(command => command)
             .Must(command => command.AfterTrackId is null ^ command.BeforeTrackId is null)
             .OverridePropertyName("afterTrackId")
+            .WithErrorCode(ValidationCodes.PositionNeighbourRequired)
             .WithMessage("Send exactly one of afterTrackId or beforeTrackId.");
 
         RuleFor(command => command.AfterTrackId)
             .NotEqual(command => command.PlaylistTrackId)
+            .WithErrorCode(ValidationCodes.PositionSelfMove)
             .WithMessage("A track cannot be moved after itself.");
 
         RuleFor(command => command.BeforeTrackId)
             .NotEqual(command => command.PlaylistTrackId)
+            .WithErrorCode(ValidationCodes.PositionSelfMove)
             .WithMessage("A track cannot be moved before itself.");
     }
 }

@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Events.Commands.SuggestTrack;
 
@@ -19,12 +20,12 @@ public sealed partial class SuggestTrackCommandValidator : AbstractValidator<Sug
     /// <summary>Declares the rules.</summary>
     public SuggestTrackCommandValidator()
     {
-        RuleFor(command => command.EventId).NotEmpty();
+        RuleFor(command => command.EventId).NotEmpty().WithErrorCode(ValidationCodes.EventRequired);
 
         RuleFor(command => command.YoutubeVideoId)
-            .NotEmpty()
-            .Length(VideoIdLength)
-            .Must(id => VideoId().IsMatch(id))
+            .NotEmpty().WithErrorCode(ValidationCodes.VideoRequired)
+            .Length(VideoIdLength).WithErrorCode(ValidationCodes.VideoInvalid)
+            .Must(id => VideoId().IsMatch(id)).WithErrorCode(ValidationCodes.VideoInvalid)
             .WithMessage("A YouTube video id is 11 characters of A-Z, a-z, 0-9, hyphen and underscore.");
     }
 

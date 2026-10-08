@@ -49,9 +49,7 @@ internal static class EventLicenceEndpoints
         }
         catch (ValidationException exception)
         {
-            return Results.ValidationProblem(
-                CredentialEndpointResults.ToErrors(exception),
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+            return CredentialEndpointResults.Invalid(exception);
         }
     }
 }

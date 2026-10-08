@@ -4,6 +4,7 @@ using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Application.Features.Auth;
 using MusicRoom.Application.Features.Auth.Commands.RequestPasswordReset;
 using MusicRoom.Application.Features.Auth.Commands.ResetPassword;
+using MusicRoom.Application.Validation;
 using MusicRoom.WebAPI.RateLimiting;
 
 namespace MusicRoom.WebAPI.Endpoints;
@@ -77,9 +78,7 @@ internal static class PasswordResetEndpoints
         {
             // 422 with the rule messages, as registration and resend answer: the rules describe the
             // shape of an address and say nothing about which addresses exist.
-            return Results.ValidationProblem(
-                CredentialEndpointResults.ToErrors(exception),
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+            return CredentialEndpointResults.Invalid(exception);
         }
 
         return throttled is null
@@ -146,7 +145,16 @@ internal static class PasswordResetEndpoints
                 // global key resolver never sees it — ADR-0043, SPEC-037.
                 ["newPassword"] = [PasswordRules.ContextMessage],
             },
-            statusCode: StatusCodes.Status422UnprocessableEntity);
+            statusCode: StatusCodes.Status422UnprocessableEntity,
+            // The codes member a validator-built body gets from `Invalid`, written by hand for the same
+            // reason the keys are — ADR-0045.
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["codes"] = new Dictionary<string, string[]>(StringComparer.Ordinal)
+                {
+                    ["newPassword"] = [ValidationCodes.PasswordContextWord],
+                },
+            });
 
     private static IResult PasswordRuleFailure(ValidationException exception)
     {
@@ -154,7 +162,7 @@ internal static class PasswordResetEndpoints
 
         return errors.ContainsKey(nameof(ResetPasswordCommand.Token))
             ? Results.BadRequest()
-            : Results.ValidationProblem(errors, statusCode: StatusCodes.Status422UnprocessableEntity);
+            : CredentialEndpointResults.Invalid(exception);
     }
 }
 

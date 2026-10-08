@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Friends.Commands.SendFriendRequest;
 
@@ -14,5 +15,5 @@ public sealed class SendFriendRequestCommandValidator : AbstractValidator<SendFr
 {
     /// <summary>Declares the rules.</summary>
     public SendFriendRequestCommandValidator() =>
-        RuleFor(command => command.TargetUserId).NotEmpty();
+        RuleFor(command => command.TargetUserId).NotEmpty().WithErrorCode(ValidationCodes.TargetUserRequired);
 }

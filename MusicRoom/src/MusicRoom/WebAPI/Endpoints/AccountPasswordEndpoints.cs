@@ -2,6 +2,7 @@ using System.Globalization;
 using FluentValidation;
 using MediatR;
 using MusicRoom.Application.Features.Auth;
+using MusicRoom.Application.Validation;
 using MusicRoom.Application.Features.Auth.Commands.ChangePassword;
 using MusicRoom.WebAPI.RateLimiting;
 
@@ -74,18 +75,27 @@ public static class AccountPasswordEndpoints
                         // the global key resolver never sees it — ADR-0043, SPEC-037.
                         ["newPassword"] = [PasswordRules.ContextMessage],
                     },
-                    statusCode: StatusCodes.Status422UnprocessableEntity),
-                _ => Results.Problem(
-                    detail: RefusedDetail,
                     statusCode: StatusCodes.Status422UnprocessableEntity,
-                    title: "Password not changed"),
+                    // And its code beside it, for the same reason — ADR-0045.
+                    extensions: new Dictionary<string, object?>(StringComparer.Ordinal)
+                    {
+                        ["codes"] = new Dictionary<string, string[]>(StringComparer.Ordinal)
+                        {
+                            ["newPassword"] = [ValidationCodes.PasswordContextWord],
+                        },
+                    }),
+
+                // No field to key on: the password that is wrong is the stored one — ADR-0045's single
+                // `code` member.
+                _ => CredentialEndpointResults.Refused(
+                    ValidationCodes.CurrentPasswordIncorrect,
+                    "Password not changed",
+                    RefusedDetail),
             };
         }
         catch (ValidationException exception)
         {
-            return Results.ValidationProblem(
-                CredentialEndpointResults.ToErrors(exception),
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+            return CredentialEndpointResults.Invalid(exception);
         }
     }
 

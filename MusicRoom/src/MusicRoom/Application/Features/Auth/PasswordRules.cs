@@ -1,5 +1,6 @@
 using System.Text;
 using FluentValidation;
+using MusicRoom.Application.Validation;
 using MusicRoom.Application.Abstractions.Security;
 
 namespace MusicRoom.Application.Features.Auth;
@@ -94,14 +95,14 @@ public static class PasswordRules
         ArgumentNullException.ThrowIfNull(breachedPasswords);
 
         return rule
-            .NotEmpty()
-            .MinimumLength(MinimumLength)
+            .NotEmpty().WithErrorCode(ValidationCodes.PasswordRequired)
+            .MinimumLength(MinimumLength).WithErrorCode(ValidationCodes.PasswordTooShort)
             .WithMessage($"Password must be at least {MinimumLength} characters.")
-            .MaximumLength(MaximumLength)
+            .MaximumLength(MaximumLength).WithErrorCode(ValidationCodes.PasswordTooLong)
             .WithMessage($"Password must be at most {MaximumLength} characters.")
-            .Must(FitsInBCryptInput)
+            .Must(FitsInBCryptInput).WithErrorCode(ValidationCodes.PasswordTooManyBytes)
             .WithMessage($"Password must be at most {PasswordMaximumUtf8Bytes} bytes when encoded as UTF-8.")
-            .Must(password => !IsBreached(breachedPasswords, password))
+            .Must(password => !IsBreached(breachedPasswords, password)).WithErrorCode(ValidationCodes.PasswordBreached)
             .WithMessage(BreachedMessage);
     }
 

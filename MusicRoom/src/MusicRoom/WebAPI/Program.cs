@@ -491,7 +491,7 @@ internal static class ApiServices
     /// </summary>
     internal static void Add(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddOpenApi();
+        services.AddOpenApi(options => ValidationProblemSchema.Declare(options));
         services.AddProblemDetails();
         CredentialRateLimiterPolicies.Add(services, configuration);
         EventRateLimiterPolicies.Add(services);

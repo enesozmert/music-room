@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 using MusicRoom.Application.Features.Playlists.Commands.CreatePlaylist;
 
 namespace MusicRoom.Application.Features.Playlists.Commands.RenamePlaylist;
@@ -11,10 +12,10 @@ public sealed class RenamePlaylistCommandValidator : AbstractValidator<RenamePla
     /// <summary>Declares the rules.</summary>
     public RenamePlaylistCommandValidator()
     {
-        RuleFor(command => command.PlaylistId).NotEmpty();
+        RuleFor(command => command.PlaylistId).NotEmpty().WithErrorCode(ValidationCodes.PlaylistRequired);
 
         RuleFor(command => command.Name)
-            .NotEmpty()
-            .MaximumLength(CreatePlaylistCommandValidator.NameMaximumLength);
+            .NotEmpty().WithErrorCode(ValidationCodes.NameRequired)
+            .MaximumLength(CreatePlaylistCommandValidator.NameMaximumLength).WithErrorCode(ValidationCodes.NameTooLong);
     }
 }

@@ -213,9 +213,7 @@ internal static class AuthEndpoints
         }
         catch (ValidationException exception)
         {
-            return Results.ValidationProblem(
-                CredentialEndpointResults.ToErrors(exception),
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+            return CredentialEndpointResults.Invalid(exception);
         }
 
         return throttled is null
@@ -241,9 +239,7 @@ internal static class AuthEndpoints
         {
             // 422 with the rule messages, as registration answers: the rules describe the shape of
             // an address, which is public knowledge, and say nothing about which addresses exist.
-            return Results.ValidationProblem(
-                CredentialEndpointResults.ToErrors(exception),
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+            return CredentialEndpointResults.Invalid(exception);
         }
 
         return throttled is null

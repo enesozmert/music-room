@@ -117,9 +117,7 @@ internal static class ProfileEndpoints
         }
         catch (ValidationException exception)
         {
-            return Results.ValidationProblem(
-                CredentialEndpointResults.ToErrors(exception),
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+            return CredentialEndpointResults.Invalid(exception);
         }
     }
 
@@ -138,9 +136,7 @@ internal static class ProfileEndpoints
         }
         catch (ValidationException exception)
         {
-            return Results.ValidationProblem(
-                CredentialEndpointResults.ToErrors(exception),
-                statusCode: StatusCodes.Status422UnprocessableEntity);
+            return CredentialEndpointResults.Invalid(exception);
         }
 
         return Results.Ok();

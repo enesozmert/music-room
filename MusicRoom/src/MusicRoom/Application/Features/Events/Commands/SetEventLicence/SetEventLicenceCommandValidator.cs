@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 
 namespace MusicRoom.Application.Features.Events.Commands.SetEventLicence;
 
@@ -15,7 +16,7 @@ public sealed class SetEventLicenceCommandValidator : AbstractValidator<SetEvent
     /// <summary>Declares the rules.</summary>
     public SetEventLicenceCommandValidator()
     {
-        RuleFor(command => command.EventId).NotEmpty();
+        RuleFor(command => command.EventId).NotEmpty().WithErrorCode(ValidationCodes.EventRequired);
 
         EventLicenceRules.AddLicenceRules(this, command => command.Licence);
     }

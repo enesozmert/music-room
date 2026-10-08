@@ -1,4 +1,5 @@
 using FluentValidation;
+using MusicRoom.Application.Validation;
 using MusicRoom.Domain.Common;
 
 namespace MusicRoom.Application.Features.Playlists.Commands.CreatePlaylist;
@@ -20,14 +21,15 @@ public sealed class CreatePlaylistCommandValidator : AbstractValidator<CreatePla
     public CreatePlaylistCommandValidator()
     {
         RuleFor(command => command.Name)
-            .NotEmpty()
-            .MaximumLength(NameMaximumLength);
+            .NotEmpty().WithErrorCode(ValidationCodes.NameRequired)
+            .MaximumLength(NameMaximumLength).WithErrorCode(ValidationCodes.NameTooLong);
 
-        RuleFor(command => command.Visibility).IsInEnum();
+        RuleFor(command => command.Visibility).IsInEnum().WithErrorCode(ValidationCodes.VisibilityUnknown);
 
         RuleFor(command => command.Licence)
-            .IsInEnum()
+            .IsInEnum().WithErrorCode(ValidationCodes.LicenceUnknown)
             .NotEqual(LicenceMode.LocationAndTimeRestricted)
-            .WithMessage("A playlist cannot be location-and-time restricted; that licence belongs to an event.");
+            .WithMessage("A playlist cannot be location-and-time restricted; that licence belongs to an event.")
+            .WithErrorCode(ValidationCodes.LicenceNotAllowed);
     }
 }
