@@ -204,4 +204,14 @@ public static class ValidationCodes
 
     /// <summary>The window ends before it starts.</summary>
     public const string EndsAtBeforeStart = "ENDS_AT.BEFORE_START";
+
+    /// <summary>
+    /// A failure nobody decided — the `500` answer, issue O29 and SPEC-039.
+    /// </summary>
+    /// <remarks>
+    /// One code for every unexpected exception, deliberately. A code per exception type would tell a caller
+    /// which component failed, which is the disclosure the handler exists to prevent; the detail is in the log
+    /// line, where only an operator reads it.
+    /// </remarks>
+    public const string InternalUnexpected = "INTERNAL.UNEXPECTED";
 }
