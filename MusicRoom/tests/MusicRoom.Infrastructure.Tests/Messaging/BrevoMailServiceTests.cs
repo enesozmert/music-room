@@ -221,7 +221,8 @@ public sealed class BrevoMailServiceTests
             new CredentialAttemptLimits(
                 CredentialAttemptLimits.DefaultPermitsPerWindow,
                 TimeSpan.FromMinutes(CredentialAttemptLimits.DefaultWindowMinutes),
-                CredentialAttemptLimits.DefaultMaximumPenaltyWindows)));
+                CredentialAttemptLimits.DefaultMaximumPenaltyWindows),
+            []));
 
         // The transport is replaced by the stub, which is the one thing a test may not take from
         // configuration: everything else here is the production registration. Named rather than defaulted,

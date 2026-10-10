@@ -115,7 +115,10 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginR
     /// </remarks>
     private bool VerifyInConstantWork(string password, UserCredential? credential)
     {
-        if (credential is null)
+        // A social-only account has no hash — SPEC-041. It costs the same work as an unknown address and
+        // answers the same generic refusal: saying "this address exists but has no password" would be the
+        // enumeration oracle this method exists to avoid.
+        if (credential?.PasswordHash is null)
         {
             _ = _passwordHasher.Hash(password);
             return false;

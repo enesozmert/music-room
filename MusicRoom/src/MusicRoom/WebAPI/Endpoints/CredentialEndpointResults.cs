@@ -107,5 +107,19 @@ internal static class CredentialEndpointResults
             title: title,
             extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = code });
 
+    /// <summary>
+    /// A `409` carrying the same single `code` member a `422` refusal does — ADR-0045.
+    /// </summary>
+    /// <param name="code">The code from <see cref="MusicRoom.Application.Validation.ValidationCodes"/>.</param>
+    /// <param name="title">The short English title.</param>
+    /// <param name="detail">The English detail, for a developer rather than an end user.</param>
+    /// <returns>A `409` a client can switch on.</returns>
+    internal static IResult Conflict(string code, string title, string detail) =>
+        Results.Problem(
+            detail: detail,
+            statusCode: StatusCodes.Status409Conflict,
+            title: title,
+            extensions: new Dictionary<string, object?>(StringComparer.Ordinal) { ["code"] = code });
+
     private static string ErrorMessage(ValidationFailure failure) => failure.ErrorMessage;
 }

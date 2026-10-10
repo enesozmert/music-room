@@ -254,7 +254,8 @@ public sealed class CachedCatalogTests
             new CredentialAttemptLimits(
                 CredentialAttemptLimits.DefaultPermitsPerWindow,
                 TimeSpan.FromMinutes(CredentialAttemptLimits.DefaultWindowMinutes),
-                CredentialAttemptLimits.DefaultMaximumPenaltyWindows)));
+                CredentialAttemptLimits.DefaultMaximumPenaltyWindows),
+            []));
 
         services.AddHttpClient(nameof(ICatalogProvider))
             .ConfigurePrimaryHttpMessageHandler(() => transport);

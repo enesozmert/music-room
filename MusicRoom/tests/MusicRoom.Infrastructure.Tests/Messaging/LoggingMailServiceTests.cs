@@ -153,7 +153,11 @@ public sealed class LoggingMailServiceTests
             new CredentialAttemptLimits(
                 CredentialAttemptLimits.DefaultPermitsPerWindow,
                 TimeSpan.FromMinutes(CredentialAttemptLimits.DefaultWindowMinutes),
-                CredentialAttemptLimits.DefaultMaximumPenaltyWindows));
+                CredentialAttemptLimits.DefaultMaximumPenaltyWindows),
+
+            // No provider rows: these suites are about the mail sender and the catalog, and a host with
+            // no provider credentials is a supported host — SPEC-041.
+            []);
 
     private static IMailService ResolveMailService(MessageLog log, string? verificationLinkBaseUrl)
     {

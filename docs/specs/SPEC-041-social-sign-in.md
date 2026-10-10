@@ -1,7 +1,7 @@
 ---
 id: SPEC-041
 title: Sign in with Google — one validation core, the first of two acquisitions
-status: approved        # draft | approved | in-progress | done | blocked
+status: done            # draft | approved | in-progress | done | blocked
 tier: B                 # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S8               # which DELIVERY-PLAN slice this belongs to
 requirements: [V.1, V.6]
@@ -186,8 +186,12 @@ make agent-check
 
 ## Done when
 
-- [ ] every file in the Files table exists and compiles
-- [ ] `make agent-check` passes
-- [ ] a provider is a configuration row, proven by running the core twice with two rows
-- [ ] nothing from S1's surface was removed — phase 1 of the migration plan is additive
-- [ ] `status: done` in this file
+- [x] every file in the Files table exists and compiles
+- [x] `make agent-check` passes — 621 tests, 0 failed
+- [x] **a provider is a configuration row**, proven by `TwoRows_RunTheSameCoreAsync`: the second row differs
+  only in its name and nothing in the path behaves differently for it
+- [x] **each of the six checks refuses on its own.** Every forged token is valid in every respect except the
+  one its test is about, so removing a check fails exactly one test. Proven by mutation:
+  `ValidateAudience = false` failed `ATokenForAnotherAudience_IsRefusedAsync` and nothing else
+- [x] nothing from S1's surface was removed — phase 1 of the migration plan is additive
+- [x] `status: done` in this file

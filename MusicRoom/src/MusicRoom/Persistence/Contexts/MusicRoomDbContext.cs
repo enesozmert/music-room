@@ -32,6 +32,11 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>The mandatory audit log — subject V.6, SDD §13.4.</summary>
     public DbSet<AuditRecord> AuditRecords => Set<AuditRecord>();
 
+    // `SocialLink` has no property here on purpose — SPEC-041. S1200 caps this class's coupling and one
+    // more entity type crosses it; the mapping is discovered by `ApplyConfigurationsFromAssembly` either way,
+    // and `SocialLinkRepository` reaches it through `Set<SocialLink>()`. A property is sugar, and the cap is
+    // not a thing to raise for sugar — the same answer O24 got in `Program.cs`.
+
     /// <summary>One profile per account — subject V.1's tiered fields.</summary>
     public DbSet<Profile> Profiles => Set<Profile>();
 

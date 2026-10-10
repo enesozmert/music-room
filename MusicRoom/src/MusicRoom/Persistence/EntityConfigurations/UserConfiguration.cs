@@ -38,10 +38,11 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(emailMaximumLength)
             .IsRequired();
 
+        // Nullable: an account that has only ever signed in with a provider has no password — SPEC-041.
+        // Not a sentinel string, which the first comparison would treat as a password somebody chose.
         builder.Property(user => user.PasswordHash)
             .HasColumnName("password_hash")
-            .HasMaxLength(passwordHashMaximumLength)
-            .IsRequired();
+            .HasMaxLength(passwordHashMaximumLength);
 
         builder.Property(user => user.DisplayName)
             .HasColumnName("display_name")

@@ -319,13 +319,7 @@ internal static class InfrastructureSetup
     /// <summary>Registers the hasher, the token issuer, the attempt limiter, the mail sender and the catalog.</summary>
     /// <param name="builder">The host being built.</param>
     internal static void Add(WebApplicationBuilder builder) =>
-        builder.Services.AddInfrastructureServices(new InfrastructureOptions(
-            EnvironmentConfiguration.ReadBCryptWorkFactor(builder.Configuration),
-            builder.Environment.IsDevelopment(),
-            EnvironmentConfiguration.ReadMailOptions(builder.Configuration),
-            EnvironmentConfiguration.ReadCatalogOptions(builder.Configuration),
-            EnvironmentConfiguration.RequireJwtOptions(builder.Configuration),
-            EnvironmentConfiguration.ReadCredentialAttemptLimits(builder.Configuration)));
+        builder.Services.AddInfrastructureServices(InfrastructureOptionsReader.Read(builder));
 }
 
 /// <summary>

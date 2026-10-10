@@ -37,6 +37,9 @@ internal static class AuthEndpoints
         // .editorconfig allows.
         SessionEndpoints.Map(group);
 
+        // Sign in with a provider, and the three link routes — subject V.1, SPEC-041.
+        SocialAuthEndpoints.Map(group);
+
         return endpoints;
     }
 
