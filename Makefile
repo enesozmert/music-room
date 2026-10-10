@@ -65,6 +65,41 @@ OPENAPI_JWT_ISSUER := musicroom-openapi
 OPENAPI_JWT_AUDIENCE := musicroom-openapi
 OPENAPI_JWT_ACCESS_TOKEN_MINUTES := 15
 
+# The dump runs inside the container: `pg_dump` is not on the host, ADR-0026 keeps it that way, and the
+# engine that wrote the files is the one that should read them. The credential is never on the command
+# line — `docker compose exec` passes the container its own POSTGRES_USER and POSTGRES_DB — so it reaches
+# neither the process table nor the shell history. ADR-0044.
+BACKUP_DIR ?= backups
+BACKUP_KEEP ?= 7
+
+# Overridable so the refusal below can be proven against a file that names another host. Nothing but a
+# test ever passes it — ADR-0044.
+BACKUP_ENV_FILE ?= .env
+
+backup: ## dump the compose database into backups/, keeping the newest BACKUP_KEEP
+	@test -f $(BACKUP_ENV_FILE) || { echo "make backup: $(BACKUP_ENV_FILE) is missing. cp .env.example .env and fill it in — ADR-0026."; exit 1; }
+	@mkdir -p $(BACKUP_DIR)
+	@set -a; . ./$(BACKUP_ENV_FILE); set +a; \
+	file="$(BACKUP_DIR)/musicroom-$$(date -u +%Y%m%dT%H%M%SZ).sql"; \
+	docker compose exec -T db pg_dump -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" > "$$file"; \
+	echo "wrote $$file"
+	@ls -1t $(BACKUP_DIR)/musicroom-*.sql 2>/dev/null | tail -n +$$(($(BACKUP_KEEP) + 1)) | \
+		while read -r old; do echo "removing $$old"; rm -f "$$old"; done; true
+
+# Refuses anything but the compose database. A restore pointed at Supabase would overwrite rows nobody
+# asked it to, and the only thing standing between those two is this check — ADR-0044.
+restore: ## restore a dump into the compose database: make restore FILE=backups/<name>.sql
+	@test -n "$(FILE)" || { echo "make restore: FILE=backups/<name>.sql is required."; exit 1; }
+	@test -f "$(FILE)" || { echo "make restore: $(FILE) does not exist."; exit 1; }
+	@test -f $(BACKUP_ENV_FILE) || { echo "make restore: $(BACKUP_ENV_FILE) is missing — ADR-0026."; exit 1; }
+	@set -a; . ./$(BACKUP_ENV_FILE); set +a; \
+	case "$$DATABASE_URL" in \
+		*Host=localhost*|*Host=127.0.0.1*|*Host=db*) ;; \
+		*) echo "make restore: DATABASE_URL does not name the compose database. Refusing — ADR-0044."; exit 1;; \
+	esac; \
+	docker compose exec -T db psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" < "$(FILE)"; \
+	echo "restored $(FILE)"
+
 openapi: ## regenerate docs/api/openapi.json from the code
 	# The generator boots the real host to read the document off it, so every start-up requirement has
 	# to be satisfied. The environment is Development because a document build is a development-time

@@ -43,3 +43,6 @@ reference/
 # against one throwaway database — SPEC-023.
 tests/load/target/
 tests/load/seed/out/
+
+# Database dumps: real rows, real addresses, real password hashes — ADR-0044, subject V.8.
+backups/
