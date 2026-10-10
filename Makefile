@@ -76,6 +76,19 @@ BACKUP_KEEP ?= 7
 # test ever passes it — ADR-0044.
 BACKUP_ENV_FILE ?= .env
 
+vault: ## start the self-hosted Infisical vault — SPEC-042, ADR-0029
+	@test -f .env || { echo "make vault: .env is missing. cp .env.example .env and fill it in — ADR-0026."; exit 1; }
+	@set -a; . ./.env; set +a; \
+	for name in INFISICAL_ENCRYPTION_KEY INFISICAL_AUTH_SECRET INFISICAL_DB_PASSWORD INFISICAL_REDIS_PASSWORD; do \
+		eval "value=\$$$$name"; \
+		test -n "$$value" || { echo "make vault: $$name is empty in .env — see .env.example."; exit 1; }; \
+	done
+	docker compose --profile vault up -d
+	@echo "Infisical is at $${INFISICAL_SITE_URL:-http://localhost:8090} once it finishes migrating."
+
+vault-down: ## stop the vault, leaving the application stack running
+	docker compose --profile vault down
+
 backup: ## dump the compose database into backups/, keeping the newest BACKUP_KEEP
 	@test -f $(BACKUP_ENV_FILE) || { echo "make backup: $(BACKUP_ENV_FILE) is missing. cp .env.example .env and fill it in — ADR-0026."; exit 1; }
 	@mkdir -p $(BACKUP_DIR)

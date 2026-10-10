@@ -47,5 +47,79 @@ services:
       db:
         condition: service_healthy
 
+  # --- The vault, behind a profile ----------------------------------------------------------------
+  #
+  # `docker compose up` does not start these. `docker compose --profile vault up -d` does, and
+  # `make vault` is the same command spelled once — SPEC-042, ADR-0029.
+  #
+  # Behind a profile because the ADR said the cost out loud before it was paid: "self-hosted
+  # Infisical is not one container... the compose stack grows from two services to roughly five, and
+  # each is something that can fail during a defence demo". The two services a demo needs stay two.
+  #
+  # Its own PostgreSQL, not the application's. Sharing one would put the secret store and the user
+  # data behind a single backup, a single migration and a single failure.
+  #
+  # The four secrets below default to empty rather than using a `:?` guard, and `make vault` refuses
+  # a blank one instead. Compose interpolates **every** service's variables even when the profile is
+  # off, so a guard here made `make up` fail for anyone who had not filled in a vault they were not
+  # starting — found by running `docker compose config` before this file was committed.
+
+  infisical-db:
+    profiles: ["vault"]
+    image: postgres:18.2-alpine
+    environment:
+      POSTGRES_USER: ${INFISICAL_DB_USER:-infisical}
+      POSTGRES_PASSWORD: ${INFISICAL_DB_PASSWORD:-}
+      POSTGRES_DB: ${INFISICAL_DB_NAME:-infisical}
+    volumes:
+      - infisical-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  infisical-redis:
+    profiles: ["vault"]
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "${INFISICAL_REDIS_PASSWORD:-}"]
+    volumes:
+      - infisical-redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a $${REDIS_PASSWORD:-$$INFISICAL_REDIS_PASSWORD} ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    environment:
+      INFISICAL_REDIS_PASSWORD: ${INFISICAL_REDIS_PASSWORD}
+
+  infisical:
+    profiles: ["vault"]
+    image: infisical/infisical:latest-postgres
+    environment:
+      # Generated once by the owner and kept in .env — `openssl rand -hex 16` and
+      # `openssl rand -base64 32`. Losing ENCRYPTION_KEY loses every secret in the vault.
+      ENCRYPTION_KEY: ${INFISICAL_ENCRYPTION_KEY:-}
+      AUTH_SECRET: ${INFISICAL_AUTH_SECRET:-}
+
+      # 8090, not 8080: the API already holds that port, and a vault that cannot start because the
+      # thing it serves is already listening is a bad first impression.
+      SITE_URL: ${INFISICAL_SITE_URL:-http://localhost:8090}
+
+      DB_CONNECTION_URI: postgres://${INFISICAL_DB_USER:-infisical}:${INFISICAL_DB_PASSWORD}@infisical-db:5432/${INFISICAL_DB_NAME:-infisical}
+      REDIS_URL: redis://default:${INFISICAL_REDIS_PASSWORD}@infisical-redis:6379
+
+      # No telemetry from a development machine.
+      TELEMETRY_ENABLED: "false"
+    ports:
+      - "${INFISICAL_HOST_PORT:-8090}:8080"
+    depends_on:
+      infisical-db:
+        condition: service_healthy
+      infisical-redis:
+        condition: service_healthy
+
 volumes:
   db-data:
+  infisical-db-data:
+  infisical-redis-data:
