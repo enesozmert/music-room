@@ -228,7 +228,7 @@ public sealed record PasswordResetResult(ResetPasswordOutcome Outcome, Guid? Use
 /// </remarks>
 public sealed record UserCredential(
     Guid UserId,
-    string PasswordHash,
+    string? PasswordHash,
     bool IsEmailVerified,
     string Email,
     string DisplayName);

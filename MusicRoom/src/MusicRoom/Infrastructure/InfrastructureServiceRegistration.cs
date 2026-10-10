@@ -5,6 +5,7 @@ using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Infrastructure.Catalog;
 using MusicRoom.Infrastructure.Configuration;
+using MusicRoom.Infrastructure.Identity;
 using MusicRoom.Infrastructure.Messaging;
 using MusicRoom.Infrastructure.Security;
 
@@ -67,6 +68,10 @@ public static class InfrastructureServiceRegistration
         // limit, and a provider concern belongs with its own wiring.
         CatalogRegistration.Add(services, options.Catalog);
 
+        // The relying-party core and its provider rows — ADR-0008, SPEC-041. An empty list is allowed: a host
+        // with no provider credentials still boots and still signs people in with a password.
+        SocialIdentityRegistration.Add(services, options.SocialProviders);
+
         return services;
     }
 }
@@ -84,6 +89,8 @@ public static class InfrastructureServiceRegistration
 /// <param name="Catalog">The YouTube key and the two cache lifetimes — ADR-0003, ADR-0023.</param>
 /// <param name="Jwt">The signing key, issuer, audience and access-token lifetime.</param>
 /// <param name="CredentialAttempts">The per-account credential limits — SPEC-006 escalation 1.</param>
+/// <param name="SocialProviders">The configured provider rows — ADR-0008's "a provider is a row", SPEC-041.
+/// Empty when no provider credentials are set, which is a host that signs people in with a password.</param>
 /// <remarks>
 /// Declared beside the registration rather than in its own file: it exists only as that method's
 /// parameter list, and SPEC-006's Files table is the contract for what this change may create.
@@ -94,4 +101,5 @@ public sealed record InfrastructureOptions(
     MailOptions Mail,
     CatalogOptions Catalog,
     JwtOptions Jwt,
-    CredentialAttemptLimits CredentialAttempts);
+    CredentialAttemptLimits CredentialAttempts,
+    IReadOnlyList<SocialProviderOptions> SocialProviders);

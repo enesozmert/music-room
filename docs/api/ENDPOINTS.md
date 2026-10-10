@@ -71,7 +71,7 @@ Subject V.1, V.5. Rules: [[authentication-authorization]], [[social-oauth]].
 | POST | `/auth/email-verifications` | `token` | `204` | `400`, `410` expired, `429` | `anon` |
 | POST | `/auth/verification-requests` | `email` | `202` | `429` | `anon` |
 | POST | `/auth/sessions` | `email`, `password` | `200` token pair | `401` generic, `429` | `anon` |
-| POST | `/auth/sessions/social` | `provider`, `idToken` | `200` token pair | `401`, `422`, `429` | `anon` |
+| POST | `/auth/sessions/social` | `provider`, `code`, `codeVerifier`, `redirectUri` | `200` token pair | `401`, `422`, `429` | `anon` |
 | POST | `/auth/tokens` | `refreshToken` | `200` rotated pair | `401`, `429` | `anon` |
 | DELETE | `/auth/sessions/current` | — | `204` | `401` | `auth` |
 | GET | `/auth/sessions` | — | `200` list | `401` | `self` |
@@ -80,7 +80,7 @@ Subject V.1, V.5. Rules: [[authentication-authorization]], [[social-oauth]].
 | POST | `/auth/password-resets` | `token`, `newPassword` | `204` | `400`, `410`, `422`, `429` | `anon` |
 | POST | `/me/password` | `currentPassword`, `newPassword` | `204` | `401`, `422`, `429` | `auth` |
 | GET | `/auth/social-links` | — | `200` list | `401` | `self` |
-| POST | `/auth/social-links` | `provider`, `idToken` | `201` | `409` already linked, `422` | `auth` |
+| POST | `/auth/social-links` | `provider`, `code`, `codeVerifier`, `redirectUri` | `201` | `409` already linked, `422` | `auth` |
 | DELETE | `/auth/social-links/{provider}` | — | `204` | `409` last sign-in method | `self` |
 
 #### OpenID Provider surface — S8
@@ -119,6 +119,16 @@ replacement passes.
   well-behaved client its session had ended and send it into a refresh-then-retry loop over a typo. There is
   nothing to hide either — the caller already knows which account this is — so the message says which check
   failed.
+- **The social routes take an authorization code, not an ID token** (SPEC-041, ADR-0008). The client runs the
+  authorization step with PKCE and sends `code` and `codeVerifier`; **this API exchanges them** at the
+  provider's token endpoint with the client secret, and validates the ID token that comes back. An ID token
+  posted by a client would be accepted on the strength of `aud` alone; a code the API exchanges itself is
+  evidence the flow ran where this API started it.
+- **A social sign-in creates an account the first time, and that account has no password.** Password sign-in
+  for it answers the same generic `401` every wrong credential answers, and `POST /me/password` answers `422`:
+  there is nothing to replace. Setting a first password is the reset flow, which already proves the address.
+- **An address the provider has not verified is refused** with `422` and `SOCIAL.EMAIL_UNVERIFIED`. Matching an
+  unverified address to an existing account is the account-takeover path ADR-0008 names.
 - **A password that was accepted yesterday can be refused today** (SPEC-035). Every route that chooses a
   password — `/auth/registrations`, `/auth/password-resets` and `/me/password` — now screens it against a set of
   known breached passwords bundled with the application and against the caller's own words: the project name, the

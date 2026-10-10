@@ -205,6 +205,30 @@ public static class ValidationCodes
     /// <summary>The window ends before it starts.</summary>
     public const string EndsAtBeforeStart = "ENDS_AT.BEFORE_START";
 
+    /// <summary>No provider was named.</summary>
+    public const string ProviderRequired = "PROVIDER.REQUIRED";
+
+    /// <summary>No configuration row names that provider — SPEC-041.</summary>
+    public const string ProviderUnknown = "PROVIDER.UNKNOWN";
+
+    /// <summary>No authorization code was sent.</summary>
+    public const string CodeRequired = "CODE.REQUIRED";
+
+    /// <summary>No PKCE verifier was sent.</summary>
+    public const string CodeVerifierRequired = "CODE_VERIFIER.REQUIRED";
+
+    /// <summary>No redirect URI was sent, or it is not an absolute one.</summary>
+    public const string RedirectUriInvalid = "REDIRECT_URI.INVALID";
+
+    /// <summary>The provider asserted an address it has not verified — ADR-0008's takeover path.</summary>
+    public const string SocialEmailUnverified = "SOCIAL.EMAIL_UNVERIFIED";
+
+    /// <summary>That identity already signs somebody in, or this account already has that provider.</summary>
+    public const string SocialAlreadyLinked = "SOCIAL.ALREADY_LINKED";
+
+    /// <summary>It is the account's only way in — SPEC-041.</summary>
+    public const string SocialLastSignInMethod = "SOCIAL.LAST_SIGN_IN_METHOD";
+
     /// <summary>
     /// A failure nobody decided — the `500` answer, issue O29 and SPEC-039.
     /// </summary>

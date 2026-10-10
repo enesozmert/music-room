@@ -86,7 +86,10 @@ internal sealed class ChangePasswordCommandHandler
             .FindCredentialByIdAsync(userId, cancellationToken)
             .ConfigureAwait(false);
 
-        if (credential is null || !_passwordHasher.Verify(request.CurrentPassword, credential.PasswordHash))
+        // A social-only account has nothing to replace, so it takes the same refusal a wrong current
+        // password takes — SPEC-041. Setting a first password is the reset flow, which proves the address.
+        if (credential?.PasswordHash is null
+            || !_passwordHasher.Verify(request.CurrentPassword, credential.PasswordHash))
         {
             // Charged, because a wrong current password is exactly the attempt this limiter exists to bound.
             _attempts.RecordChargeableAttempt(key);

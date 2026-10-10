@@ -247,7 +247,8 @@ public sealed class YouTubeCatalogProviderTests
             new CredentialAttemptLimits(
                 CredentialAttemptLimits.DefaultPermitsPerWindow,
                 TimeSpan.FromMinutes(CredentialAttemptLimits.DefaultWindowMinutes),
-                CredentialAttemptLimits.DefaultMaximumPenaltyWindows)));
+                CredentialAttemptLimits.DefaultMaximumPenaltyWindows),
+            []));
 
         services.AddHttpClient(nameof(ICatalogProvider))
             .ConfigurePrimaryHttpMessageHandler(() => transport);
