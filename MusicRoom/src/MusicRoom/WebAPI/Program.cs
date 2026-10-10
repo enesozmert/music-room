@@ -67,7 +67,8 @@ public class Program
 
         WebApplication app = builder.Build();
 
-        app.UseSerilogRequestLogging();
+        // The exception handler first and the request logger behind it — SPEC-039, issue O29.
+        ErrorHandling.Use(app);
 
         // Before authentication, because a browser's preflight carries no credentials and must be answered
         // whatever the request that follows it needs. The policy is the one `CORS_ALLOWED_ORIGINS` names, and an
@@ -492,7 +493,7 @@ internal static class ApiServices
     internal static void Add(IServiceCollection services, IConfiguration configuration)
     {
         services.AddOpenApi(options => ValidationProblemSchema.Declare(options));
-        services.AddProblemDetails();
+        ErrorHandling.Add(services);
         CredentialRateLimiterPolicies.Add(services, configuration);
         EventRateLimiterPolicies.Add(services);
         CatalogRateLimiterPolicies.Add(services);
