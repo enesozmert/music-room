@@ -1,13 +1,13 @@
 ---
 id: SPEC-041
 title: Sign in with Google — one validation core, the first of two acquisitions
-status: draft           # draft | approved | in-progress | done | blocked
+status: approved        # draft | approved | in-progress | done | blocked
 tier: B                 # A = routine, agent may self-approve if the gate is clean; B = human gate
 slice: S8               # which DELIVERY-PLAN slice this belongs to
 requirements: [V.1, V.6]
 decisions: [ADR-0008, ADR-0031, ADR-0045, ADR-0026]
 standards: [authentication-authorization, social-oauth, application-security, testing]
-approved_by:            # name, or "agent" for a clean Tier A gate
+approved_by: enesozmert # gates 1, 4 and 5 answered on 2026-10-10
 escalation: |
   **Gates 1, 4 and 5 are yes, and gate 1 is a contradiction the owner has to settle before any code.**
 
@@ -51,6 +51,26 @@ escalation: |
   so it is the second acquisition against the same core, and it cannot be tested at all until the mobile client
   exists — the ADR's own measurement says Facebook publishes no `token_endpoint` and no `code` response type.
   Shipping the core with one acquisition proves the core; adding the second then proves the core was general.
+
+  **Owner's answers, 2026-10-10: B, and the two proposals as written. Nothing beyond the subject.**
+
+  1. **B.** The app sends `code` and `codeVerifier`; this API exchanges them at Google's token endpoint with
+     `GOOGLE_CLIENT_SECRET`. `docs/api/ENDPOINTS.md` changes to match, which is gate 4 and is answered here.
+     ADR-0008's sentence about the secret staying on the server now describes something that happens.
+  2. **A social sign-in creates an account, and that account has no password.** `password_hash` becomes
+     nullable — a sentinel string would be a landmine the first time something compared against it. Password
+     sign-in for such an account answers the same generic `401` every wrong credential answers, because telling
+     a caller *"this address exists but has no password"* is an enumeration oracle. `POST /me/password`
+     answers `422` with `CURRENT_PASSWORD.REQUIRED`'s sibling, and setting a first password is the reset flow,
+     which already proves the address.
+  3. **The `nonce` lives in the database**, single-use, with a short expiry, beside the authentication it
+     belongs to. A second dependency shaped like Redis for a sixty-second value is the wrong trade at this
+     size, and ADR-0023 already refused that shape for a bigger reason.
+
+  **Scope is the subject and nothing else.** V.1 asks for two things — registering with a social account and
+  linking one to an existing account — and this unit builds those two and the four routes
+  `docs/api/ENDPOINTS.md` already publishes for them. No provider half, no Facebook, no endpoint the contract
+  does not already name.
 ---
 
 # Sign in with Google
@@ -100,8 +120,8 @@ numbered rather than described.
 | 6 | lowers a severity, deletes or skips a test? | no |
 | 7 | touches or copies from `reference/`? | no |
 
-Three yes answers, so Tier B, and gate 1 is the one that blocks: **the owner picks A or B before the Files
-table can be written.** Everything below assumes B and is marked where A would differ.
+Three yes answers, so Tier B. All three were answered by the owner on 2026-10-10 — B, and the two proposals
+as written. The Files table below is written against that answer.
 
 ## What the core does, once, for every provider
 
@@ -118,19 +138,56 @@ table can be written.** Everything below assumes B and is marked where A would d
 
 Step 3 is the part that names no provider. Steps 2 and 4 are where a provider row is read.
 
-## Open questions for the owner
+## Files
 
-1. **A or B**, which decides the request shape and whether `GOOGLE_CLIENT_SECRET` is used at all.
-2. **Does a social sign-in create an account?** Subject V.1 asks for registration with a social account, so the
-   answer is presumably yes — but then an account exists with no password, and `POST /me/password` requires a
-   current one. The spec proposes: a social-only account has no password, `POST /me/password` answers `422`
-   with a code saying so, and setting a first password is the reset flow, which already proves the address.
-3. **`nonce` needs somewhere to live** for the seconds between the authorization request and the callback.
-   The spec proposes the same table as the social link, single-use, with a short expiry — a second Redis-shaped
-   dependency for a sixty-second value would be the wrong trade at this size.
+| Path | Action |
+|---|---|
+| `MusicRoom/src/MusicRoom/Domain/Entities/SocialLink.cs` | create — `(provider, providerUserId)` to one account, unique on the pair |
+| `MusicRoom/src/MusicRoom/Domain/Entities/SocialAuthentication.cs` | create — the single-use `nonce` and its expiry, answer 3 |
+| `MusicRoom/src/MusicRoom/Domain/Entities/User.cs` | change — `PasswordHash` becomes nullable, answer 2 |
+| `MusicRoom/src/MusicRoom/Application/Abstractions/Identity/ISocialIdentityProvider.cs` | create — the core's seam: a code and a verifier in, a validated identity out |
+| `MusicRoom/src/MusicRoom/Application/Abstractions/Persistence/ISocialLinkRepository.cs` | create |
+| `MusicRoom/src/MusicRoom/Application/Features/Auth/Commands/SignInWithSocial/` | create — command, handler, validator |
+| `MusicRoom/src/MusicRoom/Application/Features/Auth/Commands/LinkSocialAccount/` | create — command, handler, validator |
+| `MusicRoom/src/MusicRoom/Application/Features/Auth/Commands/UnlinkSocialAccount/` | create — command, handler, validator |
+| `MusicRoom/src/MusicRoom/Application/Features/Auth/Queries/ListSocialLinks/` | create — query and handler |
+| `MusicRoom/src/MusicRoom/Infrastructure/Identity/OpenIdConnectIdentityProvider.cs` | create — **the core**: discovery, JWKS with rotation, the exchange, the six checks. Names no provider |
+| `MusicRoom/src/MusicRoom/Infrastructure/Identity/SocialProviderOptions.cs` | create — a provider is a configuration row |
+| `MusicRoom/src/MusicRoom/Infrastructure/InfrastructureServiceRegistration.cs` | change — register the core and the Google row |
+| `MusicRoom/src/MusicRoom/Persistence/Repositories/SocialLinkRepository.cs` | create |
+| `MusicRoom/src/MusicRoom/Persistence/Contexts/MusicRoomDbContext.cs` | change — two `DbSet`s and their configuration |
+| `MusicRoom/src/MusicRoom/Persistence/Migrations/` | create — one additive migration: two tables, one column made nullable |
+| `MusicRoom/src/MusicRoom/WebAPI/Endpoints/SocialAuthEndpoints.cs` | create — the four routes the contract already publishes |
+| `MusicRoom/src/MusicRoom/WebAPI/Endpoints/AuthEndpoints.cs` | change — map the new group |
+| `MusicRoom/src/MusicRoom/Application/Validation/ValidationCodes.cs` | change — the codes these routes answer with |
+| `MusicRoom/tests/MusicRoom.Application.Tests/Features/Auth/SocialSignInTests.cs` | create — the handler against a substituted provider |
+| `MusicRoom/tests/MusicRoom.Infrastructure.Tests/Identity/OpenIdConnectIdentityProviderTests.cs` | create — the six checks, each failing closed |
+| `MusicRoom/tests/MusicRoom.WebAPI.Tests/SocialAuthEndpointTests.cs` | create — the four routes end to end |
+| `docs/api/ENDPOINTS.md` | change — the social route's body, answer 1 |
+| `docs/api/openapi.json` | change — regenerated |
+| `brain/migrations/migrations-index.md` | change — the migration's row |
+| `docs/SDD.md` | change — §10.2, §16's two V.1 rows |
+| `docs/specs/SPEC-041-social-sign-in.md` | change — status transitions |
+
+## Verification
+
+```bash
+make agent-check
+```
+
+| Check | Proves |
+|---|---|
+| `OpenIdConnectIdentityProviderTests` — six tests, one per check | a bad signature, a wrong `iss`, a wrong `aud`, an expired token, a replayed `nonce` and an unverified email are each refused **on their own**, so no check is carrying another |
+| — the same core with two configuration rows | the core names no provider: the second row is Facebook's and it runs the same code |
+| `SocialSignInTests` | an unknown `(provider, providerUserId)` creates an account with no password; a known one signs in; an unverified email never matches an existing account |
+| `SocialAuthEndpointTests` | the four routes answer what the contract says, and a social-only account's `POST /me/password` answers `422` rather than `401` |
+| the 600 tests already passing | password sign-in is untouched: this unit adds, it removes nothing |
+| `make agent-check` | the regenerated document matches, and the migration applies |
 
 ## Done when
 
-- [ ] the owner has answered A or B, and questions 2 and 3
-- [ ] the Files table is written against that answer
-- [ ] status returns to `approved` and implementation begins
+- [ ] every file in the Files table exists and compiles
+- [ ] `make agent-check` passes
+- [ ] a provider is a configuration row, proven by running the core twice with two rows
+- [ ] nothing from S1's surface was removed — phase 1 of the migration plan is additive
+- [ ] `status: done` in this file
