@@ -101,7 +101,9 @@ internal sealed class LoginCommandHandler : IRequestHandler<LoginCommand, LoginR
         _audit.SetTargetId(credential.UserId);
 
         return LoginResult.Issued(
-            await _sessions.IssueAsync(credential.UserId, cancellationToken).ConfigureAwait(false));
+            await _sessions
+                .IssueAsync(credential.UserId, FirstPartySession.NoGrantedScope, cancellationToken)
+                .ConfigureAwait(false));
     }
 
     /// <summary>

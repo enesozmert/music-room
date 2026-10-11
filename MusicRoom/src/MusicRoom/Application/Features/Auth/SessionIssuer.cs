@@ -44,9 +44,20 @@ public sealed class SessionIssuer
 
     /// <summary>Issues the first pair of a new session.</summary>
     /// <param name="userId">The account signing in.</param>
+    /// <param name="grantedScope">
+    /// The scopes the authorization request asked for, or null for a first-party session — SPEC-045.
+    /// </param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>The pair the caller is answered with.</returns>
-    public async Task<AuthTokenPair> IssueAsync(Guid userId, CancellationToken cancellationToken)
+    /// <remarks>
+    /// Null is what the credential endpoints pass: nobody asked for a scope there, because the client is the
+    /// account's own. `GET /oauth2/userinfo` reads this through the session and answers accordingly, which is
+    /// why the value is written here rather than into the access token — SDD §13.1 fixes that token's claims.
+    /// </remarks>
+    public async Task<AuthTokenPair> IssueAsync(
+        Guid userId,
+        string? grantedScope,
+        CancellationToken cancellationToken)
     {
         DateTime nowUtc = DateTime.UtcNow;
         string plaintext = RefreshTokenSecret.Create();
@@ -72,6 +83,7 @@ public sealed class SessionIssuer
             Platform = client.Platform,
             Device = client.Device,
             AppVersion = client.AppVersion,
+            Scope = grantedScope,
         };
 
         await _refreshTokens.IssueAsync(token, cancellationToken).ConfigureAwait(false);
@@ -80,4 +92,23 @@ public sealed class SessionIssuer
 
         return new AuthTokenPair(accessToken.Token, plaintext, accessToken.ExpiresInSeconds);
     }
+}
+
+/// <summary>
+/// What the credential endpoints pass as a granted scope — SPEC-045 decision 2.
+/// </summary>
+/// <remarks>
+/// A named constant rather than a bare `null` at four call sites, because `null` there reads as an oversight
+/// and this one is a decision: a session from `POST /auth/sessions` or `POST /auth/sessions/social` has no
+/// granted scope, since nobody asked for one. `GET /oauth2/userinfo` answers such a caller the full claim
+/// set — it is the person's own account, and `GET /me` already returns strictly more.
+/// <para>
+/// It shares this file with the issuer it is passed to, the way <c>RefreshTokenSecret</c> shares
+/// <c>AuthTokenPair.cs</c>: it exists only as that method's argument.
+/// </para>
+/// </remarks>
+public static class FirstPartySession
+{
+    /// <summary>No scope was granted, because none was asked for.</summary>
+    public const string? NoGrantedScope = null;
 }

@@ -44,6 +44,12 @@ internal static class OAuth2Driver
     /// <summary>Where the authorization endpoint lives.</summary>
     internal const string AuthorizePath = "/oauth2/authorize";
 
+    /// <summary>Where UserInfo lives — SPEC-045.</summary>
+    internal const string UserInfoPath = "/oauth2/userinfo";
+
+    /// <summary>Where revocation lives — SPEC-045.</summary>
+    internal const string RevocationPath = "/oauth2/revoke";
+
     /// <summary>The value a client sends to recognise its own request.</summary>
     internal const string State = "the-clients-own-state";
 
@@ -86,26 +92,92 @@ internal static class OAuth2Driver
     internal static HttpClient Redirectless(WebApplicationFactory<Program> factory) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
+    /// <summary>
+    /// Drives the whole flow and returns the pair it ends with, plus a client holding the access token.
+    /// </summary>
+    /// <param name="factory">The test host.</param>
+    /// <param name="mail">The recording sender.</param>
+    /// <param name="email">The address to create.</param>
+    /// <param name="scope">The scopes to ask for, which is what UserInfo then filters on.</param>
+    /// <returns>A client presenting the granted access token, and the raw token response.</returns>
+    internal static async Task<(HttpClient Client, JsonDocument Body)> GrantedAsync(
+        WebApplicationFactory<Program> factory,
+        RecordingMailService mail,
+        string email,
+        string scope)
+    {
+        using HttpClient signedIn = await SignedInAsync(factory, mail, email);
+
+        string verifier = OAuth2Checks.Verifier();
+
+        using HttpResponseMessage redirected = await signedIn.GetAsync(
+            Authorize(PkceChallenge.Of(verifier), PkceChallenge.Method, null, new AuthorizeOverrides(Scope: scope)),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Found, redirected.StatusCode);
+
+        using HttpResponseMessage exchanged = await ExchangeAsync(
+            factory, OAuth2Checks.Returned(redirected)["code"].ToString(), verifier);
+
+        Assert.Equal(HttpStatusCode.OK, exchanged.StatusCode);
+
+        JsonDocument body = JsonDocument.Parse(
+            await exchanged.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+
+        HttpClient granted = factory.CreateAuditedClient();
+        granted.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            body.RootElement.GetProperty("access_token").GetString());
+
+        return (granted, body);
+    }
+
+    /// <summary>Reads UserInfo with a client that holds an access token.</summary>
+    /// <param name="client">The authenticated client.</param>
+    /// <returns>The response.</returns>
+    internal static Task<HttpResponseMessage> UserInfoAsync(HttpClient client) =>
+        client.GetAsync(new Uri(UserInfoPath, UriKind.Relative), TestContext.Current.CancellationToken);
+
+    /// <summary>Posts a revocation.</summary>
+    /// <param name="factory">The test host.</param>
+    /// <param name="token">The token to revoke.</param>
+    /// <param name="hint">A `token_type_hint`, or null to send none.</param>
+    /// <returns>The response.</returns>
+    internal static Task<HttpResponseMessage> RevokeAsync(
+        WebApplicationFactory<Program> factory,
+        string token,
+        string? hint = null)
+    {
+        Dictionary<string, string> form = new(StringComparer.Ordinal) { ["token"] = token };
+
+        if (hint is not null)
+        {
+            form["token_type_hint"] = hint;
+        }
+
+        return PostFormAsync(factory, RevocationPath, form);
+    }
+
     /// <summary>The authorization request a conforming client sends.</summary>
     /// <param name="challenge">The PKCE challenge.</param>
     /// <param name="method">The challenge method. `S256`, or `plain` to prove it is refused.</param>
     /// <param name="nonce">The nonce, or null to prove none is invented.</param>
-    /// <param name="clientId">The client, overridable to prove an unknown one is refused.</param>
-    /// <param name="redirectUri">The URI, overridable to prove an unregistered one is refused.</param>
+    /// <param name="overrides">What to send instead of the defaults, or null for all of them.</param>
     /// <returns>The relative URL, query string included.</returns>
     internal static string Authorize(
         string challenge,
         string method,
         string? nonce,
-        string clientId = ClientId,
-        string redirectUri = RedirectUri)
+        AuthorizeOverrides? overrides = null)
     {
+        AuthorizeOverrides sent = overrides ?? new AuthorizeOverrides();
+
         Dictionary<string, string?> parameters = new(StringComparer.Ordinal)
         {
             ["response_type"] = "code",
-            ["client_id"] = clientId,
-            ["redirect_uri"] = redirectUri,
-            ["scope"] = "openid",
+            ["client_id"] = sent.ClientId,
+            ["redirect_uri"] = sent.RedirectUri,
+            ["scope"] = sent.Scope,
             ["state"] = State,
             ["code_challenge"] = challenge,
             ["code_challenge_method"] = method,
@@ -132,7 +204,7 @@ internal static class OAuth2Driver
 
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
 
-        Dictionary<string, StringValues> returned = Returned(response);
+        Dictionary<string, StringValues> returned = OAuth2Checks.Returned(response);
 
         Assert.Equal(State, returned["state"].ToString());
 
@@ -163,14 +235,25 @@ internal static class OAuth2Driver
     /// <param name="factory">The test host.</param>
     /// <param name="form">The grant parameters.</param>
     /// <returns>The response.</returns>
-    internal static async Task<HttpResponseMessage> PostAsync(
+    internal static Task<HttpResponseMessage> PostAsync(
         WebApplicationFactory<Program> factory,
+        Dictionary<string, string> form) =>
+        PostFormAsync(factory, TokenPath, form);
+
+    /// <summary>Posts a form to one of the provider's routes, with the mandatory client headers.</summary>
+    /// <param name="factory">The test host.</param>
+    /// <param name="path">The route.</param>
+    /// <param name="form">The parameters.</param>
+    /// <returns>The response.</returns>
+    internal static async Task<HttpResponseMessage> PostFormAsync(
+        WebApplicationFactory<Program> factory,
+        string path,
         Dictionary<string, string> form)
     {
         using HttpClient client = factory.CreateAuditedClient();
 
         return await client.PostAsync(
-            new Uri(TokenPath, UriKind.Relative),
+            new Uri(path, UriKind.Relative),
             new FormUrlEncodedContent(form),
             TestContext.Current.CancellationToken);
     }
@@ -218,49 +301,15 @@ internal static class OAuth2Driver
                     DateTime.UtcNow.AddSeconds(-1)),
                 TestContext.Current.CancellationToken);
     }
-
-    /// <summary>The query parameters a redirect carried back.</summary>
-    /// <param name="response">The `302`.</param>
-    /// <returns>The parsed query.</returns>
-    internal static Dictionary<string, StringValues> Returned(HttpResponseMessage response)
-    {
-        Uri location = response.Headers.Location!;
-
-        return QueryHelpers.ParseQuery(location.Query);
-    }
-
-    /// <summary>Asserts an RFC 6749 §5.2 error object.</summary>
-    /// <param name="response">The refusal.</param>
-    /// <param name="status">The status expected.</param>
-    /// <param name="error">The specification's error code expected.</param>
-    /// <returns>A task that completes when the body has been read.</returns>
-    internal static async Task AssertErrorAsync(
-        HttpResponseMessage response,
-        HttpStatusCode status,
-        string error)
-    {
-        Assert.Equal(status, response.StatusCode);
-
-        using JsonDocument body = JsonDocument.Parse(
-            await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-
-        Assert.Equal(error, body.RootElement.GetProperty("error").GetString());
-    }
-
-    /// <summary>Asserts ADR-0045's `code` member on a ProblemDetails refusal.</summary>
-    /// <param name="response">The refusal.</param>
-    /// <param name="code">The code expected.</param>
-    /// <returns>A task that completes when the body has been read.</returns>
-    internal static async Task AssertCodeAsync(HttpResponseMessage response, string code)
-    {
-        using JsonDocument body = JsonDocument.Parse(
-            await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
-
-        Assert.Equal(code, body.RootElement.GetProperty("code").GetString());
-    }
-
-    /// <summary>A verifier of the length RFC 7636 asks for, from the generator a client would use.</summary>
-    /// <returns>The verifier.</returns>
-    internal static string Verifier() =>
-        System.Buffers.Text.Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
 }
+
+/// <summary>
+/// What a test sends instead of the defaults — one record, because six parameters is one over the limit.
+/// </summary>
+/// <param name="ClientId">The client, overridable to prove an unknown one is refused.</param>
+/// <param name="RedirectUri">The URI, overridable to prove an unregistered one is refused.</param>
+/// <param name="Scope">What to ask for, which is what UserInfo then filters on.</param>
+internal sealed record AuthorizeOverrides(
+    string ClientId = OAuth2Driver.ClientId,
+    string RedirectUri = OAuth2Driver.RedirectUri,
+    string Scope = "openid");
