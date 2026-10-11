@@ -150,6 +150,22 @@ public sealed class MailTemplateTests
         Assert.DoesNotContain("href=\"\"", mail.Html, StringComparison.Ordinal);
     }
 
+    /// <summary>The footer names the product, not the school — owner's correction, 2026-10-12.</summary>
+    /// <remarks>
+    /// Mail goes to people who do not know what École 42 is and have no reason to. A test because the
+    /// footer is in a layout nobody opens twice, and the next person to edit it should be told what it
+    /// has to say.
+    /// </remarks>
+    [Fact]
+    public void TheFooter_NamesTheProduct()
+    {
+        RenderedMail mail = CredentialMailTemplates.Verification(Verification(MailLanguage.English), _linkBase);
+
+        Assert.Contains("musicroomaiapp", mail.Html, StringComparison.Ordinal);
+        Assert.Contains("musicroomaiapp", mail.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("École", mail.Html, StringComparison.Ordinal);
+    }
+
     private static VerificationMail Verification(MailLanguage language) =>
         new("reader@example.com", "Reader", "a-verification-token", "ABC234", language);
 

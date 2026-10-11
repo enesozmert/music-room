@@ -11,4 +11,4 @@ MUSIC ROOM
 {{footer}}
 
 --
-Music Room · École 42
+Music Room · musicroomaiapp
