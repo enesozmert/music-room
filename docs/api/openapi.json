@@ -5,6 +5,79 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/oauth2/authorize": {
+      "get": {
+        "tags": [
+          "OAuth2Endpoints"
+        ],
+        "summary": "Authorization endpoint — authorization code flow with PKCE",
+        "description": "Takes `response_type=code`, `client_id`, `redirect_uri`, `scope`, `state`, `nonce`, `code_challenge` and `code_challenge_method=S256`, and answers 302 to the registered redirect URI with a single-use code that expires in 60 seconds. It requires a bearer access token: this provider has no login page, so the account signs in through the credential endpoints first — SPEC-044, the owner's answer A. An unknown client or an unregistered redirect URI answers 400 without redirecting, because sending an error to a URI nobody registered is the open redirect the registry exists to prevent.",
+        "operationId": "GetOAuth2Authorize",
+        "responses": {
+          "302": {
+            "description": "Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/oauth2/token": {
+      "post": {
+        "tags": [
+          "OAuth2TokenEndpoint"
+        ],
+        "summary": "Token endpoint — code exchange and refresh",
+        "description": "Form-encoded, as RFC 6749 requires. With `grant_type=authorization_code` it takes `code`, `code_verifier`, `client_id` and `redirect_uri`, spends the code once, and answers an access token, an ID token and a refresh token. With `grant_type=refresh_token` it takes `refresh_token` and rotates the session, which revokes the whole family if a spent token is presented. There is no `grant_type=password`: OAuth 2.1 removes it. Errors are RFC 6749 §5.2 objects, not ProblemDetails.",
+        "operationId": "PostOAuth2Token",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenGrantResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
     "/.well-known/openid-configuration": {
       "get": {
         "tags": [
@@ -3440,6 +3513,8 @@
         "required": [
           "issuer",
           "jwks_uri",
+          "authorization_endpoint",
+          "token_endpoint",
           "id_token_signing_alg_values_supported",
           "subject_types_supported",
           "response_types_supported",
@@ -3455,6 +3530,14 @@
           "jwks_uri": {
             "type": "string",
             "description": "Where the public keys are."
+          },
+          "authorization_endpoint": {
+            "type": "string",
+            "description": "Where the code flow starts — SPEC-044. It requires a bearer token,\n    which is this provider's first-party limitation and is recorded in ADR-0031 rather than here: a discovery\n    document has no member for \"and the account must already be signed in\"."
+          },
+          "token_endpoint": {
+            "type": "string",
+            "description": "Where a code is exchanged and a session is rotated."
           },
           "id_token_signing_alg_values_supported": {
             "type": "array",
@@ -3475,14 +3558,14 @@
             "items": {
               "type": "string"
             },
-            "description": "Empty until the authorization endpoint exists."
+            "description": "`code`, and nothing else: no implicit flow and no hybrid."
           },
           "grant_types_supported": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "Empty until the token endpoint exists."
+            "description": "`authorization_code` and `refresh_token`."
           },
           "code_challenge_methods_supported": {
             "type": "array",
@@ -4014,6 +4097,19 @@
         },
         "description": "The music preferences payload — `docs/api/ENDPOINTS.md` §2."
       },
+      "OAuthErrorResponse": {
+        "required": [
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "The specification's code: `invalid_request`, `invalid_client`, `invalid_grant` or\n    `unsupported_grant_type`."
+          }
+        },
+        "description": "A refused grant — RFC 6749 §5.2."
+      },
       "OwnProfileResponse": {
         "required": [
           "displayName",
@@ -4423,6 +4519,51 @@
         },
         "description": "The evidence a voter supplies — `presence` in `docs/api/ENDPOINTS.md` §4."
       },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The stable code for a refusal that names no field, such as a wrong current password — ADR-0045."
+          }
+        }
+      },
       "ProfileDateFieldRequest": {
         "required": [
           "value",
@@ -4745,6 +4886,55 @@
         },
         "description": "The suggestion payload — `docs/api/ENDPOINTS.md` §4."
       },
+      "TokenGrantResponse": {
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "refresh_token",
+          "id_token",
+          "scope"
+        ],
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "The bearer token every other endpoint takes."
+          },
+          "token_type": {
+            "type": "string",
+            "description": "`Bearer`, and nothing else."
+          },
+          "expires_in": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "The access token's lifetime in seconds, for the client's own planning.",
+            "format": "int32"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "The opaque refresh token. Rotated on every use."
+          },
+          "id_token": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The RS256 assertion of who authenticated, on the code grant only."
+          },
+          "scope": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "What was granted, on the code grant only."
+          }
+        },
+        "description": "The successful token response — RFC 6749 §5.1, with OpenID Connect's `id_token`."
+      },
       "TokenPairResponse": {
         "required": [
           "accessToken",
@@ -5046,6 +5236,12 @@
     }
   },
   "tags": [
+    {
+      "name": "OAuth2Endpoints"
+    },
+    {
+      "name": "OAuth2TokenEndpoint"
+    },
     {
       "name": "OpenIdMetadataEndpoints"
     },

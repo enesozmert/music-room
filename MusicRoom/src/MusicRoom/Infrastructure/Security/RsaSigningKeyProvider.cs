@@ -121,9 +121,14 @@ public sealed class RsaSigningKeyProvider : ISigningKeyProvider
                 $"{variable} is {rsa.KeySize} bits; RS256 needs at least {MinimumKeySizeBits}.");
         }
 
-        RsaSecurityKey key = new(rsa);
+        string keyId = Thumbprint(rsa);
 
-        return new SigningKeyMaterial(Thumbprint(rsa), key);
+        // The identifier on the key itself, not only beside it: `JsonWebTokenHandler` reads it to write the
+        // `kid` header of everything it signs, and a token whose header names no key forces a verifier to
+        // try every published one — which it cannot do meaningfully during a rotation overlap. SPEC-044.
+        RsaSecurityKey key = new(rsa) { KeyId = keyId };
+
+        return new SigningKeyMaterial(keyId, key);
     }
 
     /// <summary>The `kid`: a base64url SHA-256 thumbprint of the public key, per RFC 7638's shape.</summary>

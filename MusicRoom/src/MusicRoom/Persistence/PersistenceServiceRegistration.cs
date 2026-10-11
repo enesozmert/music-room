@@ -57,6 +57,7 @@ internal static class IdentityRepositories
         services.AddScoped<IProfileRepository, ProfileRepository>();
         services.AddScoped<IFriendshipRepository, FriendshipRepository>();
         services.AddScoped<ISocialLinkRepository, SocialLinkRepository>();
+        services.AddScoped<IAuthorizationCodeRepository, AuthorizationCodeRepository>();
 
         // Its own registration because it is its own file: UserRepository is at 293 code lines of the 300 S104
         // enforces (issue O27), and the reset path's context read goes beside it rather than into it — SPEC-035.

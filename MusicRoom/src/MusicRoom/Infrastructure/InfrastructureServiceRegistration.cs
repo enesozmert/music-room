@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MusicRoom.Application.Abstractions.Configuration;
+using MusicRoom.Application.Abstractions.Identity;
 using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Infrastructure.Catalog;
@@ -57,6 +58,16 @@ public static class InfrastructureServiceRegistration
         // is read once and a key that changed between requests would invalidate what the last one signed.
         services.AddSingleton<ISigningKeyProvider>(provider =>
             new RsaSigningKeyProvider(provider.GetRequiredService<ISecretProvider>()));
+
+        // The provider's own two pieces — SPEC-044. The clients are configuration rather than a table, so
+        // the registry reads them once; the ID token issuer holds the signing credentials and no request
+        // state. Both read through the abstractions above rather than growing `InfrastructureOptions`, which
+        // is already past the argument limit this method answers with one record.
+        services.AddSingleton<IOpenIdClientRegistry>(provider =>
+            new ConfiguredOpenIdClientRegistry(provider.GetRequiredService<ISecretProvider>()));
+
+        services.AddSingleton<IIdTokenIssuer>(provider =>
+            new IdTokenIssuer(provider.GetRequiredService<ISigningKeyProvider>()));
 
         // Singleton on purpose: the attempt history is the whole point, and a scoped limiter would
         // forget every failure at the end of the request that recorded it.
