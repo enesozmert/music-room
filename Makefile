@@ -121,6 +121,16 @@ restore: ## restore a dump into the compose database: make restore FILE=backups/
 	docker compose exec -T db psql -v ON_ERROR_STOP=1 -U "$$POSTGRES_USER" -d "$$POSTGRES_DB" < "$(FILE)"; \
 	echo "restored $(FILE)"
 
+# Both workflows call this target — issue O30, closed by SPEC-048. The generator boots the real host, so
+# every start-up requirement has to be satisfied in its environment, and three copies of that list diverge
+# the first time one grows: SPEC-043 added OIDC_SIGNING_KEY here, the local gate passed, and CI failed
+# because the workflows carried their own copy. SPEC-024's mail guard and SPEC-005's JWT settings had
+# already done the same thing. One list, here.
+#
+# CI passes `--no-restore`, because it restored in an earlier step and a second restore is a network round
+# trip for nothing. The default is empty, so a local run behaves as it always did.
+OPENAPI_BUILD_FLAGS ?=
+
 openapi: ## regenerate docs/api/openapi.json from the code
 	# The generator boots the real host to read the document off it, so every start-up requirement has
 	# to be satisfied. The environment is Development because a document build is a development-time
@@ -139,7 +149,7 @@ openapi: ## regenerate docs/api/openapi.json from the code
 	JWT_ACCESS_TOKEN_MINUTES="$(OPENAPI_JWT_ACCESS_TOKEN_MINUTES)" \
 	dotnet build \
 		MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj \
-		-p:GenerateOpenApiDocument=true
+		$(OPENAPI_BUILD_FLAGS) -p:GenerateOpenApiDocument=true
 
 CYCLES ?= 3
 

@@ -57,30 +57,16 @@ jobs:
           fi
 
       # openapi-documentation: the committed document must match the code that generated it.
-      # The generator boots the host, which refuses to start without DATABASE_URL. The value below
-      # is a placeholder, not a secret: generation never opens a socket.
+      # Through `make openapi`, so the environment the generator needs is defined in exactly one place —
+      # issue O30. The generator boots the real host, so every start-up requirement has to be satisfied,
+      # and three copies of that list diverge the first time one grows: SPEC-043 added OIDC_SIGNING_KEY to
+      # the Makefile, the local gate passed, and this workflow failed because it carried its own copy.
+      # SPEC-024's mail guard and SPEC-005's JWT settings had already done the same thing twice.
+      #
+      # `--no-restore` because the Restore step above already did it. Everything else — the placeholder
+      # connection string, the placeholder JWT settings, the logging mail sender and the generated RS256
+      # key that is thrown away — is in the Makefile, with the comment explaining why each is safe here.
       - name: OpenAPI document is current
-        env:
-          DATABASE_URL: Host=localhost;Port=5432;Database=openapi;Username=openapi;Password=unused
-          # SPEC-005 made the JWT settings start-up requirements, and the host refuses a signing key
-          # under 32 bytes. Placeholders on the same footing as the connection string: the document
-          # build signs no token. Never reuse them where a real token is issued.
-          JWT_SIGNING_KEY: openapi-document-build-placeholder-key-not-a-secret
-          JWT_ISSUER: musicroom-openapi
-          JWT_AUDIENCE: musicroom-openapi
-          JWT_ACCESS_TOKEN_MINUTES: 15
-          # The OpenAPI generator boots the real host; the SPEC-003 start-up guard
-          # refuses an IMailService outside Development.
-          ASPNETCORE_ENVIRONMENT: Development
-          # SPEC-024 made a mail sender a start-up requirement too, so the document build needs one.
-          # `logging` opens no socket and needs no provider key: generating a document sends nothing.
-          MAIL_PROVIDER: logging
         run: |
-          # SPEC-043 made the RS256 signing key a start-up requirement, and this project never generates
-          # one for itself — a generated key is one nobody backed up. Generated here and thrown away: the
-          # document describes routes, not signatures, so nothing it produces depends on which key it was.
-          # A fixed key in this file would be a private key in a public repository.
-          export OIDC_SIGNING_KEY="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null)"
-          dotnet build MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj \
-            --no-restore -p:GenerateOpenApiDocument=true
+          make openapi OPENAPI_BUILD_FLAGS=--no-restore
           git diff --exit-code -- docs/api/openapi.json
