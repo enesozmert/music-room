@@ -78,6 +78,59 @@
         }
       }
     },
+    "/oauth2/userinfo": {
+      "get": {
+        "tags": [
+          "OAuth2UserInfoEndpoints"
+        ],
+        "summary": "UserInfo endpoint",
+        "description": "The claims the session's grant allows — OpenID Connect Core 1.0 §5.3. `sub` always; `email` and `email_verified` when the `email` scope was granted; `name` when `profile` was. A session opened by the credential endpoints granted no scope and receives all of them, because the caller is the account's own client. The subject comes from the validated token and never from a parameter.",
+        "operationId": "GetOAuth2UserInfo",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfoResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/oauth2/revoke": {
+      "post": {
+        "tags": [
+          "OAuth2UserInfoEndpoints"
+        ],
+        "summary": "Revocation endpoint",
+        "description": "Form-encoded `token`, with an optional `token_type_hint` — RFC 7009. Revoking a refresh token ends its whole session: every token descended from the same sign-in stops rotating. An unknown or already-revoked token answers 200 as well, so the endpoint is not an oracle for which tokens exist. `token_type_hint=access_token` answers 400 `unsupported_token_type`, because a short-lived signed access token is not revocable here and a 200 would say otherwise.",
+        "operationId": "PostOAuth2Revoke",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
     "/.well-known/openid-configuration": {
       "get": {
         "tags": [
@@ -3515,6 +3568,9 @@
           "jwks_uri",
           "authorization_endpoint",
           "token_endpoint",
+          "userinfo_endpoint",
+          "revocation_endpoint",
+          "scopes_supported",
           "id_token_signing_alg_values_supported",
           "subject_types_supported",
           "response_types_supported",
@@ -3538,6 +3594,21 @@
           "token_endpoint": {
             "type": "string",
             "description": "Where a code is exchanged and a session is rotated."
+          },
+          "userinfo_endpoint": {
+            "type": "string",
+            "description": "Where the claims a grant allows are read — SPEC-045."
+          },
+          "revocation_endpoint": {
+            "type": "string",
+            "description": "Where a refresh token ends its session — RFC 7009."
+          },
+          "scopes_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`openid`, `profile`, `email` — each with a claim behind it."
           },
           "id_token_signing_alg_values_supported": {
             "type": "array",
@@ -5126,6 +5197,43 @@
         },
         "description": "The profile update payload — `docs/api/ENDPOINTS.md` §2."
       },
+      "UserInfoResponse": {
+        "required": [
+          "sub",
+          "email",
+          "email_verified",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "sub": {
+            "type": "string",
+            "description": "The `sub`, which is the account's id."
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The address, when `email` was granted."
+          },
+          "email_verified": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Whether this API has proof of it, under the same scope."
+          },
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The display name, when `profile` was granted."
+          }
+        },
+        "description": "The UserInfo response — OpenID Connect Core 1.0 §5.1, with the members this provider can honour."
+      },
       "UserSearchResult": {
         "required": [
           "userId",
@@ -5241,6 +5349,9 @@
     },
     {
       "name": "OAuth2TokenEndpoint"
+    },
+    {
+      "name": "OAuth2UserInfoEndpoints"
     },
     {
       "name": "OpenIdMetadataEndpoints"

@@ -1058,6 +1058,11 @@ namespace MusicRoom.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("revoked_at_utc");
 
+                    b.Property<string>("Scope")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("scope");
+
                     b.Property<string>("TokenHash")
                         .IsRequired()
                         .HasMaxLength(64)

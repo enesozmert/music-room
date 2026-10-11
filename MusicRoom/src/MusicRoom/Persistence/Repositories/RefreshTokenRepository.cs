@@ -105,6 +105,50 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
     }
 
     /// <inheritdoc />
+    public async Task<bool> TryRevokeByTokenAsync(
+        string tokenHash,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        // The family is read from the presented row and revoked in the same statement's shape as logout's:
+        // one indexed UPDATE over every unrevoked row of the family the token belongs to. A token that is
+        // unknown, or whose family is already revoked, affects nothing — and the endpoint answers 200 anyway.
+        Guid? familyId = await _context.RefreshTokens
+            .AsNoTracking()
+            .Where(token => token.TokenHash == tokenHash)
+            .Select(token => (Guid?)token.FamilyId)
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (familyId is not { } family)
+        {
+            return false;
+        }
+
+        return await RevokeFamilyAsync(family, nowUtc, cancellationToken).ConfigureAwait(false) > 0;
+    }
+
+    /// <inheritdoc />
+    public async Task<GrantedScope> FindGrantedScopeAsync(
+        Guid userId,
+        Guid familyId,
+        CancellationToken cancellationToken)
+    {
+        // The account is in the predicate, so another account's session does not match rather than being
+        // read and then rejected. Any row of the family answers: the scope is the family's, and every
+        // replacement inherits it.
+        List<string?> scopes = await _context.RefreshTokens
+            .AsNoTracking()
+            .Where(token => token.FamilyId == familyId && token.UserId == userId)
+            .Select(token => token.Scope)
+            .Take(1)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return scopes.Count == 0 ? GrantedScope.None : new GrantedScope(true, scopes[0]);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<SessionSummary>> ListSessionsAsync(
         Guid userId,
         DateTime nowUtc,
@@ -166,6 +210,10 @@ internal sealed class RefreshTokenRepository : IRefreshTokenRepository
         replacement.Platform = spent.Platform;
         replacement.Device = spent.Device;
         replacement.AppVersion = spent.AppVersion;
+
+        // And it carries the same grant — SPEC-045. Inherited rather than re-read from a request, because a
+        // rotation continues a session and must not widen what it was granted.
+        replacement.Scope = spent.Scope;
 
         _context.RefreshTokens.Add(replacement);
 

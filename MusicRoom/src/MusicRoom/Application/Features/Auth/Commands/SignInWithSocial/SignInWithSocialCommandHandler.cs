@@ -88,7 +88,7 @@ internal sealed class SignInWithSocialCommandHandler
         if (existing is { } userId)
         {
             return SignInWithSocialResult.Issued(
-                await _sessions.IssueAsync(userId, cancellationToken).ConfigureAwait(false));
+                await IssueAsync(userId, cancellationToken).ConfigureAwait(false));
         }
 
         if (!identity.IsEmailVerified || string.IsNullOrWhiteSpace(identity.Email))
@@ -144,7 +144,7 @@ internal sealed class SignInWithSocialCommandHandler
         if (registered)
         {
             return SignInWithSocialResult.Issued(
-                await _sessions.IssueAsync(userId, cancellationToken).ConfigureAwait(false));
+                await IssueAsync(userId, cancellationToken).ConfigureAwait(false));
         }
 
         Guid? winner = await _links
@@ -154,7 +154,7 @@ internal sealed class SignInWithSocialCommandHandler
         if (winner is { } wonUserId)
         {
             return SignInWithSocialResult.Issued(
-                await _sessions.IssueAsync(wonUserId, cancellationToken).ConfigureAwait(false));
+                await IssueAsync(wonUserId, cancellationToken).ConfigureAwait(false));
         }
 
         // The address is registered to an account this identity is not linked to. Linking it here would be
@@ -163,6 +163,16 @@ internal sealed class SignInWithSocialCommandHandler
 
         return SignInWithSocialResult.Refused(SignInWithSocialOutcome.Refused);
     }
+
+    /// <summary>Opens a session for an account this provider just authenticated.</summary>
+    /// <remarks>
+    /// `FirstPartySession.NoGrantedScope`, because this is not the authorization code flow: nobody asked for
+    /// a scope, so `GET /oauth2/userinfo` answers this session the full claim set — SPEC-045 decision 2.
+    /// Wrapped in one method rather than repeated at three call sites, which is also what keeps
+    /// `RegisterAsync` inside the 40-line method limit the root .editorconfig enforces (S138).
+    /// </remarks>
+    private Task<AuthTokenPair> IssueAsync(Guid userId, CancellationToken cancellationToken) =>
+        _sessions.IssueAsync(userId, FirstPartySession.NoGrantedScope, cancellationToken);
 
     /// <summary>The account a verified provider identity becomes.</summary>
     /// <remarks>

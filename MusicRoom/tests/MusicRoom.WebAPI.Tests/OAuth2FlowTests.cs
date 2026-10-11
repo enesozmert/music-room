@@ -73,7 +73,7 @@ public sealed class OAuth2FlowTests : IAsyncLifetime
         using HttpClient signedIn = await OAuth2Driver.SignedInAsync(
             _factory, _mail, "oauth-flow@example.com");
 
-        string verifier = OAuth2Driver.Verifier();
+        string verifier = OAuth2Checks.Verifier();
 
         // Act
         string code = await OAuth2Driver.AuthorizeAsync(signedIn, verifier, nonce: "client-chose-this");
@@ -113,7 +113,7 @@ public sealed class OAuth2FlowTests : IAsyncLifetime
         using HttpClient signedIn = await OAuth2Driver.SignedInAsync(
             _factory, _mail, "oauth-access@example.com");
 
-        string verifier = OAuth2Driver.Verifier();
+        string verifier = OAuth2Checks.Verifier();
         string code = await OAuth2Driver.AuthorizeAsync(signedIn, verifier, nonce: null);
 
         using HttpResponseMessage exchanged = await OAuth2Driver.ExchangeAsync(_factory, code, verifier);
@@ -193,12 +193,12 @@ public sealed class OAuth2FlowTests : IAsyncLifetime
         using HttpResponseMessage replayed = await RefreshAsync(pair.RefreshToken);
 
         // Assert
-        await OAuth2Driver.AssertErrorAsync(replayed, HttpStatusCode.BadRequest, "invalid_grant");
+        await OAuth2Checks.AssertErrorAsync(replayed, HttpStatusCode.BadRequest, "invalid_grant");
 
         // And the family it belonged to is gone with it, so the rotated token is worthless too.
         using HttpResponseMessage afterRevocation = await RefreshAsync(rotated);
 
-        await OAuth2Driver.AssertErrorAsync(afterRevocation, HttpStatusCode.BadRequest, "invalid_grant");
+        await OAuth2Checks.AssertErrorAsync(afterRevocation, HttpStatusCode.BadRequest, "invalid_grant");
     }
 
     private Task<HttpResponseMessage> RefreshAsync(string refreshToken) =>

@@ -47,6 +47,7 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
     private static void MapClientColumns(EntityTypeBuilder<RefreshToken> builder)
     {
         const int clientTextLength = 64;
+        const int grantedScopeLength = 128;
 
         builder.Property(token => token.Platform)
             .HasColumnName("platform")
@@ -62,6 +63,14 @@ internal sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refre
             .HasColumnName("app_version")
             .HasMaxLength(clientTextLength)
             .IsRequired();
+
+        // The granted scope — SPEC-045. Nullable, and null means a first-party session rather than an empty
+        // grant. Bounded at the same 128 characters `authorization_codes.scope` is: the same value is copied
+        // from the code that granted it, and a column that could hold more than its source would be a column
+        // storing something nothing can produce.
+        builder.Property(token => token.Scope)
+            .HasColumnName("scope")
+            .HasMaxLength(grantedScopeLength);
     }
 
     private static void MapTimestampColumns(EntityTypeBuilder<RefreshToken> builder)

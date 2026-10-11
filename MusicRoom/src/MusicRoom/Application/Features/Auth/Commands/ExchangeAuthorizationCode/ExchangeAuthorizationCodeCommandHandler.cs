@@ -94,7 +94,7 @@ internal sealed class ExchangeAuthorizationCodeCommandHandler
         _audit.SetTargetId(redemption.UserId);
 
         AuthTokenPair pair = await _sessions
-            .IssueAsync(redemption.UserId, cancellationToken)
+            .IssueAsync(redemption.UserId, redemption.Scope, cancellationToken)
             .ConfigureAwait(false);
 
         string idToken = _idTokens.Issue(

@@ -72,14 +72,14 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
         using HttpClient signedIn = await OAuth2Driver.SignedInAsync(
             _factory, _mail, "oauth-replay@example.com");
 
-        string verifier = OAuth2Driver.Verifier();
+        string verifier = OAuth2Checks.Verifier();
         string code = await OAuth2Driver.AuthorizeAsync(signedIn, verifier, nonce: null);
 
         using HttpResponseMessage first = await OAuth2Driver.ExchangeAsync(_factory, code, verifier);
         using HttpResponseMessage second = await OAuth2Driver.ExchangeAsync(_factory, code, verifier);
 
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
-        await OAuth2Driver.AssertErrorAsync(second, HttpStatusCode.BadRequest, "invalid_grant");
+        await OAuth2Checks.AssertErrorAsync(second, HttpStatusCode.BadRequest, "invalid_grant");
     }
 
     /// <summary>A wrong verifier is refused — the whole point of PKCE.</summary>
@@ -94,15 +94,15 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
         using HttpClient signedIn = await OAuth2Driver.SignedInAsync(
             _factory, _mail, "oauth-pkce@example.com");
 
-        string verifier = OAuth2Driver.Verifier();
+        string verifier = OAuth2Checks.Verifier();
         string code = await OAuth2Driver.AuthorizeAsync(signedIn, verifier, nonce: null);
 
         using HttpResponseMessage wrong = await OAuth2Driver.ExchangeAsync(
-            _factory, code, OAuth2Driver.Verifier());
+            _factory, code, OAuth2Checks.Verifier());
         using HttpResponseMessage right = await OAuth2Driver.ExchangeAsync(_factory, code, verifier);
 
-        await OAuth2Driver.AssertErrorAsync(wrong, HttpStatusCode.BadRequest, "invalid_grant");
-        await OAuth2Driver.AssertErrorAsync(right, HttpStatusCode.BadRequest, "invalid_grant");
+        await OAuth2Checks.AssertErrorAsync(wrong, HttpStatusCode.BadRequest, "invalid_grant");
+        await OAuth2Checks.AssertErrorAsync(right, HttpStatusCode.BadRequest, "invalid_grant");
     }
 
     /// <summary>A code presented against another redirect URI is refused — RFC 6749 §4.1.3.</summary>
@@ -116,13 +116,13 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
         using HttpClient signedIn = await OAuth2Driver.SignedInAsync(
             _factory, _mail, "oauth-uri@example.com");
 
-        string verifier = OAuth2Driver.Verifier();
+        string verifier = OAuth2Checks.Verifier();
         string code = await OAuth2Driver.AuthorizeAsync(signedIn, verifier, nonce: null);
 
         using HttpResponseMessage exchanged = await OAuth2Driver.ExchangeAsync(
             _factory, code, verifier, OAuth2Driver.UnregisteredUri);
 
-        await OAuth2Driver.AssertErrorAsync(exchanged, HttpStatusCode.BadRequest, "invalid_grant");
+        await OAuth2Checks.AssertErrorAsync(exchanged, HttpStatusCode.BadRequest, "invalid_grant");
     }
 
     /// <summary>An expired code is refused. Aged in the database, because 60 seconds is not a test's wait.</summary>
@@ -132,14 +132,14 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
         using HttpClient signedIn = await OAuth2Driver.SignedInAsync(
             _factory, _mail, "oauth-expiry@example.com");
 
-        string verifier = OAuth2Driver.Verifier();
+        string verifier = OAuth2Checks.Verifier();
         string code = await OAuth2Driver.AuthorizeAsync(signedIn, verifier, nonce: null);
 
         await OAuth2Driver.AgeAsync(_factory, code);
 
         using HttpResponseMessage exchanged = await OAuth2Driver.ExchangeAsync(_factory, code, verifier);
 
-        await OAuth2Driver.AssertErrorAsync(exchanged, HttpStatusCode.BadRequest, "invalid_grant");
+        await OAuth2Checks.AssertErrorAsync(exchanged, HttpStatusCode.BadRequest, "invalid_grant");
     }
 
     /// <summary>A code nobody issued is refused, and says no more than a spent one does.</summary>
@@ -147,9 +147,9 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
     public async Task AnUnknownCode_IsRefusedAsync()
     {
         using HttpResponseMessage exchanged = await OAuth2Driver.ExchangeAsync(
-            _factory, OAuth2Driver.Verifier(), OAuth2Driver.Verifier());
+            _factory, OAuth2Checks.Verifier(), OAuth2Checks.Verifier());
 
-        await OAuth2Driver.AssertErrorAsync(exchanged, HttpStatusCode.BadRequest, "invalid_grant");
+        await OAuth2Checks.AssertErrorAsync(exchanged, HttpStatusCode.BadRequest, "invalid_grant");
     }
 
     /// <summary><c>code_challenge_method=plain</c> is refused at the authorization endpoint.</summary>
@@ -165,12 +165,12 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
 
         using HttpResponseMessage response = await signedIn.GetAsync(
             OAuth2Driver.Authorize(
-                PkceChallenge.Of(OAuth2Driver.Verifier()), method: "plain", nonce: null),
+                PkceChallenge.Of(OAuth2Checks.Verifier()), method: "plain", nonce: null),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
 
-        Dictionary<string, StringValues> returned = OAuth2Driver.Returned(response);
+        Dictionary<string, StringValues> returned = OAuth2Checks.Returned(response);
 
         Assert.Equal("invalid_request", returned["error"].ToString());
         Assert.Equal(OAuth2Driver.State, returned["state"].ToString());
@@ -184,7 +184,7 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
             _factory, _mail, "oauth-response@example.com");
 
         string request = OAuth2Driver
-            .Authorize(PkceChallenge.Of(OAuth2Driver.Verifier()), PkceChallenge.Method, null)
+            .Authorize(PkceChallenge.Of(OAuth2Checks.Verifier()), PkceChallenge.Method, null)
             .Replace("response_type=code", "response_type=token", StringComparison.Ordinal);
 
         using HttpResponseMessage response = await signedIn.GetAsync(
@@ -193,7 +193,7 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
         Assert.Equal(
             "unsupported_response_type",
-            OAuth2Driver.Returned(response)["error"].ToString());
+            OAuth2Checks.Returned(response)["error"].ToString());
     }
 
     /// <summary>An unregistered redirect URI answers `400` and does not redirect.</summary>
@@ -205,16 +205,16 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
 
         using HttpResponseMessage response = await signedIn.GetAsync(
             OAuth2Driver.Authorize(
-                PkceChallenge.Of(OAuth2Driver.Verifier()),
+                PkceChallenge.Of(OAuth2Checks.Verifier()),
                 PkceChallenge.Method,
                 null,
-                redirectUri: OAuth2Driver.UnregisteredUri),
+                new AuthorizeOverrides(RedirectUri: OAuth2Driver.UnregisteredUri)),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Null(response.Headers.Location);
 
-        await OAuth2Driver.AssertCodeAsync(response, ValidationCodes.RedirectUriUnregistered);
+        await OAuth2Checks.AssertCodeAsync(response, ValidationCodes.RedirectUriUnregistered);
     }
 
     /// <summary>A client this deployment does not register answers `400`, and never redirects either.</summary>
@@ -226,16 +226,16 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
 
         using HttpResponseMessage response = await signedIn.GetAsync(
             OAuth2Driver.Authorize(
-                PkceChallenge.Of(OAuth2Driver.Verifier()),
+                PkceChallenge.Of(OAuth2Checks.Verifier()),
                 PkceChallenge.Method,
                 null,
-                clientId: "somebody-else"),
+                new AuthorizeOverrides(ClientId: "somebody-else")),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Null(response.Headers.Location);
 
-        await OAuth2Driver.AssertCodeAsync(response, ValidationCodes.ClientUnknown);
+        await OAuth2Checks.AssertCodeAsync(response, ValidationCodes.ClientUnknown);
     }
 
     /// <summary>Without a bearer token there is no authorization request — the owner's answer A.</summary>
@@ -246,7 +246,7 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
 
         using HttpResponseMessage response = await anonymous.GetAsync(
             OAuth2Driver.Authorize(
-                PkceChallenge.Of(OAuth2Driver.Verifier()), PkceChallenge.Method, null),
+                PkceChallenge.Of(OAuth2Checks.Verifier()), PkceChallenge.Method, null),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -265,7 +265,7 @@ public sealed class OAuth2RefusalTests : IAsyncLifetime
                 ["password"] = LoginEndpointTests.AccountPassword,
             });
 
-        await OAuth2Driver.AssertErrorAsync(
+        await OAuth2Checks.AssertErrorAsync(
             response, HttpStatusCode.BadRequest, "unsupported_grant_type");
     }
 }

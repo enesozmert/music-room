@@ -54,4 +54,20 @@ public sealed class RefreshToken : Entity
 
     /// <summary>The app version that started this family, from <c>X-Client-App-Version</c>.</summary>
     public required string AppVersion { get; set; }
+
+    /// <summary>
+    /// The scopes granted when this family was opened, or null for a first-party session — SPEC-045.
+    /// </summary>
+    /// <remarks>
+    /// Null is not "nothing granted": it is a session from the credential endpoints, where nobody asked for a
+    /// scope because the client is the account's own. A session from the authorization code grant carries
+    /// exactly what the authorization request asked for, and `GET /oauth2/userinfo` filters on it.
+    /// <para>
+    /// Here rather than in the access token because SDD §13.1 says that token carries <c>sub</c>, <c>sid</c>,
+    /// <c>iat</c>, <c>exp</c> and <c>jti</c> and nothing else, for a stated reason. Scope is session state,
+    /// and session state lives on this row — as the device, the absolute expiry and the revocation do.
+    /// Copied to every replacement, because a rotation continues the same session and must not widen it.
+    /// </para>
+    /// </remarks>
+    public string? Scope { get; set; }
 }

@@ -11,10 +11,10 @@ namespace MusicRoom.WebAPI.Endpoints;
 /// second sentence is why ADR-0031 removed the HMAC option — *"a shared secret cannot be published in a JWKS,
 /// and a JWKS is what makes the provider verifiable by anything other than itself."*
 /// <para>
-/// **The document advertises only what answers.** `authorization_endpoint` and `token_endpoint` joined it in
-/// SPEC-044, in the same unit that made them answer; `userinfo_endpoint` is still absent rather than present
-/// and broken, because a client reading a discovery document is entitled to assume every URL in it exists and
-/// `OpenIdMetadataEndpointTests` asserts exactly that by calling each one.
+/// **The document advertises only what answers**, and as of SPEC-045 that is the whole surface ADR-0031
+/// specified: discovery, JWKS, authorization, token, UserInfo and revocation. Each one joined this document
+/// in the unit that made it answer, because a client reading a discovery document is entitled to assume every
+/// URL in it exists — and `OpenIdMetadataEndpointTests` asserts exactly that by calling each one.
 /// </para>
 /// </remarks>
 internal static class OpenIdMetadataEndpoints
@@ -39,6 +39,7 @@ internal static class OpenIdMetadataEndpoints
 
         endpoints.MapAuthorizeEndpoint();
         endpoints.MapTokenEndpoint();
+        endpoints.MapUserInfoAndRevocation();
 
         endpoints.MapGet(DiscoveryPath, Discovery)
             .AllowAnonymous()
@@ -71,6 +72,12 @@ internal static class OpenIdMetadataEndpoints
             issuer + JwksPath,
             issuer + OAuth2Endpoints.AuthorizePath,
             issuer + OAuth2TokenEndpoint.TokenPath,
+            issuer + OAuth2UserInfoEndpoints.UserInfoPath,
+            issuer + OAuth2UserInfoEndpoints.RevocationPath,
+
+            // Three scopes, because three is what the claim set can honour — SPEC-045. A scope advertised
+            // with no claim behind it would be a promise this provider cannot keep.
+            ["openid", "profile", "email"],
             ["RS256"],
             ["public"],
             ["code"],
@@ -111,6 +118,9 @@ internal static class OpenIdMetadataEndpoints
 /// which is this provider's first-party limitation and is recorded in ADR-0031 rather than here: a discovery
 /// document has no member for "and the account must already be signed in".</param>
 /// <param name="TokenEndpoint">Where a code is exchanged and a session is rotated.</param>
+/// <param name="UserInfoEndpoint">Where the claims a grant allows are read — SPEC-045.</param>
+/// <param name="RevocationEndpoint">Where a refresh token ends its session — RFC 7009.</param>
+/// <param name="ScopesSupported">`openid`, `profile`, `email` — each with a claim behind it.</param>
 /// <param name="IdTokenSigningAlgValuesSupported">`RS256`, and nothing else — ADR-0031 pinned it.</param>
 /// <param name="SubjectTypesSupported">`public`: the `sub` is the same for every client.</param>
 /// <param name="ResponseTypesSupported">`code`, and nothing else: no implicit flow and no hybrid.</param>
@@ -124,6 +134,11 @@ internal sealed record DiscoveryDocument(
     [property: System.Text.Json.Serialization.JsonPropertyName("authorization_endpoint")]
     string AuthorizationEndpoint,
     [property: System.Text.Json.Serialization.JsonPropertyName("token_endpoint")] string TokenEndpoint,
+    [property: System.Text.Json.Serialization.JsonPropertyName("userinfo_endpoint")] string UserInfoEndpoint,
+    [property: System.Text.Json.Serialization.JsonPropertyName("revocation_endpoint")]
+    string RevocationEndpoint,
+    [property: System.Text.Json.Serialization.JsonPropertyName("scopes_supported")]
+    IReadOnlyList<string> ScopesSupported,
     [property: System.Text.Json.Serialization.JsonPropertyName("id_token_signing_alg_values_supported")]
     IReadOnlyList<string> IdTokenSigningAlgValuesSupported,
     [property: System.Text.Json.Serialization.JsonPropertyName("subject_types_supported")]

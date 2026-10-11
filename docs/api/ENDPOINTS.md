@@ -95,7 +95,7 @@ parameter names below follow OpenID Connect Core 1.0 and are **not** ours to ren
 | GET | `/oauth2/authorize` | `response_type=code`, `client_id`, `redirect_uri`, `scope`, `state`, `nonce`, `code_challenge`, `code_challenge_method=S256` | `302` to `redirect_uri` with `code` | `400` unknown client or unregistered `redirect_uri`, `302` with `error`, `401` | `auth` |
 | POST | `/oauth2/token` | form-encoded: `grant_type=authorization_code` + `code` + `code_verifier` + `client_id` + `redirect_uri`, or `grant_type=refresh_token` + `refresh_token` | `200` access token + rotated refresh token, and an ID token on the code grant | `400` `invalid_grant` or `unsupported_grant_type`, `401` `invalid_client`, `429` | `anon` |
 | GET | `/oauth2/userinfo` | — | `200` claims the granted scopes allow | `401` | `auth` |
-| POST | `/oauth2/revoke` | `token` | `200` | `401` | `anon` |
+| POST | `/oauth2/revoke` | form-encoded `token`, optional `token_type_hint` | `200`, including for an unknown token | `400` `unsupported_token_type` for `token_type_hint=access_token`, `429` | `anon` |
 
 `code_challenge_method=S256` is required; `plain` is refused. There is no
 `grant_type=password`: OAuth 2.1 removes the resource-owner password-credentials grant and RFC
@@ -118,6 +118,21 @@ non-redirecting refusals *are* ProblemDetails, carrying `CLIENT.UNKNOWN` and
 **An unregistered `redirect_uri` answers `400` and does not redirect.** Sending an error to a URI
 nobody registered is the open redirect the registered list exists to prevent — RFC 6749
 §4.1.2.1. Every later refusal *is* delivered to the registered URI, with `state` echoed.
+
+**UserInfo answers the claims the session's grant allows** — `openid` gives `sub`, `email` gives
+`email` and `email_verified`, `profile` gives `name` (OpenID Connect Core 1.0 §5.4). A claim the
+grant does not allow is **omitted**, not returned as null. The scopes are read from the session the
+access token names, never from the request: a scope a caller could send is a scope a caller grants
+itself. **A session opened by `POST /auth/sessions` or `POST /auth/sessions/social` granted no scope
+and receives all three** — the caller is the account's own client, and `GET /me` already returns
+strictly more. A rotation inherits the grant, so refreshing never widens it.
+
+**Revocation answers `200` for a token it has never seen.** RFC 7009 §2.2: a caller must not be able
+to tell a live token from a dead one, or the endpoint is an oracle for which tokens exist. Revoking
+a refresh token ends its **whole family**, because a session is a family — a revocation that left
+the rotated token alive would revoke nothing that matters. `token_type_hint=access_token` is the one
+refusal: a 15-minute signed access token cannot be revoked by this design, and `200` would tell a
+client its token is dead while it still opens every route.
 
 **The refresh grant answers no `id_token`.** An ID token asserts an authentication event, and a
 refresh exchange is not one: nothing new was proven, a stored token was presented. OpenID Connect

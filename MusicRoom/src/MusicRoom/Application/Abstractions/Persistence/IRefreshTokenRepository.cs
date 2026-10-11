@@ -58,6 +58,52 @@ public interface IRefreshTokenRepository
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Revokes the family a presented refresh token belongs to — <c>POST /oauth2/revoke</c>, SPEC-045.
+    /// </summary>
+    /// <param name="tokenHash">The digest of the presented token. The caller hashes it; the plaintext never
+    /// reaches this layer.</param>
+    /// <param name="nowUtc">The instant the rows are stamped with.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// True when a family was revoked, false when the token is unknown or its family was already revoked.
+    /// **The endpoint answers `200` either way** — RFC 7009 §2.2 — so this value exists for the audit record
+    /// and for nothing the caller can see.
+    /// </returns>
+    /// <remarks>
+    /// No account is named, unlike <see cref="TryRevokeFamilyAsync"/>: this route is anonymous and the token
+    /// itself is the credential. Whoever holds a live refresh token may end its session, which is what a
+    /// client doing so at sign-out is doing.
+    /// <para>
+    /// The whole family, not the one row: a session is a family (ADR-0032), and revoking a single row would
+    /// leave its replacement live — a revocation that does not revoke.
+    /// </para>
+    /// </remarks>
+    Task<bool> TryRevokeByTokenAsync(
+        string tokenHash,
+        DateTime nowUtc,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads the scopes granted when a session was opened — <c>GET /oauth2/userinfo</c>, SPEC-045.
+    /// </summary>
+    /// <param name="userId">The account from the validated token's <c>sub</c>.</param>
+    /// <param name="familyId">The session from the validated token's <c>sid</c>.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// What the session was granted. <see cref="GrantedScope.Found"/> is false only when no row of that
+    /// family belongs to that account, which a validated token makes impossible today; UserInfo answers such
+    /// a caller the minimal claim set rather than guessing.
+    /// </returns>
+    /// <remarks>
+    /// The account is part of the lookup rather than checked after it, so another account's session cannot be
+    /// read by naming its id — the same shape <see cref="TryRevokeFamilyAsync"/> uses.
+    /// </remarks>
+    Task<GrantedScope> FindGrantedScopeAsync(
+        Guid userId,
+        Guid familyId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Lists an account's live sessions, newest first.
     /// </summary>
     /// <param name="userId">The account whose sessions to list. Never widened: this is the <c>self</c> gate.</param>
@@ -86,6 +132,23 @@ public interface IRefreshTokenRepository
 /// value, and SPEC-005's Files table is the contract for what this change may create.
 /// </remarks>
 public sealed record RefreshTokenRotation(RefreshTokenRotationStatus Status, Guid UserId, Guid FamilyId);
+
+/// <summary>
+/// What a session was granted — SPEC-045.
+/// </summary>
+/// <param name="Found">Whether a row of that family belongs to that account.</param>
+/// <param name="Scope">The scopes granted when the family was opened, or null for a first-party session.
+/// Null is not "nothing granted": it is a session from the credential endpoints, where nobody asked.</param>
+/// <remarks>
+/// A record rather than a bare <c>string?</c>, because null already means something here: without the
+/// <see cref="Found"/> flag, "no such session" and "a session with no granted scope" would be one value with
+/// two opposite meanings.
+/// </remarks>
+public sealed record GrantedScope(bool Found, string? Scope)
+{
+    /// <summary>No row of that family belongs to that account.</summary>
+    public static GrantedScope None { get; } = new(false, null);
+}
 
 /// <summary>
 /// The three ways an exchange ends.
