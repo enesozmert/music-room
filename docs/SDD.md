@@ -860,8 +860,8 @@ engineering decision; an unwritten one is an oversight.
 | Secrets | `EnvSecretProvider` for the everyday loop; `InfisicalSecretProvider` behind the same abstraction, vault self-hosted in the compose stack under a `vault` profile and **beside the API on Render in production** -- [[ADR-0029-containerised-dev-and-secret-vault]], [[ADR-0046-live-deployment-render]] | **required scope.** The abstraction lands early, the vault at S1b, and the delivered system runs on it |
 | Vault store | a **second Supabase project**, separate from the application's -- [[ADR-0046-live-deployment-render]] | Render's free PostgreSQL is deleted 30 days after creation, and the database that would vanish holds every secret |
 
-**There is a live deployment** since 2026-10-11 — Render, Frankfurt, free plan, with the vault beside
-the API and both databases on Supabase ([[ADR-0046-live-deployment-render]], `docs/deploy/RENDER.md`).
+**There is a live deployment** since 2026-10-11 — https://music-room-api-regw.onrender.com, on Render, Frankfurt, free plan, with the
+vault beside the API and both databases on Supabase ([[ADR-0046-live-deployment-render]], `docs/deploy/RENDER.md`).
 Vercel was never a candidate: serverless, no long-lived process, no persistent WebSocket.
 
 The free tier sleeps after fifteen minutes and takes about a minute to wake, so a demo warms the stack

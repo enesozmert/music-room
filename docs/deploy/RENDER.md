@@ -1,5 +1,7 @@
 # Running MusicRoom live, on Render
 
+**Live at https://music-room-api-regw.onrender.com** since 2026-10-11.
+
 The deployment ADR-0046 chose, as a runbook. It covers what is clicked, in what order, and what breaks
 if the order is wrong. `render.yaml` carries the same stack as code; this file carries the parts a
 Blueprint cannot: the values, the sequence and the traps.
@@ -161,10 +163,13 @@ tier the vault may be waking up.
 
 ```
 curl -fsS https://music-room-vault.onrender.com/api/status
-curl -fsS https://music-room-api.onrender.com/health
-curl -fsS https://music-room-api.onrender.com/health/ready
-curl -fsS https://music-room-api.onrender.com/.well-known/openid-configuration
+curl -fsS https://music-room-api-regw.onrender.com/health
+curl -fsS https://music-room-api-regw.onrender.com/health/ready
+curl -fsS https://music-room-api-regw.onrender.com/.well-known/openid-configuration
 ```
+
+Render appends a suffix to a service's host name, so the URL is not the service name — `render.yaml`
+names the service and the platform names the host.
 
 In that order: the vault first, because the API reads it at start-up. `/health/ready` is the one that
 proves the database is awake too.
