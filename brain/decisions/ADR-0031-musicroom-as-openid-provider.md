@@ -61,6 +61,38 @@ The API implements the provider role of OpenID Connect Core 1.0:
 - S8 already owns social login, so both halves of OIDC land in one slice, reviewed together.
 - The migration is part of S8's spec: the endpoints S1 shipped are replaced, not kept alongside.
 
+## Amendment, 2026-10-11 — this is a first-party provider
+
+SPEC-044 asked a question this decision had not answered: `GET /oauth2/authorize` is the endpoint a
+**person** interacts with, and this API has no login page, no cookie session and no HTML. A standard
+provider answers an unauthenticated authorization request with a sign-in page; this one has nowhere
+to send anybody.
+
+**Owner's answer, 2026-10-11: option A — the authorization endpoint requires a bearer access
+token.** The client signs in through the credential endpoints and then drives the code flow with the
+token it already holds. The contract's auth column for that row changes from `anon` to `auth`.
+
+What that buys: this stays a JSON API, and it grows no second authentication path — the thing most
+likely to drift from the first and quietly weaken it.
+
+What it costs, stated here rather than discovered later:
+
+- **No third party can federate with this provider.** Somebody who is not already a MusicRoom user
+  cannot complete an authorization request, because there is no interface in which they could
+  become one. The surface is conformant; the deployment is first-party.
+- **The token endpoint requires the mandatory client headers**, like every other mutating request
+  (SDD §10.7). A standards client that sends only RFC 6749's form fields is refused with `400`. That
+  is the same trade: our client sends them already, a stranger's does not.
+- **Making this a general-purpose provider is a user interface, not an endpoint.** A consent screen
+  and an interactive sign-in page are what would be missing, and neither is in the subject.
+
+Two smaller decisions SPEC-044 took under the same answer, recorded so they are not re-litigated:
+**clients are configuration rather than a table** — nobody can self-register, so a registry is a
+row read the way the social provider rows are — and **the access token stays HMAC in that unit**,
+because changing the signature of a token `AddJwtBearer` already validates, in the unit that
+introduces a new flow, is two migrations in one diff. The RS256 move goes with the removal of the
+old endpoints.
+
 ## Consequences
 
 - **S8 grows from "add two providers" to "become a provider".** It is the largest single slice in

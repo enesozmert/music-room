@@ -229,6 +229,18 @@ public static class ValidationCodes
     /// <summary>It is the account's only way in — SPEC-041.</summary>
     public const string SocialLastSignInMethod = "SOCIAL.LAST_SIGN_IN_METHOD";
 
+    /// <summary>No client is registered under that identifier — SPEC-044.</summary>
+    public const string ClientUnknown = "CLIENT.UNKNOWN";
+
+    /// <summary>
+    /// The client exists and has not registered that redirect URI — SPEC-044.
+    /// </summary>
+    /// <remarks>
+    /// Answered `400` at the authorization endpoint and never redirected: an error sent to a URI nobody
+    /// registered is the open redirect the registered list exists to prevent.
+    /// </remarks>
+    public const string RedirectUriUnregistered = "REDIRECT_URI.UNREGISTERED";
+
     /// <summary>
     /// A failure nobody decided — the `500` answer, issue O29 and SPEC-039.
     /// </summary>

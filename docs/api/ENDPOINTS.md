@@ -92,14 +92,36 @@ parameter names below follow OpenID Connect Core 1.0 and are **not** ours to ren
 |---|---|---|---|---|---|
 | GET | `/.well-known/openid-configuration` | — | `200` discovery document | — | `anon` |
 | GET | `/.well-known/jwks.json` | — | `200` public key set | — | `anon` |
-| GET | `/oauth2/authorize` | `response_type=code`, `client_id`, `redirect_uri`, `scope`, `state`, `nonce`, `code_challenge`, `code_challenge_method=S256` | `302` to `redirect_uri` with `code` | `302` with `error` | `anon` |
-| POST | `/oauth2/token` | `grant_type=authorization_code` + `code` + `code_verifier`, or `grant_type=refresh_token` + `refresh_token` | `200` access token + ID token + rotated refresh token | `400` `invalid_grant`, `401`, `429` | `anon` |
+| GET | `/oauth2/authorize` | `response_type=code`, `client_id`, `redirect_uri`, `scope`, `state`, `nonce`, `code_challenge`, `code_challenge_method=S256` | `302` to `redirect_uri` with `code` | `400` unknown client or unregistered `redirect_uri`, `302` with `error`, `401` | `auth` |
+| POST | `/oauth2/token` | form-encoded: `grant_type=authorization_code` + `code` + `code_verifier` + `client_id` + `redirect_uri`, or `grant_type=refresh_token` + `refresh_token` | `200` access token + rotated refresh token, and an ID token on the code grant | `400` `invalid_grant` or `unsupported_grant_type`, `401` `invalid_client`, `429` | `anon` |
 | GET | `/oauth2/userinfo` | — | `200` claims the granted scopes allow | `401` | `auth` |
 | POST | `/oauth2/revoke` | `token` | `200` | `401` | `anon` |
 
 `code_challenge_method=S256` is required; `plain` is refused. There is no
 `grant_type=password`: OAuth 2.1 removes the resource-owner password-credentials grant and RFC
 9700 deprecates it.
+
+**`GET /oauth2/authorize` takes a bearer access token** — owner's answer A of 2026-10-11,
+SPEC-044. This API has no login page, no cookie session and no HTML, so a person who is not
+already signed in has nowhere to sign in: the client authenticates with the credential endpoints
+first and then drives the code flow. The consequence is stated rather than discovered — **this is
+a first-party provider**, recorded as an amendment in
+[[ADR-0031-musicroom-as-openid-provider]].
+
+**`POST /oauth2/token` is the one place where a refusal is not ProblemDetails.** The request is
+form-encoded and the error body is `{"error":"invalid_grant"}`, both fixed by RFC 6749 §4.1 and
+§5.2, which a client's own OAuth library reads. ADR-0045's `code` member applies to refusals this
+API designed; these the specification already named. The authorization endpoint's two
+non-redirecting refusals *are* ProblemDetails, carrying `CLIENT.UNKNOWN` and
+`REDIRECT_URI.UNREGISTERED`.
+
+**An unregistered `redirect_uri` answers `400` and does not redirect.** Sending an error to a URI
+nobody registered is the open redirect the registered list exists to prevent — RFC 6749
+§4.1.2.1. Every later refusal *is* delivered to the registered URI, with `state` echoed.
+
+**The refresh grant answers no `id_token`.** An ID token asserts an authentication event, and a
+refresh exchange is not one: nothing new was proven, a stored token was presented. OpenID Connect
+Core 1.0 §12.1 leaves it optional.
 
 **These replace rather than join** `POST /auth/sessions`, `POST /auth/sessions/social` and
 `POST /auth/tokens`. The removal is part of S8's spec, and no old endpoint is deleted before its
