@@ -77,6 +77,7 @@ one is a crash loop rather than a warning:
 
 ```
 ASPNETCORE_ENVIRONMENT=Production
+ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
 ASPNETCORE_HTTP_PORTS=10000
 PORT=10000
 JWT_ISSUER=musicroom
@@ -149,6 +150,13 @@ a log would say the posture had changed. Start-up retries for about ninety secon
 tier the vault may be waking up.
 
 ## The traps this tier comes with
+
+**`ASPNETCORE_FORWARDEDHEADERS_ENABLED` is not optional.** Render terminates TLS at its proxy, so
+without it the host sees `http` and two things break at once. The visible one: the discovery document
+and every ID token say `iss: http://…` while being served over HTTPS, and a conforming client refuses an
+issuer that does not match the origin it fetched from. The silent one: `RemoteIpAddress` is the proxy's,
+so SPEC-006's per-IP credential limit puts every caller in the world in one bucket — nothing fails, the
+limit simply stops being a limit. Both were found by driving the live deployment, not by reading it.
 
 | Trap | What happens | What to do |
 |---|---|---|
