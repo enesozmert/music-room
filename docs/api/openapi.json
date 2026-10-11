@@ -5,6 +5,43 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/.well-known/openid-configuration": {
+      "get": {
+        "tags": [
+          "OpenIdMetadataEndpoints"
+        ],
+        "summary": "OpenID Connect discovery document",
+        "description": "What this provider offers. Only endpoints that answer are listed: a client reading this document may assume every URL in it exists.",
+        "operationId": "GetOpenIdConfiguration",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DiscoveryDocument"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/jwks.json": {
+      "get": {
+        "tags": [
+          "OpenIdMetadataEndpoints"
+        ],
+        "summary": "Public signing keys",
+        "description": "The public half of every key a token from this API may carry: the current one, and the outgoing one during a rotation overlap. Private material never appears here.",
+        "operationId": "GetJsonWebKeySet",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -3399,6 +3436,64 @@
         },
         "description": "One device, as its owner reads it."
       },
+      "DiscoveryDocument": {
+        "required": [
+          "issuer",
+          "jwks_uri",
+          "id_token_signing_alg_values_supported",
+          "subject_types_supported",
+          "response_types_supported",
+          "grant_types_supported",
+          "code_challenge_methods_supported"
+        ],
+        "type": "object",
+        "properties": {
+          "issuer": {
+            "type": "string",
+            "description": "This provider's identifier, which is also the origin the document came from."
+          },
+          "jwks_uri": {
+            "type": "string",
+            "description": "Where the public keys are."
+          },
+          "id_token_signing_alg_values_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`RS256`, and nothing else — ADR-0031 pinned it."
+          },
+          "subject_types_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`public`: the `sub` is the same for every client."
+          },
+          "response_types_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Empty until the authorization endpoint exists."
+          },
+          "grant_types_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Empty until the token endpoint exists."
+          },
+          "code_challenge_methods_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`S256` only. `plain` is refused, which `docs/api/ENDPOINTS.md` already publishes."
+          }
+        },
+        "description": "The discovery document — OpenID Connect Discovery 1.0 §3, with only the members this provider can honour."
+      },
       "EmailVerificationRequest": {
         "required": [
           "token"
@@ -4951,6 +5046,9 @@
     }
   },
   "tags": [
+    {
+      "name": "OpenIdMetadataEndpoints"
+    },
     {
       "name": "MusicRoom.WebAPI"
     },

@@ -92,6 +92,7 @@ public class Program
         // host only — ADR-0035. `MapOpenApi()` is outside that branch, inside the one call this root can
         // afford: Program.cs is at S104's cap, and SPEC-032's answer 5 forbids moving anything else out.
         InteractiveDocumentation.Use(app);
+        app.MapOpenIdMetadata();
         app.MapHealthEndpoints();
         app.MapAuthEndpoints();
         app.MapProfileEndpoints();
