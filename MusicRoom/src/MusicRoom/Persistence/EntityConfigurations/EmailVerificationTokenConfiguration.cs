@@ -31,6 +31,19 @@ internal sealed class EmailVerificationTokenConfiguration
             .IsFixedLength()
             .IsRequired();
 
+        // The code's digest, beside the token's and the same shape — SPEC-052.
+        builder.Property(token => token.CodeHash)
+            .HasColumnName("code_hash")
+            .HasMaxLength(tokenHashLength)
+            .IsFixedLength()
+            .IsRequired();
+
+        // The attempt budget. Not indexed: it is read and written through the row the digest already
+        // found, never searched on.
+        builder.Property(token => token.Attempts)
+            .HasColumnName("attempts")
+            .HasDefaultValue(0);
+
         builder.Property(token => token.ExpiresAtUtc)
             .HasColumnName("expires_at_utc")
             .HasColumnType("timestamp with time zone");

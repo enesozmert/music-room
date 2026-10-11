@@ -32,4 +32,14 @@ public sealed class User : Entity
     /// <summary>False until the address is proven. An unverified account cannot use the services —
     /// SDD §11.1.</summary>
     public bool IsEmailVerified { get; set; }
+
+    /// <summary>
+    /// When the welcome message was sent, or null when it has not been — SPEC-052 decision 9.
+    /// </summary>
+    /// <remarks>
+    /// A stamp rather than a flag, because "when" answers "whether" and one more question besides. It is
+    /// what makes once mean once: the first sign-in after verification sends the message and writes this,
+    /// and every sign-in after that reads it and sends nothing.
+    /// </remarks>
+    public DateTime? WelcomeSentAtUtc { get; set; }
 }

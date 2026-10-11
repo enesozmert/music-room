@@ -68,7 +68,7 @@ Subject V.1, V.5. Rules: [[authentication-authorization]], [[social-oauth]].
 | Method | Path | Body | Success | Failures | Auth |
 |---|---|---|---|---|---|
 | POST | `/auth/registrations` | `email`, `password`, `displayName` | `202` | `400`, `422`, `429` | `anon` |
-| POST | `/auth/email-verifications` | `token` | `204` | `400`, `410` expired, `429` | `anon` |
+| POST | `/auth/email-verifications` | `token`, **or** `email` + `code` | `204` | `400`, `410` expired, `429` | `anon` |
 | POST | `/auth/verification-requests` | `email` | `202` | `429` | `anon` |
 | POST | `/auth/sessions` | `email`, `password` | `200` token pair | `401` generic, `429` | `anon` |
 | POST | `/auth/sessions/social` | `provider`, `code`, `codeVerifier`, `redirectUri` | `200` token pair | `401`, `422`, `429` | `anon` |
@@ -155,6 +155,33 @@ Both answer the same session model: one refresh-token family, rotation on every 
 the family (ADR-0032). Neither is a second credential path in the sense that matters — they are two
 front doors onto one session, which is why the rate limits, the audit records and the revocation all
 apply identically.
+
+**A verification message carries a link and a six-character code** — SPEC-052. They are two
+credentials on one record: the link's token is 256 bits, the code is six characters from a
+32-symbol alphabet (`A-Z` without `I` and `O`, `2-9`), and spending either spends both. Send
+`token`, or send `email` with `code`; the address is required with a code because six characters
+are not unique across accounts.
+
+**A wrong code costs one of five attempts.** The fifth spends the row, so the sixth attempt is
+refused even when the code is right, and the person asks for a new message through
+`/auth/verification-requests` — which is rate-limited per IP and per account. That budget, not the
+length, is what makes a short code safe.
+
+**Both last fifteen minutes**, down from twenty-four hours: a credential typed out of an inbox
+should not sit in one overnight. A message delayed past the window needs a resend.
+
+**Case and spacing in a code do not matter.** `abc-234` and `ABC234` are the same code; what a mail
+client puts on the clipboard works.
+
+**A wrong code, an unknown address, a spent row and an exhausted budget are one answer.** A caller
+who could tell them apart could learn which addresses have a verification outstanding.
+
+**The password reset has no code** — link only. A six-character credential that replaces a password
+is a weak credential for the strongest action in the system.
+
+**`Accept-Language` picks the language of every message**, `tr` or English, with English as the
+default for anything else. It is a header rather than a stored preference, so the message a request
+causes is in the language that request was made in.
 
 ### Design notes
 

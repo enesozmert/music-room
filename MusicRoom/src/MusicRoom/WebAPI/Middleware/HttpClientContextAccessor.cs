@@ -40,6 +40,7 @@ internal sealed class HttpClientContextAccessor : IClientContextAccessor
                 values.Device,
                 values.AppVersion,
                 values.CorrelationId,
-                values.UserId)
+                values.UserId,
+                values.Language)
             : _hubCaller.Context;
 }

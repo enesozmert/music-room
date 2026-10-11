@@ -52,7 +52,7 @@ public sealed class BrevoMailServiceTests
         (IMailService mail, StubHttpMessageHandler transport, _) = Resolve();
 
         // Act
-        await mail.SendEmailVerificationAsync(EmailAddress, Token, TestContext.Current.CancellationToken);
+        await mail.SendEmailVerificationAsync(Verification(), TestContext.Current.CancellationToken);
 
         // Assert
         CapturedRequest request = Assert.Single(transport.Requests);
@@ -73,7 +73,7 @@ public sealed class BrevoMailServiceTests
         (IMailService mail, StubHttpMessageHandler transport, _) = Resolve();
 
         // Act
-        await mail.SendEmailVerificationAsync(EmailAddress, Token, TestContext.Current.CancellationToken);
+        await mail.SendEmailVerificationAsync(Verification(), TestContext.Current.CancellationToken);
 
         // Assert — the verification base, not the reset one, and the token inside it.
         string body = Assert.Single(transport.Requests).Body;
@@ -90,7 +90,7 @@ public sealed class BrevoMailServiceTests
         (IMailService mail, StubHttpMessageHandler transport, _) = Resolve();
 
         // Act
-        await mail.SendPasswordResetAsync(EmailAddress, Token, TestContext.Current.CancellationToken);
+        await mail.SendPasswordResetAsync(Reset(), TestContext.Current.CancellationToken);
 
         // Assert
         string body = Assert.Single(transport.Requests).Body;
@@ -100,11 +100,16 @@ public sealed class BrevoMailServiceTests
     }
 
     /// <summary>
-    /// With no base URL configured the message carries the bare token and composes no link.
+    /// With no base URL configured the message carries the code and composes no link.
     /// </summary>
     /// <remarks>
     /// The same rule <see cref="LoggingMailService"/> follows: a link to a machine nobody intended is worse
-    /// than no link, and the flow still completes through the API with the code.
+    /// than no link, and the flow still completes through the API.
+    /// <para>
+    /// **The code, not the token** — SPEC-052. Before the code existed the message fell back to printing
+    /// the 43-character token for somebody to paste; six characters are what a person can actually type,
+    /// which is the whole reason the code was added.
+    /// </para>
     /// </remarks>
     [Fact]
     public async Task SendEmailVerificationAsync_WithNoBaseUrl_SendsTheCodeAsync()
@@ -114,11 +119,11 @@ public sealed class BrevoMailServiceTests
             Resolve(verificationLinkBaseUrl: null);
 
         // Act
-        await mail.SendEmailVerificationAsync(EmailAddress, Token, TestContext.Current.CancellationToken);
+        await mail.SendEmailVerificationAsync(Verification(), TestContext.Current.CancellationToken);
 
         // Assert
         string body = Assert.Single(transport.Requests).Body;
-        Assert.Contains(Token, body, StringComparison.Ordinal);
+        Assert.Contains("ABC234", body, StringComparison.Ordinal);
         Assert.DoesNotContain("href", body, StringComparison.Ordinal);
     }
 
@@ -132,7 +137,7 @@ public sealed class BrevoMailServiceTests
         (IMailService mail, _, LoggingMailServiceTests.MessageLog log) = Resolve();
 
         // Act
-        await mail.SendEmailVerificationAsync(EmailAddress, Token, TestContext.Current.CancellationToken);
+        await mail.SendEmailVerificationAsync(Verification(), TestContext.Current.CancellationToken);
 
         // Assert — the recipient and the provider's id are logged; the credential is not.
         string message = Assert.Single(log.Messages);
@@ -160,7 +165,7 @@ public sealed class BrevoMailServiceTests
 
         // Act
         HttpRequestException exception = await Assert.ThrowsAsync<HttpRequestException>(
-            () => mail.SendEmailVerificationAsync(EmailAddress, Token, TestContext.Current.CancellationToken));
+            () => mail.SendEmailVerificationAsync(Verification(), TestContext.Current.CancellationToken));
 
         // Assert
         Assert.Equal(HttpStatusCode.Unauthorized, exception.StatusCode);
@@ -261,4 +266,12 @@ public sealed class BrevoMailServiceTests
             // the container is gone.
         }
     }
+
+    /// <summary>The verification message these tests send — SPEC-052's record form.</summary>
+    private static VerificationMail Verification(MailLanguage language = MailLanguage.English) =>
+        new(EmailAddress, "Reader", Token, "ABC234", language);
+
+    /// <summary>The reset message, which carries a token and deliberately no code.</summary>
+    private static PasswordResetMail Reset(MailLanguage language = MailLanguage.English) =>
+        new(EmailAddress, "Reader", Token, language);
 }

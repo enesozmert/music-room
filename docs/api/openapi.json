@@ -347,7 +347,7 @@
           "AuthEndpoints"
         ],
         "summary": "Verify an email address",
-        "description": "Spends the token from the verification mail exactly once and marks the address verified. The description says nothing about what separates 400 from 410 for a given token, because that is the caller's business only when they hold it.",
+        "description": "Spends a verification credential exactly once and marks the address verified. Send either `token`, from the link, or `email` with the six-character `code` from the message. A wrong code costs one of five attempts against that message, after which it is spent whatever is typed. The description says nothing about what separates 400 from 410 for a given credential, because that is the caller's business only when they hold it.",
         "operationId": "PostAuthEmailVerification",
         "requestBody": {
           "content": {
@@ -3655,11 +3655,28 @@
         "type": "object",
         "properties": {
           "token": {
-            "type": "string",
-            "description": "The token from the verification mail."
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The token from the link, or null when a code is sent instead."
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The address the code was sent to. Required with a code, because six characters are\n    not unique across accounts; absent with a token, which identifies its own row."
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The six characters from the message. Case and spacing do not matter — they are\n    normalised before anything is compared."
           }
         },
-        "description": "The email verification payload — `docs/api/ENDPOINTS.md` §1."
+        "description": "The email verification payload — `docs/api/ENDPOINTS.md` §1. One credential or the other,\nSPEC-052."
       },
       "EventCodeRequest": {
         "required": [

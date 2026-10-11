@@ -74,6 +74,10 @@ public static class ApplicationServiceRegistration
         services.AddScoped<SessionIssuer>();
         services.AddScoped<CredentialMailDispatcher>();
 
+        // The one-per-account welcome message — SPEC-052. Scoped like the issuer that calls it, because
+        // it writes a stamp in the request's own unit of work.
+        services.AddScoped<WelcomeMailSender>();
+
         return services;
     }
 }

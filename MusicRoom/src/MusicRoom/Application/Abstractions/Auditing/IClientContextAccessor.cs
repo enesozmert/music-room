@@ -1,3 +1,5 @@
+using MusicRoom.Application.Abstractions.Messaging;
+
 namespace MusicRoom.Application.Abstractions.Auditing;
 
 /// <summary>
@@ -28,6 +30,9 @@ public interface IClientContextAccessor
 /// <param name="UserId">The authenticated account, from the validated <c>sub</c> claim, or null on an
 /// anonymous request. It is where an audit record's <c>user_id</c> comes from for an authenticated command,
 /// so a handler does not have to remember — SPEC-010 escalation 4.</param>
+/// <param name="Language">Which language the caller reads, from <c>Accept-Language</c> — SPEC-052. It is
+/// here rather than in a stored preference because the message a request causes should be in the language
+/// that request was made in, and because a preference is a settings screen this project does not have.</param>
 /// <remarks>
 /// Declared beside the accessor rather than in its own file: it exists only as that property's type, and
 /// SPEC-008's Files table is the contract for what this change may create.
@@ -37,4 +42,5 @@ public sealed record ClientContext(
     string Device,
     string AppVersion,
     string CorrelationId,
-    Guid? UserId = null);
+    Guid? UserId = null,
+    MailLanguage Language = MailLanguage.English);

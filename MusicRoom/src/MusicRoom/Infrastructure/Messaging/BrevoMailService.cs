@@ -51,39 +51,42 @@ internal sealed class BrevoMailService : IMailService
     }
 
     /// <inheritdoc />
-    public Task SendEmailVerificationAsync(
-        string emailAddress,
-        string token,
-        CancellationToken cancellationToken) =>
+    public Task SendEmailVerificationAsync(VerificationMail message, CancellationToken cancellationToken) =>
         SendAsync(
-            emailAddress,
-            CredentialMailTemplates.VerificationSubject,
-            CredentialMailTemplates.Verification(token, _options.VerificationLinkBaseUrl),
+            message?.EmailAddress ?? throw new ArgumentNullException(nameof(message)),
+            CredentialMailTemplates.Verification(message, _options.VerificationLinkBaseUrl),
             cancellationToken);
 
     /// <inheritdoc />
-    public Task SendPasswordResetAsync(
-        string emailAddress,
-        string token,
-        CancellationToken cancellationToken) =>
+    public Task SendPasswordResetAsync(PasswordResetMail message, CancellationToken cancellationToken) =>
         SendAsync(
-            emailAddress,
-            CredentialMailTemplates.ResetSubject,
-            CredentialMailTemplates.Reset(token, _options.PasswordResetLinkBaseUrl),
+            message?.EmailAddress ?? throw new ArgumentNullException(nameof(message)),
+            CredentialMailTemplates.Reset(message, _options.PasswordResetLinkBaseUrl),
+            cancellationToken);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The welcome message points at the verification screen's base, which is the one URL this service
+    /// knows that belongs to the product rather than to a credential. With none configured the message
+    /// still says what the product is for and carries no button — SPEC-052.
+    /// </remarks>
+    public Task SendWelcomeAsync(WelcomeMail message, CancellationToken cancellationToken) =>
+        SendAsync(
+            message?.EmailAddress ?? throw new ArgumentNullException(nameof(message)),
+            CredentialMailTemplates.Welcome(message, _options.VerificationLinkBaseUrl),
             cancellationToken);
 
     private async Task SendAsync(
         string emailAddress,
-        string subject,
-        MailBody body,
+        RenderedMail mail,
         CancellationToken cancellationToken)
     {
         BrevoSendRequest request = new(
             new BrevoSender(_options.FromAddress ?? string.Empty, _options.FromName),
             [new BrevoRecipient(emailAddress)],
-            subject,
-            body.Html,
-            body.Text);
+            mail.Subject,
+            mail.Html,
+            mail.Text);
 
         using HttpResponseMessage response = await _client
             .PostAsJsonAsync(SendPath, request, cancellationToken)
