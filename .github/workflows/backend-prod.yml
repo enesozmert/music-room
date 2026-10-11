@@ -70,4 +70,4 @@ jobs:
 
       # Proven buildable, never pushed. No registry and no token exist yet — ADR-0015.
       - name: Container image builds
-        run: docker build -f MusicRoom/Dockerfile MusicRoom
+        run: docker build -f MusicRoom/Dockerfile .

@@ -29,8 +29,11 @@ services:
 
   api:
     build:
-      context: ./MusicRoom
-      dockerfile: Dockerfile
+      # The repository root, not `MusicRoom/` — SPEC-051. One context everywhere: compose, CI and the
+      # hosting platform all build the same way, so "which directory is the context" stops being a
+      # per-place setting that can disagree. The root `.dockerignore` keeps the upload small.
+      context: .
+      dockerfile: MusicRoom/Dockerfile
     env_file:
       - .env
 
