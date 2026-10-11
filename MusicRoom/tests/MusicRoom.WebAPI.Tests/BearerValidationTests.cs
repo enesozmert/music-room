@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using MusicRoom.Application.Abstractions.Messaging;
+using MusicRoom.Infrastructure.Security;
 using MusicRoom.Persistence.Contexts;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -20,6 +22,11 @@ namespace MusicRoom.WebAPI.Tests;
 /// <remarks>
 /// Each token here is forged deliberately, one property wrong at a time, because "the endpoint accepted a
 /// token" is only interesting next to the tokens it must not accept.
+/// <para>
+/// The forged tokens are **RS256 signed with the host's own key** since SPEC-050, read out of the test
+/// host's container. One of them is deliberately HMAC, because "no HMAC overlap" is a decision and a
+/// decision with no test is a comment.
+/// </para>
 /// </remarks>
 public sealed class BearerValidationTests : IAsyncLifetime
 {
@@ -87,8 +94,32 @@ public sealed class BearerValidationTests : IAsyncLifetime
     [Fact]
     public async Task Sessions_WithATokenSignedByAnotherKey_Returns401Async()
     {
+        // Arrange — a well-formed RS256 token from a key this host never published.
+        using RSA stranger = RSA.Create(2048);
+        string token = Forge(key: new RsaSecurityKey(stranger) { KeyId = "a-stranger" });
+
+        // Act
+        using HttpResponseMessage response = await GetSessionsAsync(token);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    /// <summary>
+    /// A token signed with an HMAC secret is refused — the overlap SPEC-050 deliberately did not keep.
+    /// </summary>
+    /// <remarks>
+    /// Until SPEC-050 this was the shape of every access token. Keeping it accepted "for a window" would
+    /// have kept a shared secret that still mints valid tokens, plus a knob to remember to turn off; the
+    /// cost of not keeping it is one `401` per client at deploy, and the refresh token is untouched.
+    /// </remarks>
+    [Fact]
+    public async Task Sessions_WithAnHmacSignedToken_Returns401Async()
+    {
         // Arrange
-        string token = Forge(signingKey: "a-completely-different-signing-key-32b");
+        string token = Forge(
+            key: new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes("musicroom-integration-test-signing-key-32")));
 
         // Act
         using HttpResponseMessage response = await GetSessionsAsync(token);
@@ -176,14 +207,19 @@ public sealed class BearerValidationTests : IAsyncLifetime
     /// Mints a token that is correct except for the property under test. The defaults match what the test host
     /// is configured with, so exactly one thing is ever wrong.
     /// </summary>
-    private static string Forge(
-        string signingKey = "musicroom-integration-test-signing-key-32",
+    private string Forge(
+        SecurityKey? key = null,
         string issuer = "musicroom-tests",
         string audience = "musicroom-tests-client",
         DateTime? issuedAt = null,
         TimeSpan? lifetime = null)
     {
         DateTime nowUtc = issuedAt ?? DateTime.UtcNow;
+
+        // The host's own key by default, so exactly one property is ever wrong. Read from the container
+        // rather than from a constant: since SPEC-050 the signature is asymmetric and the private half is
+        // generated per test process, so there is no constant to share.
+        SecurityKey signingKey = key ?? _factory.Services.GetRequiredService<ISigningKeyProvider>().Current.Key;
 
         SecurityTokenDescriptor descriptor = new()
         {
@@ -193,8 +229,10 @@ public sealed class BearerValidationTests : IAsyncLifetime
             NotBefore = nowUtc,
             Expires = nowUtc + (lifetime ?? TimeSpan.FromMinutes(15)),
             SigningCredentials = new SigningCredentials(
-                new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
-                SecurityAlgorithms.HmacSha256),
+                signingKey,
+                signingKey is SymmetricSecurityKey
+                    ? SecurityAlgorithms.HmacSha256
+                    : SecurityAlgorithms.RsaSha256),
             Claims = new Dictionary<string, object>(StringComparer.Ordinal)
             {
                 ["sub"] = Guid.NewGuid().ToString(),

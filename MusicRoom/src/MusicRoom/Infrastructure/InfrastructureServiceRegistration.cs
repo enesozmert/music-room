@@ -54,13 +54,16 @@ public static class InfrastructureServiceRegistration
         // SPEC-035, ADR-0042. A build without the resource throws here rather than screening nothing.
         services.AddSingleton<IBreachedPasswordSet>(_ => new BundledBreachedPasswordSet());
 
-        // Singleton: the signing credentials are built once and the issuer holds no request state.
-        services.AddSingleton<IAccessTokenIssuer>(_ => new JwtAccessTokenIssuer(options.Jwt));
-
-        // The RS256 pair this API signs identity assertions with — ADR-0031, O19. Singleton because the key
-        // is read once and a key that changed between requests would invalidate what the last one signed.
+        // The RS256 pair this API signs with — ADR-0031, O19. Singleton because the key is read once and a
+        // key that changed between requests would invalidate what the last one signed. Registered before the
+        // token issuer, which now takes it: since SPEC-050 the access token is RS256 too, so one pair signs
+        // everything this API issues and the JWKS publishes the half that verifies it.
         services.AddSingleton<ISigningKeyProvider>(provider =>
             new RsaSigningKeyProvider(provider.GetRequiredService<ISecretProvider>()));
+
+        // Singleton: the issuer holds no request state.
+        services.AddSingleton<IAccessTokenIssuer>(provider =>
+            new JwtAccessTokenIssuer(options.Jwt, provider.GetRequiredService<ISigningKeyProvider>()));
 
         // The provider's own two pieces — SPEC-044. The clients are configuration rather than a table, so
         // the registry reads them once; the ID token issuer holds the signing credentials and no request

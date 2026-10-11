@@ -1,7 +1,7 @@
-using System.Globalization;
-using System.Text;
+using System.Security.Cryptography;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using MusicRoom.Application.Abstractions.Configuration;
 using MusicRoom.Application.Abstractions.Security;
 using MusicRoom.Infrastructure.Security;
 using Xunit;
@@ -9,14 +9,13 @@ using Xunit;
 namespace MusicRoom.Infrastructure.Tests.Security;
 
 /// <summary>
-/// Proves the SDD §13.1 token properties against the real handler: what the token says, how long it
-/// lives, and that the signature is over the configured key.
+/// Proves the SDD §13.1 token properties against the real handler: what the token says, how long it lives,
+/// and that the signature is RS256 over the key this API publishes — SPEC-050.
 /// </summary>
 public sealed class JwtAccessTokenIssuerTests
 {
     // Constants are internal rather than private because the .editorconfig naming rule requires an
     // underscore prefix on private fields, and a const is a field to that rule.
-    internal const string SigningKey = "a-test-signing-key-of-at-least-32-bytes";
     internal const string Issuer = "musicroom-tests";
     internal const string Audience = "musicroom-tests-client";
     internal const int AccessTokenMinutes = 15;
@@ -81,7 +80,7 @@ public sealed class JwtAccessTokenIssuerTests
     {
         // Arrange
         const int secondsPerMinute = 60;
-        JwtAccessTokenIssuer issuer = new(Options());
+        JwtAccessTokenIssuer issuer = new(Options(), Keys());
 
         // Act
         IssuedAccessToken issued = issuer.Issue(Guid.NewGuid(), Guid.NewGuid(), _nowUtc);
@@ -90,62 +89,139 @@ public sealed class JwtAccessTokenIssuerTests
         Assert.Equal(AccessTokenMinutes * secondsPerMinute, issued.ExpiresInSeconds);
     }
 
-    /// <summary>The signature is over the configured key, so a token signed elsewhere is not ours.</summary>
+    /// <summary>The token is RS256, and its header names the key the JWKS publishes — SPEC-050.</summary>
+    /// <remarks>
+    /// The `kid` is what lets a verifier pick one key out of a published set, which is the whole point of
+    /// signing an access token with a pair rather than a shared secret.
+    /// </remarks>
     [Fact]
-    public async Task Issue_ProducesATokenThatValidatesUnderTheConfiguredKeyOnlyAsync()
+    public void Issue_SignsWithRs256AndNamesTheKey()
     {
         // Arrange
-        JwtAccessTokenIssuer issuer = new(Options());
-        IssuedAccessToken issued = issuer.Issue(Guid.NewGuid(), Guid.NewGuid(), DateTime.UtcNow);
+        RsaSigningKeyProvider keys = Keys();
 
         // Act
-        TokenValidationResult accepted = await _handler.ValidateTokenAsync(issued.Token, Parameters(SigningKey));
-        TokenValidationResult refused = await _handler.ValidateTokenAsync(
-            issued.Token,
-            Parameters("a-different-signing-key-of-32-plus-bytes"));
+        JsonWebToken token = _handler.ReadJsonWebToken(
+            new JwtAccessTokenIssuer(Options(), keys).Issue(Guid.NewGuid(), SessionId, _nowUtc).Token);
 
         // Assert
-        Assert.True(accepted.IsValid);
+        Assert.Equal(SecurityAlgorithms.RsaSha256, token.Alg);
+        Assert.Equal(keys.Current.KeyId, token.Kid);
+    }
+
+    /// <summary>
+    /// A verifier given only the published key set accepts it; one given another key does not.
+    /// </summary>
+    /// <remarks>
+    /// The second half is the assertion that matters: "signed by something" is not the claim, "signed by
+    /// this issuer's key" is. The validation below is handed the JWKS and nothing else.
+    /// </remarks>
+    [Fact]
+    public async Task Issue_ValidatesAgainstThePublishedKeySetOnlyAsync()
+    {
+        // Arrange
+        RsaSigningKeyProvider keys = Keys();
+        IssuedAccessToken issued = new JwtAccessTokenIssuer(Options(), keys)
+            .Issue(Guid.NewGuid(), SessionId, DateTime.UtcNow);
+
+        // Act
+        TokenValidationResult accepted = await _handler.ValidateTokenAsync(issued.Token, Parameters(keys));
+        TokenValidationResult refused = await _handler.ValidateTokenAsync(issued.Token, Parameters(Keys()));
+
+        // Assert
+        Assert.True(accepted.IsValid, accepted.Exception?.Message);
         Assert.False(refused.IsValid);
     }
 
-    /// <summary>A key too short for HS256 fails the constructor, not a later request.</summary>
+    /// <summary>
+    /// During a rotation overlap, a token signed by the outgoing key still validates.
+    /// </summary>
+    /// <remarks>
+    /// What SPEC-043's second slot was built for, asserted on the access token rather than only on the key
+    /// provider: the keys the handler accepts are every key the JWKS publishes, so a rotation does not
+    /// invalidate what the previous key signed.
+    /// </remarks>
     [Fact]
-    public void JwtOptions_WithAKeyBelowTheFloor_Throws()
+    public async Task ARotationOverlap_KeepsTheOutgoingKeyAcceptedAsync()
     {
-        // Act
-        ArgumentException exception = Assert.Throws<ArgumentException>(
-            () => new JwtOptions("too-short", Issuer, Audience, AccessTokenMinutes));
+        // Arrange — a token from the key that is about to become the previous one.
+        string outgoing = Pem();
+        RsaSigningKeyProvider before = new(new OneKeySecretProvider(outgoing));
 
-        // Assert — the message names the variable and the floor, never a value.
-        Assert.Contains("JWT_SIGNING_KEY", exception.Message, StringComparison.Ordinal);
-        Assert.Contains(
-            JwtOptions.MinimumSigningKeyBytes.ToString(CultureInfo.InvariantCulture),
-            exception.Message,
-            StringComparison.Ordinal);
+        IssuedAccessToken issued = new JwtAccessTokenIssuer(Options(), before)
+            .Issue(Guid.NewGuid(), SessionId, DateTime.UtcNow);
+
+        // The rotation: a new key signs, the outgoing one is published and accepted.
+        RsaSigningKeyProvider after = new(new OneKeySecretProvider(Pem(), outgoing));
+
+        // Act
+        TokenValidationResult result = await _handler.ValidateTokenAsync(issued.Token, Parameters(after));
+
+        // Assert
+        Assert.True(result.IsValid, result.Exception?.Message);
+        Assert.Equal(2, after.Verification.Count);
     }
 
     /// <summary>A lifetime of zero or less would issue tokens that are already expired.</summary>
     [Fact]
     public void JwtOptions_WithANonPositiveLifetime_Throws() =>
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => new JwtOptions(SigningKey, Issuer, Audience, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new JwtOptions(Issuer, Audience, 0));
 
-    private static JwtOptions Options() => new(SigningKey, Issuer, Audience, AccessTokenMinutes);
+    /// <summary>An issuer or audience nobody configured is refused at start-up.</summary>
+    [Fact]
+    public void JwtOptions_WithoutAnIssuerOrAudience_Throws()
+    {
+        Assert.Throws<ArgumentException>(() => new JwtOptions(" ", Audience, AccessTokenMinutes));
+        Assert.Throws<ArgumentException>(() => new JwtOptions(Issuer, " ", AccessTokenMinutes));
+    }
+
+    private static JwtOptions Options() => new(Issuer, Audience, AccessTokenMinutes);
+
+    /// <summary>A fresh key pair, as a host reads one out of configuration.</summary>
+    private static RsaSigningKeyProvider Keys() => new(new OneKeySecretProvider(Pem()));
+
+    /// <summary>One PEM private key.</summary>
+    private static string Pem()
+    {
+        using RSA rsa = RSA.Create(2048);
+
+        return rsa.ExportPkcs8PrivateKeyPem();
+    }
+
+    /// <summary>Answers the current key variable and nothing else.</summary>
+    private sealed class OneKeySecretProvider : ISecretProvider
+    {
+        private readonly string _pem;
+
+        private readonly string? _previous;
+
+        internal OneKeySecretProvider(string pem, string? previous = null)
+        {
+            _pem = pem;
+            _previous = previous;
+        }
+
+        public string Require(string name) => Read(name) ?? throw new InvalidOperationException(name);
+
+        public string? Read(string name) => name switch
+        {
+            RsaSigningKeyProvider.CurrentKeyVariable => _pem,
+            RsaSigningKeyProvider.PreviousKeyVariable => _previous,
+            _ => null,
+        };
+
+        public int ReadInteger(string name, int fallback) => fallback;
+
+        public bool ReadBoolean(string name, bool fallback) => fallback;
+    }
 
     private static JsonWebToken Issue(Guid userId)
     {
-        JwtAccessTokenIssuer issuer = new(Options());
+        JwtAccessTokenIssuer issuer = new(Options(), Keys());
 
         return _handler.ReadJsonWebToken(issuer.Issue(userId, SessionId, _nowUtc).Token);
     }
 
-    private static TokenValidationParameters Parameters(string signingKey) => new()
-    {
-        ValidIssuer = Issuer,
-        ValidAudience = Audience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
-        ValidateIssuerSigningKey = true,
-        ValidateLifetime = true,
-    };
+    private static TokenValidationParameters Parameters(ISigningKeyProvider keys) =>
+        JwtBearerConfiguration.Build(Options(), keys);
 }

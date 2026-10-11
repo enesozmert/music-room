@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using MusicRoom.Application.Abstractions.Security;
@@ -6,31 +5,43 @@ using MusicRoom.Application.Abstractions.Security;
 namespace MusicRoom.Infrastructure.Security;
 
 /// <summary>
-/// Signs access tokens with HS256, via the handler in
-/// <c>Microsoft.AspNetCore.Authentication.JwtBearer</c> — owner decision, 2026-09-27, escalation 1
-/// option B.
+/// Signs access tokens with **RS256**, using the key pair SPEC-043 published — ADR-0031, SPEC-050.
 /// </summary>
 /// <remarks>
-/// Issuance only. Validating a token is the middleware's job and lands with the first authenticated
-/// endpoint, which is logout; nothing here registers an authentication handler.
+/// Issuance only. Validating a token is the middleware's job; nothing here registers an authentication
+/// handler.
+/// <para>
+/// **RS256 since SPEC-050, which closed O32.** It was HS256 until then, which ADR-0031 had already decided
+/// against — *"a shared secret cannot be published in a JWKS, and a JWKS is what makes the provider
+/// verifiable by anything other than itself."* The ID token moved first (SPEC-044) because changing the
+/// signature of the token `AddJwtBearer` validates, in the unit that introduced a new flow, would have been
+/// two migrations in one diff. This is the second one, on its own.
+/// </para>
+/// <para>
+/// The `kid` header is written by the handler from the key's own identifier, which
+/// <see cref="RsaSigningKeyProvider" /> sets to the thumbprint the JWKS publishes. A verifier therefore
+/// picks the right key out of the set instead of trying each one — and a token signed before a rotation
+/// still names the key that signed it.
+/// </para>
 /// </remarks>
 public sealed class JwtAccessTokenIssuer : IAccessTokenIssuer
 {
     private static readonly JsonWebTokenHandler _handler = new();
 
     private readonly JwtOptions _options;
-    private readonly SigningCredentials _credentials;
+    private readonly ISigningKeyProvider _keys;
 
-    /// <summary>Takes the validated settings and prepares the signing credentials once.</summary>
-    /// <param name="options">The settings the composition root read from configuration.</param>
-    public JwtAccessTokenIssuer(JwtOptions options)
+    /// <summary>Takes the validated settings and the key pair to sign with.</summary>
+    /// <param name="options">The issuer, audience and lifetime the composition root read.</param>
+    /// <param name="keys">The RS256 pair — SPEC-043. Its current key signs; the previous one, during a
+    /// rotation overlap, is published and verified against and never signs.</param>
+    public JwtAccessTokenIssuer(JwtOptions options, ISigningKeyProvider keys)
     {
         ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(keys);
 
         _options = options;
-        _credentials = new SigningCredentials(
-            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.SigningKey)),
-            SecurityAlgorithms.HmacSha256);
+        _keys = keys;
     }
 
     /// <inheritdoc />
@@ -51,7 +62,7 @@ public sealed class JwtAccessTokenIssuer : IAccessTokenIssuer
             IssuedAt = nowUtc,
             NotBefore = nowUtc,
             Expires = nowUtc.AddMinutes(_options.AccessTokenMinutes),
-            SigningCredentials = _credentials,
+            SigningCredentials = new SigningCredentials(_keys.Current.Key, SecurityAlgorithms.RsaSha256),
             Claims = new Dictionary<string, object>(StringComparer.Ordinal)
             {
                 // The account this token speaks for, and a unique id per token so a single issued

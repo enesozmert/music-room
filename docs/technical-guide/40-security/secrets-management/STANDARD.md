@@ -53,7 +53,7 @@ a committed bootstrap token fails the project exactly as a committed API key wou
 | `YOUTUBE_API_KEY` | backend only |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | secret is backend only |
 | `FACEBOOK_APP_ID` / `FACEBOOK_APP_SECRET` | secret is backend only |
-| `JWT_SIGNING_KEY` | backend only |
+| `OIDC_SIGNING_KEY` / `OIDC_SIGNING_KEY_PREVIOUS` | backend only — the RS256 pair every token is signed with; the public half is published at `/.well-known/jwks.json` |
 | `DATABASE_URL` (pooled, or the local container) | backend only |
 | `DATABASE_DIRECT_URL` (migrations) | backend only, CI only |
 | `SUPABASE_SERVICE_ROLE_KEY` (only if ever issued) | backend only — never a client |

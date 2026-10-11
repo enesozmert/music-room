@@ -214,7 +214,6 @@ public sealed class BrevoMailServiceTests
                 CatalogOptions.DefaultMemoryLifetime,
                 CatalogOptions.DefaultRequestTimeout),
             new JwtOptions(
-                new string('k', JwtOptions.MinimumSigningKeyBytes),
                 "musicroom-tests",
                 "musicroom-tests",
                 15),

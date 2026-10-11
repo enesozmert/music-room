@@ -240,7 +240,7 @@ public sealed class OpenIdConnectIdentityProviderTests
                 TrackSearchCache.DefaultLifetime,
                 CatalogOptions.DefaultMemoryLifetime,
                 CatalogOptions.DefaultRequestTimeout),
-            new JwtOptions(new string('k', JwtOptions.MinimumSigningKeyBytes), "tests", "tests", 15),
+            new JwtOptions("tests", "tests", 15),
             new CredentialAttemptLimits(
                 CredentialAttemptLimits.DefaultPermitsPerWindow,
                 TimeSpan.FromMinutes(CredentialAttemptLimits.DefaultWindowMinutes),

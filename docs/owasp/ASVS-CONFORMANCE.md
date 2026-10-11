@@ -209,8 +209,8 @@ builds a path from a submitted name. Profile imagery would land here and is not 
 | Req | Outcome | Evidence |
 |---|---|---|
 | V9.1.1 | met | `BearerValidationTests`: a tampered token is `401` |
-| V9.1.2 | met | `JwtAccessTokenIssuer` signs HS256 and the handler accepts that algorithm only; `JwtOptions` enforces a 32-byte key floor |
-| V9.1.3 | met | the key comes from `JWT_SIGNING_KEY` at start-up and the host refuses to boot without it — `EnvironmentConfiguration.RequireJwtOptions` |
+| V9.1.2 | met | **SPEC-050:** `JwtAccessTokenIssuer` signs **RS256** with the key pair SPEC-043 published, the token's `kid` names it, and the handler accepts only the keys the JWKS publishes — no HMAC, not even during a deploy. `RsaSigningKeyProvider` enforces a 2048-bit floor and refuses a shorter or malformed key at start-up |
+| V9.1.3 | met | the key comes from `OIDC_SIGNING_KEY` at start-up and the host refuses to boot without it — `RsaSigningKeyProvider`, resolved at map time by `MapOpenIdMetadata`. Nothing generates a key for itself: a generated key is one nobody backed up and nothing else can verify against after a restart. `JWT_SIGNING_KEY` no longer exists (SPEC-050) |
 | V9.2.1 | met | `BearerValidationTests.Sessions_WithAnExpiredToken_Returns401Async`, with the 30-second skew stated in [[sdd]] §13.1 |
 | V9.2.2 | partial | the access token is the only token type this service issues and accepts, so there is nothing to confuse it with — but no explicit `typ` or purpose claim is validated. S8 introduces an ID token, which is when this becomes a real distinction |
 | V9.2.3 | met | `BearerValidationTests`: issuer and audience are both validated, and a token minted for another audience is `401` |
