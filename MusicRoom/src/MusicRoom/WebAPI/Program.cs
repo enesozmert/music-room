@@ -128,7 +128,13 @@ internal static class EnvironmentConfiguration
     /// resolve anything from. The same type is registered as well, so a later request-time reader gets the same
     /// behaviour — <c>AddInfrastructureServices</c>.
     /// </remarks>
-    internal static ISecretProvider For(IConfiguration configuration) => new EnvSecretProvider(configuration);
+    /// <remarks>
+    /// Through the factory since SPEC-047: `SECRET_PROVIDER` decides whether this is the process environment
+    /// or the vault, and the factory builds one instance per configuration so the several reads this root
+    /// performs cost one vault login rather than one each.
+    /// </remarks>
+    internal static ISecretProvider For(IConfiguration configuration) =>
+        SecretProviderFactory.For(configuration);
 
     /// <summary>
     /// Reads the vendor-neutral <c>DATABASE_URL</c> — ADR-0026. There is deliberately no fallback

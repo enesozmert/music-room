@@ -887,8 +887,19 @@ requires a locally installed SDK, database client or CLI; `dotnet-ef` is pinned 
 
 Secrets are read through a provider abstraction, so the vault replaces the environment without
 touching a call site. The vault is **required scope** -- [[ADR-0029-containerised-dev-and-secret-vault]],
-amended 2026-09-27 -- and it lands at S1b. It **shrinks** `.env` to the vault's own bootstrap
-credentials; it does not remove it, and subject V.8 still applies to what remains.
+amended 2026-09-27 -- and it **landed at S1b**: SPEC-030 the abstraction, SPEC-042 the vault in this
+compose stack, SPEC-047 the provider that reads from it. It **shrinks** `.env` to the vault's own
+bootstrap credentials; it does not remove it, and subject V.8 still applies to what remains.
+
+`SECRET_PROVIDER` selects: `env` (the default, and what CI uses) or `infisical`. Three properties of
+that switch are load-bearing, and each is asserted by a test rather than described here only. **The
+vault outranks `.env`, and `.env` is the floor beneath it** -- forced rather than chosen, because
+`INFISICAL_CLIENT_ID` and `INFISICAL_CLIENT_SECRET` are what the application logs in with and so
+cannot live in the vault they open. **A vault that cannot be reached stops the host**, because a
+fallback would silently return the system to reading API keys out of a file and nothing in a log
+would say the posture had changed. And **secrets are read once, at start-up**, so a read costs no
+network, a vault outage is a boot failure rather than a request failure, and rotating a secret takes
+a restart -- the honest cost, written beside the variable in `.env.example`.
 
 All configuration from environment variables, named after the role rather than the vendor
 (`DATABASE_URL`, not a provider name) -- [[ADR-0026-environment-bring-up]]. External credentials
@@ -1012,7 +1023,7 @@ table to walk through at defence.
 | V.6 | OWASP conformance of all code | [[asvs-conformance]], §13 | target committed, evidence pending |
 | V.8 | per-layer tests | [[testing]], [[ADR-0012-test-stack]] | **partly implemented** -- tests in four projects, the count being whatever `make agent-check` prints rather than a number that rots here: validation and pipeline behaviours (`MusicRoom.Application.Tests`), infrastructure (`MusicRoom.Infrastructure.Tests`), persistence (`MusicRoom.Persistence.Tests`, which holds the built model to the schema naming conventions without needing an engine) and API integration (`MusicRoom.WebAPI.Tests`, Testcontainers-backed against a real PostgreSQL). Every slice with a contended write carries the parallel test AGENTS.md requires, each asserting final database state rather than status codes alone: one row from 20 parallel registrations of an address; one `204` and one `consumed_at_utc` from 20 verifications of a token; one `200`, one spent row and one replacement from 20 refresh-token rotations; one `204` and no live refresh token from 20 password resets; one friendship from 20 accepts; one `200` and nineteen `412` from 20 playlist reorders; twenty votes and a count of twenty from twenty accounts, against one row from 20 votes by one account; one spent venue code; one controller from 20 simultaneous claims; and one track advanced from 20 parallel advances. **The realtime layer is tested too** -- three hub suites and three broadcast suites drive a real SignalR client against the test host. The domain layer has no tests of its own: its types carry no behaviour worth isolating, which is a consequence of the anaemic shape ADR-0028 chose and is stated here rather than left as a gap |
 | V.8 | continuous integration | [[ci-cd-containerization]] | **done** -- `.github/workflows/backend-dev.yml` and `backend-prod.yml`: restore, format, build -warnaserror, test, vulnerable-package scan, OpenAPI drift check; prod also builds the image. No deployment, by [[ADR-0015-hosting-and-deployment]] |
-| V.8 | credentials in a git-ignored `.env` | §14.3, `.env.example` | **done** |
+| V.8 | credentials in a git-ignored `.env` | §14.3, `.env.example` | **done**, and past the floor since 2026-10-11: `SECRET_PROVIDER=infisical` reads configuration from the self-hosted vault in this compose stack, leaving `.env` holding the vault's own bootstrap credentials — SPEC-047, O18 closed |
 | V.8 | enforced code quality | [[dotnet-csharp]], `.editorconfig`, `MusicRoom/SonarLint.xml` | **done** -- proven live in S0: a 47-line method fails the build with `S138 ... greater than the 40 lines authorized`, and six parameters fail with `S107`. The thresholds moved to `SonarLint.xml`; in `.editorconfig` they were silently ignored |
 | IV.1 | no third-party source in the repo | §5.1, `.gitignore` excludes `reference/` | **done** |
 | IV.1 | dependencies install from a fresh clone | §14.2, `Makefile`, `docker-compose.yml` | **done** -- clone, `cp .env.example .env`, fill, `make up`. Verified end to end: the API container serves `/health` and `/health/ready` against the compose PostgreSQL |
@@ -1039,7 +1050,6 @@ defence, not more.
 | O11 | remote deployment target | a live demo URL | [[ADR-0015-hosting-and-deployment]]. Fly.io, Railway, Render, Azure Container Apps. **Not Vercel** |
 | O12 | fluent assertion library | test readability | add only if xUnit's built-ins prove insufficient |
 | O13 | silent-controller recovery | a stalled playback session | [[ADR-0017-playback-session]] accepted no watchdog; takeover is the manual path. Revisit only if it bites in testing |
-| O18 | self-hosted Infisical vault | API keys sitting readable in `.env` | [[ADR-0029-containerised-dev-and-secret-vault]], amended 2026-09-27: **required scope, not optional.** The provider abstraction lands early, the vault at S1b, after the mail adapter at S1a (O17). Self-hosted Infisical needs its own PostgreSQL, Redis and encryption key — roughly five compose services instead of two. Subject V.8 does not ask for it; the owner does, and the delivered system runs on it. It is planned alongside S1 to S9, not after them |
 | O14 | music preferences have no consumer | nothing | V.1 requires storing and updating them, which is met. Note for defence: storage-only today |
 | O19 | RS256 key pair: generation, storage, JWKS exposure and rotation with an overlap window | the OpenID Provider surface at S8 | [[ADR-0031-musicroom-as-openid-provider]]. `EnvSecretProvider` holds the private key until the vault lands at S1b, after which it belongs there. Rotation needs an overlap so tokens signed by the outgoing key keep verifying |
 | O20 | PostgreSQL Row Level Security policies are not written | nothing — it is defence in depth | §13.2 claimed RLS was enabled; no migration creates a policy. Opened by the SPEC-013 SDD sync on 2026-09-29. Deny-by-default policies on the per-account tables would mean a query that forgot its `WHERE` returns nothing rather than everything. Cost: every read path needs a session variable carrying the caller, which the current single-connection-pool design does not set |
@@ -1057,6 +1067,7 @@ defence, not more.
 | # | Issue | Closed by |
 |---|---|---|
 | O21 | hub call limits and handshake origin decided and not built | **SPEC-026, 2026-10-04.** The ceiling, the per-connection invocation limit and the `Origin` check all exist, with the numbers the owner set in [[ADR-0030-hub-rate-limits-and-origin]] on the same day. `CORS_ALLOWED_ORIGINS` is read by code for the first time, which is the half of this issue the brain-check of 2026-10-02 found. T-12 narrows from "bounded payloads and timeouts" to a stated limit with tests behind it; the per-process residual is O8, unchanged |
+| O18 | self-hosted Infisical vault | **SPEC-030, SPEC-042 and SPEC-047, closed 2026-10-11.** `ISecretProvider` with two implementations; a self-hosted Infisical in this compose stack behind a `vault` profile, so `make up` stays two services and a defence walkthrough brings the vault up; and `InfisicalSecretProvider`, selected by `SECRET_PROVIDER`, authenticating with a machine identity. The vault outranks `.env` and `.env` remains the floor — forced, because the vault's own bootstrap credentials cannot live inside it, which ADR-0029 wrote down before any of it was built. A vault that cannot be reached stops the host instead of falling back, because a fallback would silently restore the posture the vault exists to remove. Secrets are read once at start-up, so rotation needs a restart |
 | O17 | real mail provider adapter | **SPEC-024, 2026-10-04.** `BrevoMailService` behind `IMailService`, selected by `MAIL_PROVIDER`; the Development logging sender stays for local work and is refused anywhere else. Verification and reset messages now reach a real mailbox, from Brevo's sandbox sender (§10.1). Closes T-26 with it |
 | O1 | which services ship | [[ADR-0010-service-scope]] — all three |
 | O9 | concrete table and column definitions | the migrations, not a document: `InitialIdentity`, `RefreshTokens`, `PasswordResetTokens` and `AuditRecords` ([[migrations-index]]). `SchemaConventionTests` holds the built model to the naming rules |

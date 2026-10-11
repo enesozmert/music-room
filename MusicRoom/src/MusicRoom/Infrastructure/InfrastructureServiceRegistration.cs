@@ -41,8 +41,11 @@ public static class InfrastructureServiceRegistration
 
         // Registered as well as constructed at start-up: the composition root needs one before a container
         // exists, and anything resolving the abstraction later must get the same behaviour — SPEC-030.
+        // Through the factory since SPEC-047, which memoises per configuration, so what the container hands
+        // out is the **same instance** the root read `DATABASE_URL` through — one vault login, one view of
+        // the secrets, and no chance of two components disagreeing about what is configured.
         services.AddSingleton<ISecretProvider>(provider =>
-            new EnvSecretProvider(provider.GetRequiredService<IConfiguration>()));
+            SecretProviderFactory.For(provider.GetRequiredService<IConfiguration>()));
 
         services.AddSingleton<IPasswordHasher>(_ => new BCryptPasswordHasher(options.BCryptWorkFactor));
 
