@@ -38,6 +38,12 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
+      # `dotnet ef` reads the project the way a build does, so it needs the assets file a restore writes:
+      # without this the first run failed with `NETSDK1004 ... Unable to retrieve project metadata`. The
+      # tool restore above installs `dotnet-ef` and restores nothing else.
+      - name: Restore
+        run: dotnet restore MusicRoom/MusicRoom.sln
+
       # The session pooler, not the transaction pooler the API uses: transaction-mode pooling cannot
       # carry a migration, and Supabase's direct host is IPv6-only while this runner is not.
       - name: Pending migrations
