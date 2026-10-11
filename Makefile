@@ -76,6 +76,14 @@ BACKUP_KEEP ?= 7
 # test ever passes it — ADR-0044.
 BACKUP_ENV_FILE ?= .env
 
+# Prints a pair and writes nothing. This project never generates its own signing key at start-up: a
+# generated key is one nobody backed up, nobody can rotate and nothing else can verify against after a
+# restart — ADR-0031, issue O19, SPEC-043.
+oidc-key: ## print an RS256 private key for OIDC_SIGNING_KEY
+	@openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null \
+		| awk 'BEGIN{printf "OIDC_SIGNING_KEY=\""} {printf "%s\\n", $$0} END{print "\""}'
+	@echo "# Paste the line above into .env. Rotating: move the old value to OIDC_SIGNING_KEY_PREVIOUS first."
+
 vault: ## start the self-hosted Infisical vault — SPEC-042, ADR-0029
 	@test -f .env || { echo "make vault: .env is missing. cp .env.example .env and fill it in — ADR-0026."; exit 1; }
 	@set -a; . ./.env; set +a; \
@@ -118,8 +126,13 @@ openapi: ## regenerate docs/api/openapi.json from the code
 	# to be satisfied. The environment is Development because a document build is a development-time
 	# operation, and MAIL_PROVIDER is set because SPEC-024 made a mail sender a start-up requirement:
 	# `logging` opens no socket, so generating a document sends nothing and needs no provider key.
+	#
+	# OIDC_SIGNING_KEY is generated here and thrown away: SPEC-043 made a missing key stop the host, and
+	# the document describes routes rather than signatures, so nothing this build produces depends on
+	# which key it was. A fixed key in this file would be a private key in the repository.
 	ASPNETCORE_ENVIRONMENT=Development DATABASE_URL="$(OPENAPI_DATABASE_URL)" \
 	MAIL_PROVIDER=logging \
+	OIDC_SIGNING_KEY="$$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null)" \
 	JWT_SIGNING_KEY="$(OPENAPI_JWT_SIGNING_KEY)" \
 	JWT_ISSUER="$(OPENAPI_JWT_ISSUER)" \
 	JWT_AUDIENCE="$(OPENAPI_JWT_AUDIENCE)" \

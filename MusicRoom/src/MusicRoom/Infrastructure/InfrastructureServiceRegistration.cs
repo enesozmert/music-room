@@ -53,6 +53,11 @@ public static class InfrastructureServiceRegistration
         // Singleton: the signing credentials are built once and the issuer holds no request state.
         services.AddSingleton<IAccessTokenIssuer>(_ => new JwtAccessTokenIssuer(options.Jwt));
 
+        // The RS256 pair this API signs identity assertions with — ADR-0031, O19. Singleton because the key
+        // is read once and a key that changed between requests would invalidate what the last one signed.
+        services.AddSingleton<ISigningKeyProvider>(provider =>
+            new RsaSigningKeyProvider(provider.GetRequiredService<ISecretProvider>()));
+
         // Singleton on purpose: the attempt history is the whole point, and a scoped limiter would
         // forget every failure at the end of the request that recorded it.
         services.AddSingleton<ICredentialAttemptLimiter>(_ =>

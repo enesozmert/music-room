@@ -238,7 +238,27 @@ internal static class TestJwtSettings
         webHost.UseSetting("JWT_ISSUER", "musicroom-tests");
         webHost.UseSetting("JWT_AUDIENCE", "musicroom-tests-client");
         webHost.UseSetting("JWT_ACCESS_TOKEN_MINUTES", "15");
+
+        // The OIDC signing key, here rather than in each suite: SPEC-043 made a missing key stop the host,
+        // so every test host needs one whether or not its suite touches the provider surface. Generated per
+        // process rather than hard-coded — a private key checked into a repository is a private key.
+        webHost.UseSetting(
+            MusicRoom.Infrastructure.Security.RsaSigningKeyProvider.CurrentKeyVariable, OidcSigningKey);
     }
+
+    /// <summary>One RSA key for this test process, made once.</summary>
+    /// <remarks>
+    /// `Lazy` because generating 2048 bits costs tens of milliseconds and every suite in the assembly would
+    /// otherwise pay it again. A fixed key in source would be a private key in a public repository.
+    /// </remarks>
+    private static string OidcSigningKey => _oidcSigningKey.Value;
+
+    private static readonly Lazy<string> _oidcSigningKey = new(() =>
+    {
+        using System.Security.Cryptography.RSA rsa = System.Security.Cryptography.RSA.Create(2048);
+
+        return rsa.ExportPkcs8PrivateKeyPem();
+    });
 }
 
 /// <summary>
