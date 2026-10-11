@@ -13,6 +13,25 @@ namespace MusicRoom.Application.Features.Auth.Commands.Register;
 /// </summary>
 internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, CredentialThrottle?>
 {
+    /// <summary>The account a registration becomes, before anything has been written.</summary>
+    /// <remarks>
+    /// Its own method because the handler reached the 40-line limit the root .editorconfig enforces (S138)
+    /// when SPEC-052 gave the verification mail a display name and a code. The address is lower-cased on
+    /// the way in, so `ux_users_email` is case-insensitive without a functional index: `Alice@example.com`
+    /// and `alice@example.com` are one account, not two.
+    /// </remarks>
+    private User NewAccount(RegisterCommand request, DateTime nowUtc) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            Email = request.Email.Trim().ToLowerInvariant(),
+            PasswordHash = _passwordHasher.Hash(request.Password),
+            DisplayName = request.DisplayName.Trim(),
+            IsEmailVerified = false,
+            CreatedAtUtc = nowUtc,
+            UpdatedAtUtc = nowUtc,
+        };
+
     private readonly IUserRepository _users;
     private readonly IPasswordHasher _passwordHasher;
     private readonly CredentialMailDispatcher _mail;
@@ -65,18 +84,7 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
 
         _attempts.RecordChargeableAttempt(partitionKey);
 
-        User user = new()
-        {
-            Id = Guid.NewGuid(),
-            // Lower-cased on the way in, so ux_users_email is case-insensitive without a functional
-            // index: Alice@example.com and alice@example.com are one account, not two.
-            Email = request.Email.Trim().ToLowerInvariant(),
-            PasswordHash = _passwordHasher.Hash(request.Password),
-            DisplayName = request.DisplayName.Trim(),
-            IsEmailVerified = false,
-            CreatedAtUtc = nowUtc,
-            UpdatedAtUtc = nowUtc,
-        };
+        User user = NewAccount(request, nowUtc);
 
         IssuedVerificationToken issued = VerificationTokenIssuer.Issue(user.Id, nowUtc);
 
@@ -106,7 +114,14 @@ internal sealed class RegisterCommandHandler : IRequestHandler<RegisterCommand, 
         }
 
         // After the insert committed, never inside it — ADR-0013.
-        await _mail.SendVerificationAsync(user.Email, issued.Plaintext, cancellationToken).ConfigureAwait(false);
+        await _mail
+            .SendVerificationAsync(
+                user.Email,
+                user.DisplayName,
+                issued.Plaintext,
+                issued.Code,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         _audit.SetUserId(user.Id);
         _audit.SetTargetId(user.Id);

@@ -35,7 +35,7 @@ public sealed class LoggingMailServiceTests
         IMailService mail = ResolveMailService(log, BaseUrl);
 
         // Act
-        await mail.SendEmailVerificationAsync(EmailAddress, Token, TestContext.Current.CancellationToken);
+        await mail.SendEmailVerificationAsync(Verification(), TestContext.Current.CancellationToken);
 
         // Assert
         string message = Assert.Single(log.Messages);
@@ -55,7 +55,7 @@ public sealed class LoggingMailServiceTests
         IMailService mail = ResolveMailService(log, verificationLinkBaseUrl: null);
 
         // Act
-        await mail.SendEmailVerificationAsync(EmailAddress, Token, TestContext.Current.CancellationToken);
+        await mail.SendEmailVerificationAsync(Verification(), TestContext.Current.CancellationToken);
 
         // Assert
         string message = Assert.Single(log.Messages);
@@ -76,7 +76,7 @@ public sealed class LoggingMailServiceTests
         IMailService mail = ResolveMailService(log, BaseUrl);
 
         // Act
-        await mail.SendPasswordResetAsync(EmailAddress, Token, TestContext.Current.CancellationToken);
+        await mail.SendPasswordResetAsync(Reset(), TestContext.Current.CancellationToken);
 
         // Assert
         string message = Assert.Single(log.Messages);
@@ -97,7 +97,7 @@ public sealed class LoggingMailServiceTests
         IMailService mail = ResolveMailService(log, BaseUrl);
 
         // Act
-        await mail.SendPasswordResetAsync(EmailAddress, Token, TestContext.Current.CancellationToken);
+        await mail.SendPasswordResetAsync(Reset(), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Equal(LogLevel.Warning, Assert.Single(log.Levels));
@@ -252,4 +252,12 @@ public sealed class LoggingMailServiceTests
             _log.Add(logLevel, formatter(state, exception));
         }
     }
+
+    /// <summary>The verification message these tests send — SPEC-052's record form.</summary>
+    private static VerificationMail Verification(MailLanguage language = MailLanguage.English) =>
+        new(EmailAddress, "Reader", Token, "ABC234", language);
+
+    /// <summary>The reset message, which carries a token and deliberately no code.</summary>
+    private static PasswordResetMail Reset(MailLanguage language = MailLanguage.English) =>
+        new(EmailAddress, "Reader", Token, language);
 }

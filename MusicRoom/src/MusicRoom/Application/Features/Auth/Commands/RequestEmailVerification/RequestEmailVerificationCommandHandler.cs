@@ -85,7 +85,11 @@ internal sealed class RequestEmailVerificationCommandHandler : IRequestHandler<R
         }
 
         // After the insert committed, never inside it — ADR-0013.
-        await _mail.SendVerificationAsync(email, issued.Plaintext, cancellationToken).ConfigureAwait(false);
+        // No display name: this path is keyed on an address and reads no account, because reading one
+        // would be a way to learn whether it exists. The greeting is the one without a name — SPEC-052.
+        await _mail
+            .SendVerificationAsync(email, string.Empty, issued.Plaintext, issued.Code, cancellationToken)
+            .ConfigureAwait(false);
 
         return null;
     }

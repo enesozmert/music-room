@@ -247,6 +247,19 @@ namespace MusicRoom.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int>("Attempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempts");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character(64)")
+                        .HasColumnName("code_hash")
+                        .IsFixedLength();
+
                     b.Property<DateTime?>("ConsumedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("consumed_at_utc");
@@ -1272,6 +1285,10 @@ namespace MusicRoom.Persistence.Migrations
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
+
+                    b.Property<DateTime?>("WelcomeSentAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("welcome_sent_at_utc");
 
                     b.HasKey("Id");
 

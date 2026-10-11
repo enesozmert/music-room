@@ -66,9 +66,12 @@ internal static class AuthEndpoints
             .WithName("PostAuthEmailVerification")
             .WithSummary("Verify an email address")
             .WithDescription(
-                "Spends the token from the verification mail exactly once and marks the address "
-                + "verified. The description says nothing about what separates 400 from 410 for a "
-                + "given token, because that is the caller's business only when they hold it.")
+                "Spends a verification credential exactly once and marks the address verified. Send "
+                + "either `token`, from the link, or `email` with the six-character `code` from the "
+                + "message. A wrong code costs one of five attempts against that message, after which it "
+                + "is spent whatever is typed. The description says nothing about what separates 400 "
+                + "from 410 for a given credential, because that is the caller's business only when they "
+                + "hold it.")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status410Gone)
@@ -255,7 +258,7 @@ internal static class AuthEndpoints
         ISender sender,
         CancellationToken cancellationToken)
     {
-        VerifyEmailCommand command = new(request.Token);
+        VerifyEmailCommand command = new(request.Token, request.Email, request.Code);
 
         VerifyEmailOutcome outcome;
 
@@ -292,10 +295,15 @@ internal static class AuthEndpoints
 internal sealed record RegistrationRequest(string Email, string Password, string DisplayName);
 
 /// <summary>
-/// The email verification payload — <c>docs/api/ENDPOINTS.md</c> §1.
+/// The email verification payload — <c>docs/api/ENDPOINTS.md</c> §1. One credential or the other,
+/// SPEC-052.
 /// </summary>
-/// <param name="Token">The token from the verification mail.</param>
-internal sealed record EmailVerificationRequest(string Token);
+/// <param name="Token">The token from the link, or null when a code is sent instead.</param>
+/// <param name="Email">The address the code was sent to. Required with a code, because six characters are
+/// not unique across accounts; absent with a token, which identifies its own row.</param>
+/// <param name="Code">The six characters from the message. Case and spacing do not matter — they are
+/// normalised before anything is compared.</param>
+internal sealed record EmailVerificationRequest(string? Token, string? Email = null, string? Code = null);
 
 /// <summary>
 /// The verification resend payload — <c>docs/api/ENDPOINTS.md</c> §1.

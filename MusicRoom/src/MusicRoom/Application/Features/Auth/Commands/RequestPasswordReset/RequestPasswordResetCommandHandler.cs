@@ -82,7 +82,11 @@ internal sealed class RequestPasswordResetCommandHandler : IRequestHandler<Reque
         }
 
         // After the insert committed, never inside it — ADR-0013.
-        await _mail.SendPasswordResetAsync(email, issued.Plaintext, cancellationToken).ConfigureAwait(false);
+        // No display name, for the reason the resend path gives: this is keyed on an address and reads
+        // no account.
+        await _mail
+            .SendPasswordResetAsync(email, string.Empty, issued.Plaintext, cancellationToken)
+            .ConfigureAwait(false);
 
         return null;
     }

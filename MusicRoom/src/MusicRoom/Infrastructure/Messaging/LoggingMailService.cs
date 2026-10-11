@@ -34,28 +34,23 @@ internal sealed class LoggingMailService : IMailService
     }
 
     /// <inheritdoc />
-    public Task SendEmailVerificationAsync(
-        string emailAddress,
-        string token,
-        CancellationToken cancellationToken)
+    /// <remarks>
+    /// Both credentials are written, because either completes the flow and a developer should not have to
+    /// guess which one this build issued — SPEC-052.
+    /// </remarks>
+    public Task SendEmailVerificationAsync(VerificationMail message, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(message);
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (string.IsNullOrWhiteSpace(_verificationLinkBaseUrl))
-        {
-            _logger.LogInformation(
-                "Email verification token issued for {EmailAddress}: {VerificationToken}. "
-                + "VERIFICATION_LINK_BASE_URL is not set, so no link was composed.",
-                emailAddress,
-                token);
-
-            return Task.CompletedTask;
-        }
-
         _logger.LogInformation(
-            "Email verification link issued for {EmailAddress}: {VerificationLink}",
-            emailAddress,
-            $"{_verificationLinkBaseUrl.TrimEnd('/')}?token={Uri.EscapeDataString(token)}");
+            "Email verification issued for {EmailAddress} in {MailLanguage}: code {VerificationCode}, "
+            + "token {VerificationToken}. {VerificationLink}",
+            message.EmailAddress,
+            message.Language,
+            message.Code,
+            message.Token,
+            Link(message.Token));
 
         return Task.CompletedTask;
     }
@@ -64,24 +59,43 @@ internal sealed class LoggingMailService : IMailService
     /// <remarks>
     /// The reset token is written to the log, which the repository owner accepted on 2026-09-27
     /// (SPEC-006 escalation 3 — recorded as the widening of T-26). It is strictly worse than the
-    /// verification token this class already logs: a reader of a Development log can take the account
+    /// verification credential this class already logs: a reader of a Development log can take the account
     /// over, not merely confirm its address. The start-up guard in
-    /// <see cref="InfrastructureServiceRegistration"/> is what keeps that to Development hosts, and the
-    /// row closes when slice S1a lands the real sender.
+    /// <see cref="InfrastructureServiceRegistration"/> is what keeps that to Development hosts.
     /// </remarks>
-    public Task SendPasswordResetAsync(
-        string emailAddress,
-        string token,
-        CancellationToken cancellationToken)
+    public Task SendPasswordResetAsync(PasswordResetMail message, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(message);
         cancellationToken.ThrowIfCancellationRequested();
 
         _logger.LogWarning(
-            "Password reset token issued for {EmailAddress}: {PasswordResetToken}. This token replaces "
-            + "a password; it is logged only because this sender is Development-only (T-26).",
-            emailAddress,
-            token);
+            "Password reset token issued for {EmailAddress} in {MailLanguage}: {PasswordResetToken}. This "
+            + "token replaces a password; it is logged only because this sender is Development-only (T-26).",
+            message.EmailAddress,
+            message.Language,
+            message.Token);
 
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    /// <remarks>Nothing secret in this one, so it is an ordinary information line.</remarks>
+    public Task SendWelcomeAsync(WelcomeMail message, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        _logger.LogInformation(
+            "Welcome mail issued for {EmailAddress} in {MailLanguage}.",
+            message.EmailAddress,
+            message.Language);
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>The link, or a sentence saying why there is none.</summary>
+    private string Link(string token) =>
+        string.IsNullOrWhiteSpace(_verificationLinkBaseUrl)
+            ? "VERIFICATION_LINK_BASE_URL is not set, so no link was composed."
+            : $"{_verificationLinkBaseUrl.TrimEnd('/')}?token={Uri.EscapeDataString(token)}";
 }

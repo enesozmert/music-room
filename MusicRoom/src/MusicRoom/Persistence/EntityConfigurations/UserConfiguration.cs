@@ -55,6 +55,12 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone");
 
+        // When the welcome message was sent, or null — SPEC-052. Nullable because "never" is a real state
+        // and the column is what makes once mean once.
+        builder.Property(user => user.WelcomeSentAtUtc)
+            .HasColumnName("welcome_sent_at_utc")
+            .HasColumnType("timestamp with time zone");
+
         builder.Property(user => user.UpdatedAtUtc)
             .HasColumnName("updated_at_utc")
             .HasColumnType("timestamp with time zone");

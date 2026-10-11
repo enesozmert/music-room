@@ -5,6 +5,11 @@
          the binary is a deployment step somebody can forget, and a missing screen that boots is worse than a
          boot that refuses. Data, not a dependency — nothing is added to Directory.Packages.props. -->
     <EmbeddedResource Include="Security/breached-passwords.txt" />
+
+    <!-- The mail layout, one HTML and one text — SPEC-052. Embedded rather than copied beside the
+         binary so a deployment cannot ship a message the build did not see. -->
+    <EmbeddedResource Include="Messaging/Templates/Message.html" />
+    <EmbeddedResource Include="Messaging/Templates/Message.txt" />
   </ItemGroup>
 
   <ItemGroup>

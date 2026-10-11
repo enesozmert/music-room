@@ -12,7 +12,7 @@ namespace MusicRoom.Persistence.Repositories;
 /// <summary>
 /// The EF Core write path for accounts.
 /// </summary>
-internal sealed class UserRepository : IUserRepository
+internal sealed partial class UserRepository : IUserRepository
 {
     private readonly MusicRoomDbContext _context;
 

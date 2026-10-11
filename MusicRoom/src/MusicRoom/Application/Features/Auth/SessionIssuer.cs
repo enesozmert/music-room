@@ -25,6 +25,7 @@ public sealed class SessionIssuer
     private readonly IRefreshTokenRepository _refreshTokens;
     private readonly IAccessTokenIssuer _accessTokens;
     private readonly IClientContextAccessor _clientContext;
+    private readonly WelcomeMailSender _welcome;
 
     /// <summary>Takes the refresh-token write path, the access-token issuer and the client context.</summary>
     /// <param name="refreshTokens">The refresh-token write path.</param>
@@ -32,14 +33,19 @@ public sealed class SessionIssuer
     /// <param name="clientContext">The platform, device and app version the session is remembered by —
     /// SPEC-010 escalation 2. It is the same accessor the audit behaviour reads, so no new plumbing crosses a
     /// boundary.</param>
+    /// <param name="welcome">The one-per-account welcome message — SPEC-052. It lives here rather than in
+    /// a sign-in handler because every way in opens its session through this class: a password, a provider,
+    /// and the authorization code grant. In a handler it would welcome some accounts and not others.</param>
     public SessionIssuer(
         IRefreshTokenRepository refreshTokens,
         IAccessTokenIssuer accessTokens,
-        IClientContextAccessor clientContext)
+        IClientContextAccessor clientContext,
+        WelcomeMailSender welcome)
     {
         _refreshTokens = refreshTokens;
         _accessTokens = accessTokens;
         _clientContext = clientContext;
+        _welcome = welcome;
     }
 
     /// <summary>Issues the first pair of a new session.</summary>
@@ -89,6 +95,10 @@ public sealed class SessionIssuer
         await _refreshTokens.IssueAsync(token, cancellationToken).ConfigureAwait(false);
 
         IssuedAccessToken accessToken = _accessTokens.Issue(userId, familyId, nowUtc);
+
+        // After the session exists, and unable to fail it: the stamp is conditional, so this sends once
+        // per account however many times or ways somebody signs in — SPEC-052.
+        await _welcome.SendIfFirstAsync(userId, cancellationToken).ConfigureAwait(false);
 
         return new AuthTokenPair(accessToken.Token, plaintext, accessToken.ExpiresInSeconds);
     }

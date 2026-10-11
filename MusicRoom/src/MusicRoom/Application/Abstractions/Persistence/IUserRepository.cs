@@ -49,6 +49,43 @@ public interface IUserRepository
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Spends a verification **code** for one address, counting the attempt — SPEC-052.
+    /// </summary>
+    /// <param name="email">The address the code was sent to, trimmed and lower-cased by the caller. The
+    /// code alone would not do: six characters are not unique across accounts, and a code is only ever
+    /// offered by somebody who also knows which address it was sent to.</param>
+    /// <param name="codeHash">The digest of the submitted code.</param>
+    /// <param name="nowUtc">The instant the request is judged against.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// <see cref="VerifyEmailOutcome.Verified"/> for the caller that won the code. Everything else — an
+    /// unknown address, a wrong code, a spent one, a row out of attempts — is
+    /// <see cref="VerifyEmailOutcome.Invalid"/>, because a caller who could tell them apart could learn
+    /// which addresses have a verification outstanding.
+    /// </returns>
+    /// <remarks>
+    /// **A wrong code costs an attempt**, and the fifth spends the row. That budget is what makes six
+    /// characters safe: without it the code is one in a billion per guess and guesses are free.
+    /// </remarks>
+    Task<VerifyEmailOutcome> TryConsumeEmailVerificationCodeAsync(
+        string email,
+        string codeHash,
+        DateTime nowUtc,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Stamps the welcome message as sent, and reports whether this call is the one that did it.
+    /// </summary>
+    /// <param name="userId">The account that just signed in.</param>
+    /// <param name="nowUtc">The instant to stamp.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// True exactly once per account. The stamp is written by a conditional UPDATE, so two sign-ins that
+    /// race produce one message — the database decides which, rather than a read-then-write here.
+    /// </returns>
+    Task<bool> TryStampWelcomeAsync(Guid userId, DateTime nowUtc, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Issues a replacement verification token for an unverified account, superseding any link
     /// already outstanding for it, in one transaction.
     /// </summary>

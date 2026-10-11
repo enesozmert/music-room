@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using MusicRoom.Application.Abstractions.Messaging;
 using MusicRoom.WebAPI.Hubs;
 
 namespace MusicRoom.WebAPI.Middleware;
@@ -125,7 +126,8 @@ public sealed class ClientContextMiddleware
             Activity.Current?.TraceId.ToString() ?? httpContext.TraceIdentifier,
             // Present only when the bearer middleware has already validated a token, which is why this
             // middleware runs after UseAuthentication — SPEC-010.
-            ClaimedUserId(httpContext));
+            ClaimedUserId(httpContext),
+            PreferredLanguage(httpContext));
 
         return true;
     }
@@ -210,6 +212,37 @@ public sealed class ClientContextMiddleware
             && !httpContext.Request.Path.StartsWithSegments(HubPaths, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
+    /// Which language the caller reads, from <c>Accept-Language</c> — SPEC-052 decision 6.
+    /// </summary>
+    /// <remarks>
+    /// A prefix match on the first tag, and nothing more: `tr`, `tr-TR` and `tr-CY` are Turkish, everything
+    /// else is English. Quality values are not weighed, because weighing them would be choosing between two
+    /// languages a reader listed — and with exactly two supported, the first tag already said which one
+    /// they prefer.
+    /// <para>
+    /// A header is not a credential and is not trusted for anything: the worst a forged one does is send a
+    /// message in the wrong language.
+    /// </para>
+    /// </remarks>
+    private static MailLanguage PreferredLanguage(HttpContext httpContext)
+    {
+        const string turkish = "tr";
+
+        string? requested = httpContext.Request.Headers.AcceptLanguage.ToString();
+
+        if (string.IsNullOrWhiteSpace(requested))
+        {
+            return MailLanguage.English;
+        }
+
+        string first = requested.Split(',')[0].Split(';')[0].Trim();
+
+        return first.StartsWith(turkish, StringComparison.OrdinalIgnoreCase)
+            ? MailLanguage.Turkish
+            : MailLanguage.English;
+    }
+
+    /// <summary>
     /// Whether this is the `POST .../negotiate` that opens a hub connection.
     /// </summary>
     /// <remarks>
@@ -251,6 +284,7 @@ public sealed class ClientContextMiddleware
 /// <param name="AppVersion">From <c>X-Client-App-Version</c>.</param>
 /// <param name="CorrelationId">The request's trace id — ADR-0022.</param>
 /// <param name="UserId">The validated account, or null when the request is anonymous.</param>
+/// <param name="Language">Which language the caller reads, from <c>Accept-Language</c> — SPEC-052.</param>
 /// <remarks>
 /// A `WebAPI` type rather than the `Application` record, so nothing in the pipeline depends on how the
 /// values travelled. The accessor maps one to the other.
@@ -260,4 +294,5 @@ internal sealed record ClientContextValues(
     string Device,
     string AppVersion,
     string CorrelationId,
-    Guid? UserId);
+    Guid? UserId,
+    MailLanguage Language);

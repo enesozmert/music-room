@@ -39,12 +39,13 @@ internal sealed class VerifyEmailCommandHandler : IRequestHandler<VerifyEmailCom
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        VerifyEmailOutcome outcome = await _users
-            .TryConsumeEmailVerificationTokenAsync(
-                OpaqueTokenHash.Of(request.Token),
-                DateTime.UtcNow,
-                cancellationToken)
-            .ConfigureAwait(false);
+        DateTime nowUtc = DateTime.UtcNow;
+
+        VerifyEmailOutcome outcome = request.Token is { Length: > 0 } token
+            ? await _users
+                .TryConsumeEmailVerificationTokenAsync(OpaqueTokenHash.Of(token), nowUtc, cancellationToken)
+                .ConfigureAwait(false)
+            : await ConsumeCodeAsync(request, nowUtc, cancellationToken).ConfigureAwait(false);
 
         // No account is named: this path is keyed on a token, and a row naming the account a refused token
         // once belonged to would say more than the caller proved.
@@ -56,5 +57,40 @@ internal sealed class VerifyEmailCommandHandler : IRequestHandler<VerifyEmailCom
         });
 
         return outcome;
+    }
+
+    /// <summary>
+    /// Spends a typed code, after checking it could be one at all.
+    /// </summary>
+    /// <remarks>
+    /// The shape check comes first so that a caller sending a sentence costs a comparison rather than a
+    /// query — and, more importantly, so the attempt budget is spent by guesses at a code rather than by
+    /// malformed input. An address with no code, or a code of the wrong shape, is the same `Invalid`
+    /// everything else is.
+    /// </remarks>
+    private async Task<VerifyEmailOutcome> ConsumeCodeAsync(
+        VerifyEmailCommand request,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        if (request.Email is not { Length: > 0 } email || request.Code is null)
+        {
+            return VerifyEmailOutcome.Invalid;
+        }
+
+        string code = VerificationCode.Normalise(request.Code);
+
+        if (!VerificationCode.IsWellFormed(code))
+        {
+            return VerifyEmailOutcome.Invalid;
+        }
+
+        return await _users
+            .TryConsumeEmailVerificationCodeAsync(
+                email.Trim().ToLowerInvariant(),
+                OpaqueTokenHash.Of(code),
+                nowUtc,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 }
