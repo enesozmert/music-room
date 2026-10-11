@@ -138,9 +138,23 @@ client its token is dead while it still opens every route.
 refresh exchange is not one: nothing new was proven, a stored token was presented. OpenID Connect
 Core 1.0 §12.1 leaves it optional.
 
-**These replace rather than join** `POST /auth/sessions`, `POST /auth/sessions/social` and
-`POST /auth/tokens`. The removal is part of S8's spec, and no old endpoint is deleted before its
-replacement passes.
+**These join `POST /auth/sessions`, `POST /auth/sessions/social` and `POST /auth/tokens`; they do
+not replace them** — owner's answer of 2026-10-11, SPEC-049. An earlier draft of this section said
+the opposite, and it was written before the authorization endpoint was given its auth column: under
+that answer the credential endpoints are the **precondition** of `GET /oauth2/authorize`, so removing
+them would leave the code flow with no way for anybody to be authenticated in the first place.
+
+What each surface is for, so two ways in reads as a trade-off rather than indecision:
+
+| Surface | Who uses it | What it gives |
+|---|---|---|
+| `POST /auth/sessions`, `/auth/sessions/social`, `/auth/tokens` | this project's own client | the access and refresh tokens every other endpoint takes. One request, no redirect, no browser |
+| `/oauth2/authorize` + `/oauth2/token` | a standard client, including ours when it wants an ID token | the authorization code flow with PKCE, an **ID token** a third party can verify against the JWKS, and the scope a UserInfo call is filtered by |
+
+Both answer the same session model: one refresh-token family, rotation on every use, reuse revokes
+the family (ADR-0032). Neither is a second credential path in the sense that matters — they are two
+front doors onto one session, which is why the rate limits, the audit records and the revocation all
+apply identically.
 
 ### Design notes
 

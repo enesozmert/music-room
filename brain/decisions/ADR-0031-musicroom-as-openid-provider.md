@@ -60,6 +60,8 @@ The API implements the provider role of OpenID Connect Core 1.0:
 - S1's current sign-in surface stays as it is until S8.
 - S8 already owns social login, so both halves of OIDC land in one slice, reviewed together.
 - The migration is part of S8's spec: the endpoints S1 shipped are replaced, not kept alongside.
+  **Withdrawn by amendment 2, 2026-10-11** — once the authorization endpoint required a bearer token,
+  those endpoints became its precondition rather than its predecessor.
 
 ## Amendment, 2026-10-11 — this is a first-party provider
 
@@ -92,6 +94,35 @@ row read the way the social provider rows are — and **the access token stays H
 because changing the signature of a token `AddJwtBearer` already validates, in the unit that
 introduces a new flow, is two migrations in one diff. The RS256 move goes with the removal of the
 old endpoints.
+
+## Amendment 2, 2026-10-11 — the credential endpoints are not removed
+
+This decision said, under *"It lands at S8, not now"*:
+
+> - The migration is part of S8's spec: the endpoints S1 shipped are **replaced, not kept alongside**.
+
+**That sentence is withdrawn.** It was written on 2026-09-27, before amendment 1 gave the authorization
+endpoint its auth column. Once `GET /oauth2/authorize` requires a bearer access token, the credential
+endpoints are its **precondition**: something has to authenticate a person before a code can be issued for
+them, and in a first-party provider that something is `POST /auth/sessions` or `POST /auth/sessions/social`.
+Removing them would leave a flow whose entry condition cannot be met.
+
+**Owner's answer, 2026-10-11: both surfaces stay, permanently**, and what each is for is published in
+`docs/api/ENDPOINTS.md` rather than left to a reader to infer. They are two front doors onto one session —
+the same refresh-token family, the same rotation, the same family revocation (ADR-0032), the same rate limits
+and the same audit records.
+
+What this costs, stated rather than discovered: **the project does not get to claim it migrated.** The
+honest sentence at defence is the longer one — *the API implements the OpenID provider role, our client
+authenticates through the credential endpoints, and the two coexist because a first-party provider has no
+sign-in surface of its own.*
+
+Two consequences follow:
+
+- **SPEC-041's migration plan loses its phases 3 and 4.** They are marked not applicable in that spec, with
+  this reasoning, rather than deleted — a plan that stopped being correct is a finding worth keeping.
+- **The access token's move to RS256 is decoupled.** It was scheduled with phase 4 only because phase 4 was
+  going to rewrite the same code; nothing about a signature depends on removing an endpoint. It is issue O32.
 
 ## Consequences
 

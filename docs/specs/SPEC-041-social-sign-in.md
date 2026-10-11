@@ -102,11 +102,19 @@ alongside"*. S8 is two specs, so the plan is stated here in full and executed by
 |---|---|---|
 | 1 — **this spec** | the social routes are **added**. Nothing is removed; password sign-in is untouched | always: it is additive |
 | 2 — the provider spec | `/oauth2/authorize` and `/oauth2/token` are added beside `POST /auth/sessions` and `POST /auth/tokens`, both surfaces live | when the provider's own tests pass |
-| 3 — the provider spec | the mobile client moves to the authorization endpoint | when a client exists to move. Until then phase 3 does not start, and the old endpoints are the only ones anything uses |
-| 4 — the provider spec | `POST /auth/sessions`, `POST /auth/sessions/social` and `POST /auth/tokens` are removed, with their tests and their §16 rows | only after phase 3, and never in the same pull request as phase 2 |
+| 3 — the provider spec | the mobile client moves to the authorization endpoint | **not applicable, 2026-10-11** |
+| 4 — the provider spec | `POST /auth/sessions`, `POST /auth/sessions/social` and `POST /auth/tokens` are removed, with their tests and their §16 rows | **not applicable, 2026-10-11** |
 
 **Nothing is deleted before its replacement passes**, which is the ADR's rule and the reason the phases are
 numbered rather than described.
+
+**Phases 3 and 4 will not run — SPEC-049, owner's answer of 2026-10-11.** They are left in this table rather
+than deleted, because a plan that stopped being correct is a finding. What changed is the authorization
+endpoint's auth column: SPEC-044's answer A made `GET /oauth2/authorize` require a bearer access token, which
+makes the credential endpoints its **precondition** rather than its predecessor. There is nothing for the
+client to move *to* that does not start here, and removing the old endpoints would leave the code flow with
+no way for anybody to be authenticated in the first place. ADR-0031's amendment 2 withdraws the sentence
+these two rows were executing.
 
 ## Gate
 
