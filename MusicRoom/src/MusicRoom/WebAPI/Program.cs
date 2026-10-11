@@ -161,7 +161,6 @@ internal static class EnvironmentConfiguration
     {
         ISecretProvider secrets = For(configuration);
 
-        string? signingKey = secrets.Read("JWT_SIGNING_KEY");
         string? issuer = secrets.Read("JWT_ISSUER");
         string? audience = secrets.Read("JWT_AUDIENCE");
         string? accessTokenMinutes = secrets.Read("JWT_ACCESS_TOKEN_MINUTES");
@@ -176,7 +175,7 @@ internal static class EnvironmentConfiguration
                 + "ADR-0026.");
         }
 
-        return new JwtOptions(signingKey ?? string.Empty, issuer, audience, minutes);
+        return new JwtOptions(issuer, audience, minutes);
     }
 
     /// <summary>
@@ -353,14 +352,21 @@ internal static class CallerServices
 
         JwtOptions jwtOptions = EnvironmentConfiguration.RequireJwtOptions(configuration);
 
+        // The same PEM the container's own provider reads, so the same key and the same `kid` — SPEC-043's
+        // thumbprint is computed from the key rather than configured, which is what makes two instances
+        // agree without being told. Built here because `AddJwtBearer` is configured while the container is
+        // still being assembled, and nothing signs with this one: validation needs the public half only.
+        ISigningKeyProvider signingKeys = new RsaSigningKeyProvider(EnvironmentConfiguration.For(configuration));
+
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
-                options.TokenValidationParameters = JwtBearerConfiguration.Build(jwtOptions);
+                options.TokenValidationParameters = JwtBearerConfiguration.Build(jwtOptions, signingKeys);
 
-                // No metadata endpoint to reach and no HTTPS requirement on the handler itself: the token is
-                // symmetric and TLS is the deployment's job, not this handler's.
+                // No metadata endpoint to reach and no HTTPS requirement on the handler itself: the keys
+                // come from configuration rather than from a discovery document — this API is the issuer —
+                // and TLS is the deployment's job, not this handler's.
                 options.RequireHttpsMetadata = false;
 
                 // A WebSocket handshake cannot carry an Authorization header, so SignalR documents the

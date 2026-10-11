@@ -230,11 +230,12 @@ public sealed class LoginEndpointTests : IAsyncLifetime
 /// </remarks>
 internal static class TestJwtSettings
 {
-    /// <summary>Applies the four settings to a test host builder.</summary>
+    /// <summary>Applies the settings every test host needs.</summary>
     /// <param name="webHost">The builder being configured.</param>
     internal static void Apply(IWebHostBuilder webHost)
     {
-        webHost.UseSetting("JWT_SIGNING_KEY", "musicroom-integration-test-signing-key-32");
+        // No JWT_SIGNING_KEY: since SPEC-050 the access token is RS256 and the only key this host needs is
+        // the RSA pair below. A setting nothing reads would be a setting a reader has to check.
         webHost.UseSetting("JWT_ISSUER", "musicroom-tests");
         webHost.UseSetting("JWT_AUDIENCE", "musicroom-tests-client");
         webHost.UseSetting("JWT_ACCESS_TOKEN_MINUTES", "15");

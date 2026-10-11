@@ -57,10 +57,10 @@ load: ## run a Gatling scenario against the compose stack: make load SCENARIO=vo
 # never opens a socket: only a request to /health/ready connects.
 OPENAPI_DATABASE_URL := Host=localhost;Port=5432;Database=openapi;Username=openapi;Password=unused
 
-# The host also requires the JWT settings from SPEC-005, and refuses a signing key under 32 bytes.
-# These are placeholders on the same footing as the connection string above: generating the document
-# signs no token and reaches no network. Never reuse them anywhere a real token is issued.
-OPENAPI_JWT_SIGNING_KEY := openapi-document-build-placeholder-key-not-a-secret
+# The host also requires the JWT settings from SPEC-005. These are placeholders on the same footing as the
+# connection string above: generating the document signs no token and reaches no network. There is no signing
+# key among them — since SPEC-050 every token is RS256, and the key the target generates below is the only
+# one the host needs.
 OPENAPI_JWT_ISSUER := musicroom-openapi
 OPENAPI_JWT_AUDIENCE := musicroom-openapi
 OPENAPI_JWT_ACCESS_TOKEN_MINUTES := 15
@@ -143,7 +143,6 @@ openapi: ## regenerate docs/api/openapi.json from the code
 	ASPNETCORE_ENVIRONMENT=Development DATABASE_URL="$(OPENAPI_DATABASE_URL)" \
 	MAIL_PROVIDER=logging \
 	OIDC_SIGNING_KEY="$$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null)" \
-	JWT_SIGNING_KEY="$(OPENAPI_JWT_SIGNING_KEY)" \
 	JWT_ISSUER="$(OPENAPI_JWT_ISSUER)" \
 	JWT_AUDIENCE="$(OPENAPI_JWT_AUDIENCE)" \
 	JWT_ACCESS_TOKEN_MINUTES="$(OPENAPI_JWT_ACCESS_TOKEN_MINUTES)" \

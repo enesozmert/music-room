@@ -240,7 +240,6 @@ public sealed class YouTubeCatalogProviderTests
             new MailOptions(MailOptions.LoggingProvider, null, null, null, null, null),
             options,
             new JwtOptions(
-                new string('k', JwtOptions.MinimumSigningKeyBytes),
                 "musicroom-tests",
                 "musicroom-tests",
                 15),

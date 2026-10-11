@@ -67,9 +67,9 @@ public sealed class InfisicalSecretProviderTests
         ISecretProvider provider = await VaultBackedAsync("""{"secrets":[]}""", []);
 
         InvalidOperationException refused = Assert.Throws<InvalidOperationException>(
-            () => provider.Require("JWT_SIGNING_KEY"));
+            () => provider.Require("MAIL_API_KEY"));
 
-        Assert.Contains("JWT_SIGNING_KEY", refused.Message, StringComparison.Ordinal);
+        Assert.Contains("MAIL_API_KEY", refused.Message, StringComparison.Ordinal);
         Assert.Contains("INFISICAL_PROJECT_ID", refused.Message, StringComparison.Ordinal);
     }
 
