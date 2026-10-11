@@ -124,6 +124,13 @@ field all carry one line cleanly and a multi-line value badly, so `make oidc-key
 literal characters are not a line break. `ImportFromPem` answers an `ArgumentException` that names nothing
 useful. The escape is undone in the provider, with a test that loads a one-line key.
 
+**The document build is configured in three places, and CI proved it.** `make openapi` got the throwaway
+key, the local gate passed, and CI failed anyway: `backend-dev.yml` and `backend-prod.yml` each carry their
+own copy of the generator's environment, because the generator boots the real host. The same trap caught
+SPEC-024's mail guard and SPEC-005's JWT settings before this. All three are fixed here and the duplication
+itself is now issue **O30** — the fix is for the workflows to call `make openapi`, which is a change to how
+CI invokes the build rather than to what it builds, and belongs in its own unit.
+
 **"Refuses at start-up" was not true as written.** A lazily-resolved singleton throws on first use, so a host
 with no key looked healthy until somebody fetched the JWKS — the worst moment to find out. The provider is now
 resolved at map time, which made every test host need a key: `TestJwtSettings` generates one per process,

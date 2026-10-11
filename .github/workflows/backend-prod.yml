@@ -72,6 +72,9 @@ jobs:
           # `logging` opens no socket and needs no provider key: generating a document sends nothing.
           MAIL_PROVIDER: logging
         run: |
+          # SPEC-043 made the RS256 signing key a start-up requirement. Generated here and thrown away,
+          # exactly as in backend-dev: the document describes routes, not signatures.
+          export OIDC_SIGNING_KEY="$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null)"
           dotnet build MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj \
             --no-restore -p:GenerateOpenApiDocument=true
           git diff --exit-code -- docs/api/openapi.json
