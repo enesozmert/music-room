@@ -851,16 +851,24 @@ engineering decision; an unwritten one is an oversight.
 
 | Element | Where | Note |
 |---|---|---|
-| API | local Docker on a declared machine -- [[ADR-0015-hosting-and-deployment]] | multi-stage image, pinned base, non-root user |
+| API | **live on Render**, Frankfurt, free plan, the same image `docker compose` builds -- [[ADR-0046-live-deployment-render]]; local Docker on a declared machine for development and measurement -- [[ADR-0015-hosting-and-deployment]] | multi-stage image, pinned base, non-root user. The build context is the **repository root**, identical in compose, CI and Render — SPEC-051 |
 | Database | S0-S3 a **local PostgreSQL container**; S4 onward Supabase Free tier, Frankfurt -- [[ADR-0026-environment-bring-up]] | same engine, same migrations, different connection string |
 | Client | user devices | React Native, built by the second team member after the backend slices land |
 | CI | GitHub Actions, separate `dev` and `prod` configurations, plus an independent client job | builds and tests; **does not deploy** |
 | Merging | `main` requires the `gate` check and `enforce_admins`; **not** that a branch be up to date, since merge queue is unavailable on this plan -- [[ADR-0040-pull-requests-need-not-be-up-to-date]]. Auto-merge lands a pull request when `gate` is green | `backend-prod` runs on every push to `main`, so a semantic conflict two green pull requests create together is red within minutes |
 | Observability | Serilog to stdout; OpenTelemetry exporter configuration-driven, **off by default** -- [[ADR-0022-observability-stack]] | switched on for a load run |
-| Secrets | `EnvSecretProvider` for the everyday loop; `InfisicalSecretProvider` behind the same abstraction, vault self-hosted in the compose stack under a `vault` profile -- [[ADR-0029-containerised-dev-and-secret-vault]] | **required scope.** The abstraction lands early, the vault at S1b, and the delivered system runs on it |
+| Secrets | `EnvSecretProvider` for the everyday loop; `InfisicalSecretProvider` behind the same abstraction, vault self-hosted in the compose stack under a `vault` profile and **beside the API on Render in production** -- [[ADR-0029-containerised-dev-and-secret-vault]], [[ADR-0046-live-deployment-render]] | **required scope.** The abstraction lands early, the vault at S1b, and the delivered system runs on it |
+| Vault store | a **second Supabase project**, separate from the application's -- [[ADR-0046-live-deployment-render]] | Render's free PostgreSQL is deleted 30 days after creation, and the database that would vanish holds every secret |
 
-The defence runs on the local stack. No remote deployment target is chosen yet; Vercel cannot host
-this API (serverless, no long-lived process, no persistent WebSocket).
+**There is a live deployment** since 2026-10-11 — https://music-room-api-regw.onrender.com, on Render, Frankfurt, free plan, with the
+vault beside the API and both databases on Supabase ([[ADR-0046-live-deployment-render]], `docs/deploy/RENDER.md`).
+Vercel was never a candidate: serverless, no long-lived process, no persistent WebSocket.
+
+The free tier sleeps after fifteen minutes and takes about a minute to wake, so a demo warms the stack
+first — the vault before the API, because the API reads its secrets at start-up and refuses to start
+without them. **The live deployment is not where the capacity figure comes from**: subject V.7 is
+answered by the declared machine in `docs/load/REPORT.md`, and a 512 MB shared-CPU container that
+sleeps is a URL rather than a measurement.
 
 The database being off-premise must be stated in the load report: network latency to Supabase is
 part of the measured numbers, not an excuse for them.
@@ -1047,7 +1055,6 @@ defence, not more.
 | # | Issue | Blocks | Note |
 |---|---|---|---|
 | O8 | SignalR scale-out backplane (Redis) | multi-instance deployment | **deliberately open.** Not needed for a single-instance defence |
-| O11 | remote deployment target | a live demo URL | [[ADR-0015-hosting-and-deployment]]. Fly.io, Railway, Render, Azure Container Apps. **Not Vercel** |
 | O12 | fluent assertion library | test readability | add only if xUnit's built-ins prove insufficient |
 | O13 | silent-controller recovery | a stalled playback session | [[ADR-0017-playback-session]] accepted no watchdog; takeover is the manual path. Revisit only if it bites in testing |
 | O14 | music preferences have no consumer | nothing | V.1 requires storing and updating them, which is met. Note for defence: storage-only today |
@@ -1067,6 +1074,7 @@ defence, not more.
 | # | Issue | Closed by |
 |---|---|---|
 | O21 | hub call limits and handshake origin decided and not built | **SPEC-026, 2026-10-04.** The ceiling, the per-connection invocation limit and the `Origin` check all exist, with the numbers the owner set in [[ADR-0030-hub-rate-limits-and-origin]] on the same day. `CORS_ALLOWED_ORIGINS` is read by code for the first time, which is the half of this issue the brain-check of 2026-10-02 found. T-12 narrows from "bounded payloads and timeouts" to a stated limit with tests behind it; the per-process residual is O8, unchanged |
+| O11 | remote deployment target | **ADR-0046 and SPEC-051, closed 2026-10-11.** Render, Frankfurt, free plan: the API and a self-hosted Infisical as two Docker services, a Key Value cache, and both databases on Supabase. Chosen from the three free tiers the owner named on one fact — it is the only one that can run a second Docker service for free, and the vault is a second Docker service. The costs are in the ADR rather than discovered: the tier sleeps, the vault becomes a boot-order dependency the API retries for ninety seconds and then still refuses, and the capacity figure stays on the declared machine |
 | O32 | the access token was HS256 while the ID token was RS256 | **SPEC-050, closed 2026-10-11.** `JwtAccessTokenIssuer` signs with `ISigningKeyProvider.Current` and the handler accepts every key the JWKS publishes, so a rotation overlap covers access tokens as well. `JWT_SIGNING_KEY` is removed from the code, the test host, `.env.example` and the document build — a secret a project asks for and never uses is configuration nobody can audit. **No HMAC overlap**, deliberately: it would have kept a shared secret that still mints valid tokens plus a knob to remember to turn off, and the cost of refusing is one `401` per active client in one 15-minute window, with refresh tokens untouched |
 | O30 | the document build's environment was configured in three places | **SPEC-048, closed 2026-10-11.** Both workflows call `make openapi`, so the Makefile is the one definition of what the generator needs; CI keeps its `--no-restore` through `OPENAPI_BUILD_FLAGS`, which defaults to empty so a local run is unchanged. The trap this closes caught three units in a row — SPEC-005's JWT settings, SPEC-024's mail guard and SPEC-043's signing key — each adding a start-up requirement in one place and failing in another. `grep` over `.github/workflows/` now finds no copy of the generator's environment |
 | O18 | self-hosted Infisical vault | **SPEC-030, SPEC-042 and SPEC-047, closed 2026-10-11.** `ISecretProvider` with two implementations; a self-hosted Infisical in this compose stack behind a `vault` profile, so `make up` stays two services and a defence walkthrough brings the vault up; and `InfisicalSecretProvider`, selected by `SECRET_PROVIDER`, authenticating with a machine identity. The vault outranks `.env` and `.env` remains the floor — forced, because the vault's own bootstrap credentials cannot live inside it, which ADR-0029 wrote down before any of it was built. A vault that cannot be reached stops the host instead of falling back, because a fallback would silently restore the posture the vault exists to remove. Secrets are read once at start-up, so rotation needs a restart |

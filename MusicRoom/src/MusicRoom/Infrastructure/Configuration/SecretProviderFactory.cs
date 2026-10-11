@@ -95,18 +95,62 @@ public static class SecretProviderFactory
 
         using HttpClient client = new() { BaseAddress = options.SiteUrl, Timeout = VaultTimeout };
 
-        IReadOnlyDictionary<string, string> secrets = new InfisicalVaultClient(client, options)
-            .FetchAsync(CancellationToken.None)
-            .GetAwaiter()
-            .GetResult();
+        InfisicalVaultClient vault = new(client, options);
 
-        return new InfisicalSecretProvider(secrets, environment);
+        return new InfisicalSecretProvider(Fetch(vault), environment);
     }
 
-    /// <summary>How long start-up waits for the vault.</summary>
+    /// <summary>
+    /// Reads the vault, retrying a cold one — ADR-0046, SPEC-051.
+    /// </summary>
+    /// <remarks>
+    /// **A retry is not a fallback.** After the last attempt this still throws, and nothing reads a secret
+    /// out of `.env` that the vault was supposed to hold; SPEC-047's refusal is unchanged in substance.
+    /// <para>
+    /// It exists because of where this now runs. On a free tier both the API and the vault sleep after
+    /// fifteen minutes and wake independently, so the API can start while the vault is still cold — a
+    /// container that takes about a minute to answer its first request. Refusing on the first connection
+    /// error would make a sleeping dependency a crash loop; waiting a minute and a half for it is the
+    /// difference between "the vault is starting" and "there is no vault".
+    /// </para>
+    /// </remarks>
+    private static IReadOnlyDictionary<string, string> Fetch(InfisicalVaultClient vault)
+    {
+        for (int attempt = 1; attempt < VaultAttempts; attempt++)
+        {
+            try
+            {
+                return vault.FetchAsync(CancellationToken.None).GetAwaiter().GetResult();
+            }
+            catch (InvalidOperationException)
+            {
+                // Every refusal is retried, not only a transport error: a vault that is still starting
+                // answers 502 and 503 as readily as it refuses a connection, and the client turns all of
+                // them into one refusal on purpose.
+                Thread.Sleep(VaultRetryDelay);
+            }
+        }
+
+        // The last attempt is outside the loop, so its exception is the one that reaches the operator
+        // rather than being swallowed by a retry that was never going to happen.
+        return vault.FetchAsync(CancellationToken.None).GetAwaiter().GetResult();
+    }
+
+    /// <summary>How long one request to the vault may take.</summary>
     /// <remarks>
     /// Ten seconds: long enough for a container that has just come up alongside this one, short enough that
     /// a vault which is not there fails the boot while somebody is still watching it.
     /// </remarks>
     private static TimeSpan VaultTimeout => TimeSpan.FromSeconds(10);
+
+    /// <summary>How many times start-up asks the vault before giving up.</summary>
+    /// <remarks>
+    /// Seven attempts, fifteen seconds apart, is a little over ninety seconds — about the time a sleeping
+    /// free-tier container takes to answer its first request, with room to spare. Beyond that the honest
+    /// reading is that the vault is not coming, and the host says so instead of waiting out a deploy.
+    /// </remarks>
+    private static int VaultAttempts => 7;
+
+    /// <summary>How long to wait between attempts.</summary>
+    private static TimeSpan VaultRetryDelay => TimeSpan.FromSeconds(15);
 }

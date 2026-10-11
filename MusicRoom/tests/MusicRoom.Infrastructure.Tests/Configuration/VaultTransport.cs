@@ -82,3 +82,53 @@ internal sealed class UnreachableVaultTransport : HttpMessageHandler
         CancellationToken cancellationToken) =>
         throw new HttpRequestException("connection refused");
 }
+
+/// <summary>
+/// A vault that refuses a few times and then answers — a container finishing its start-up, SPEC-051.
+/// </summary>
+/// <remarks>
+/// What a free-tier platform does to a dependency: the first requests reach a service that is still
+/// waking, and only then does it serve. The bounded retry in `SecretProviderFactory` exists for exactly
+/// this shape, and a transport that is only ever up or only ever down cannot express it.
+/// </remarks>
+internal sealed class FlakyVaultTransport : HttpMessageHandler
+{
+    private readonly string _loginBody;
+    private readonly string _secrets;
+
+    private int _remainingRefusals;
+
+    /// <summary>Takes how many times to refuse, then what to answer.</summary>
+    /// <param name="refusals">How many requests fail before the vault is up.</param>
+    /// <param name="loginBody">The login endpoint's body once it is.</param>
+    /// <param name="secrets">The raw-secrets endpoint's body once it is.</param>
+    internal FlakyVaultTransport(int refusals, string loginBody, string secrets)
+    {
+        _remainingRefusals = refusals;
+        _loginBody = loginBody;
+        _secrets = secrets;
+    }
+
+    /// <inheritdoc />
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (_remainingRefusals > 0)
+        {
+            _remainingRefusals--;
+
+            throw new HttpRequestException("connection refused");
+        }
+
+        bool login = request.RequestUri!.AbsolutePath
+            .Contains("universal-auth/login", StringComparison.Ordinal);
+
+        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(login ? _loginBody : _secrets, Encoding.UTF8, "application/json"),
+        });
+    }
+}

@@ -18,6 +18,8 @@ public sealed class InfisicalSecretProviderTests
 {
     private const string _loginAnswer = """{"accessToken":"a-short-lived-vault-token"}""";
 
+    private const string _emptySecrets = "{\"secrets\":[]}";
+
     /// <summary>A name the vault holds comes from the vault, not from the environment.</summary>
     [Fact]
     public async Task TheVault_OutranksTheEnvironmentAsync()
@@ -205,6 +207,39 @@ public sealed class InfisicalSecretProviderTests
 
         Assert.Contains("INFISICAL_PROJECT_ID", refused.Message, StringComparison.Ordinal);
         Assert.Contains("403", refused.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A vault that is cold and then answers is waited for; one that never answers is still refused.
+    /// </summary>
+    /// <remarks>
+    /// The behaviour ADR-0046 needs and SPEC-047 must not lose. On a free tier the API and the vault sleep
+    /// independently and wake in whatever order a request arrives in, so a first connection error means
+    /// "starting" at least as often as it means "gone". The factory's retry waits for the first; it does
+    /// not fall back for the second, and the first half of this test is what makes that distinction real.
+    /// </remarks>
+    [Fact]
+    public async Task AColdVault_RefusesOnceAndSucceedsWhenItIsUpAsync()
+    {
+        // Arrange — a transport that refuses once and then answers, as a container finishing its
+        // start-up does. The factory is what retries; this asserts the shape the retry depends on.
+        FlakyVaultTransport flaky = new(refusals: 1, loginBody: _loginAnswer, secrets: _emptySecrets);
+
+        using HttpClient client = new(flaky) { BaseAddress = new Uri("http://vault.test") };
+
+        // Act, Assert — every refusal arrives as the same exception, so one `catch` in the factory covers
+        // a cold vault as well as an absent one.
+        InvalidOperationException refused = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => new InfisicalVaultClient(client, Options())
+                .FetchAsync(TestContext.Current.CancellationToken));
+
+        Assert.Contains("SECRET_PROVIDER", refused.Message, StringComparison.Ordinal);
+
+        // And once it is up the same client succeeds, so a retry has something to succeed at.
+        IReadOnlyDictionary<string, string> secrets = await new InfisicalVaultClient(client, Options())
+            .FetchAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(secrets);
     }
 
     private static async Task<ISecretProvider> VaultBackedAsync(

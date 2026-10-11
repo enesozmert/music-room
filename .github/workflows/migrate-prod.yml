@@ -1,0 +1,59 @@
+# Applies EF Core migrations to the live database — SPEC-051, ADR-0046.
+#
+# By hand, never on deploy. Schema ownership belongs to migrations run deliberately (SDD §8.5), and an
+# application that migrates as it starts migrates once per instance and once per restart — on a free tier
+# that restarts whenever it likes, that is a schema change nobody decided to make.
+name: migrate-prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "migrate" to confirm applying migrations to the live database'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+
+    steps:
+      # A dispatch button is easy to press by accident, and this one writes to the database the live API
+      # is serving from. The word is the pause.
+      - name: Confirmation
+        if: inputs.confirm != 'migrate'
+        run: |
+          echo "::error::Type 'migrate' to confirm. Nothing was applied."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      # The session pooler, not the transaction pooler the API uses: transaction-mode pooling cannot
+      # carry a migration, and Supabase's direct host is IPv6-only while this runner is not.
+      - name: Pending migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_DIRECT_URL }}
+        run: |
+          dotnet ef migrations list \
+            --project MusicRoom/src/MusicRoom/Persistence \
+            --startup-project MusicRoom/src/MusicRoom/WebAPI \
+            --context MusicRoomDbContext
+
+      - name: Apply
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_DIRECT_URL }}
+        run: |
+          dotnet ef database update \
+            --project MusicRoom/src/MusicRoom/Persistence \
+            --startup-project MusicRoom/src/MusicRoom/WebAPI \
+            --context MusicRoomDbContext

@@ -1,0 +1,150 @@
+# The live deployment, as code — ADR-0046, SPEC-051.
+#
+# Render reads this as a Blueprint, so the stack is described here rather than in a dashboard nobody
+# can review. Two web services and one cache; the two databases are Supabase projects, which Render
+# does not manage and this file therefore does not pretend to.
+#
+# **No secret is in this file.** Every value a secret would go in is `sync: false`, which makes Render
+# ask for it once and keep it. What is here is the shape — ports, health checks, plans and which
+# service talks to which — and the shape is the part worth reviewing.
+
+services:
+  # --- The API ------------------------------------------------------------------------------------
+  - type: web
+    name: music-room-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+
+    # Frankfurt because the database is: ADR-0016 put Supabase there, and an API on another continent
+    # would pay an ocean crossing per query — the load report would measure the Atlantic, not the code.
+
+    # The context is the repository root and the Dockerfile names its own paths — SPEC-051. A platform
+    # that resolves these two from different places is the reason that changed.
+    dockerfilePath: ./MusicRoom/Dockerfile
+    dockerContext: .
+
+    # `/health`, not `/health/ready`: readiness asks the database, and a paused free Supabase project
+    # would turn a healthy deploy into a failed one. Liveness answers whether the process is up, which
+    # is the question a platform's health check is actually asking.
+    healthCheckPath: /health
+
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+
+      # Render routes to the port the service listens on, and ASP.NET listens where this says.
+      - key: ASPNETCORE_HTTP_PORTS
+        value: 10000
+      - key: PORT
+        value: 10000
+
+      - key: JWT_ISSUER
+        value: musicroom
+      - key: JWT_AUDIENCE
+        value: musicroom-clients
+      - key: JWT_ACCESS_TOKEN_MINUTES
+        value: 15
+      - key: BCRYPT_WORK_FACTOR
+        value: 12
+
+      # `brevo`, and never `logging` here: the logging sender writes the verification link and the reset
+      # token to the application log, which the start-up guard allows on a Development host only (T-26).
+      - key: MAIL_PROVIDER
+        value: brevo
+
+      # Everything below is entered once in the dashboard and never written down here.
+      #
+      # DATABASE_URL is Supabase's **transaction pooler** string (port 6543) with the Npgsql flags
+      # PgBouncer needs: `No Reset On Close=true` above all, because Npgsql otherwise sends `DISCARD ALL`
+      # on every connection close and transaction-mode pooling refuses it.
+      - key: DATABASE_URL
+        sync: false
+      - key: MAIL_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+
+      # The RS256 pair every token is signed with — SPEC-043, SPEC-050. One line, with `\n` written out;
+      # the provider undoes the escape. A different key from the development one, because a key that
+      # signs production tokens is not a key that also sits in somebody's .env.
+      - key: OIDC_SIGNING_KEY
+        sync: false
+
+      # `env` until the vault below is up and holds this deployment's secrets; then `infisical`, and the
+      # five INFISICAL_* values become the only ones Render itself holds — SPEC-047, ADR-0029.
+      - key: SECRET_PROVIDER
+        value: env
+
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_DISCOVERY_URL
+        sync: false
+      - key: GOOGLE_ISSUER
+        sync: false
+
+      # Empty allows no origin, which is correct until the client exists — SPEC-026.
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+  # --- The vault ----------------------------------------------------------------------------------
+  #
+  # ADR-0029 made a self-hosted Infisical required scope, and ADR-0046 kept it that way in production:
+  # a delivered system that reads its secrets from a file would make that decision ornamental.
+  - type: web
+    name: music-room-vault
+    runtime: image
+    plan: free
+    region: frankfurt
+
+    image:
+      url: docker.io/infisical/infisical:latest-postgres
+
+    healthCheckPath: /api/status
+
+    envVars:
+      - key: PORT
+        value: 8080
+
+      # Its own PostgreSQL, in a **second Supabase project** — Render's free database is deleted 30 days
+      # after it is created, and losing the vault's database loses every secret in it. ADR-0029 also
+      # requires the vault's store to be separate from the application's, which two projects satisfy.
+      - key: DB_CONNECTION_URI
+        sync: false
+
+      # Generated once and never regenerated: losing ENCRYPTION_KEY loses every secret in the vault.
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: AUTH_SECRET
+        sync: false
+
+      - key: SITE_URL
+        sync: false
+
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: music-room-vault-cache
+          property: connectionString
+
+      - key: TELEMETRY_ENABLED
+        value: "false"
+
+# --- The vault's cache ------------------------------------------------------------------------------
+#
+# Free Key Value is 25 MB and is **not persisted**: a restart empties it. That is survivable here and
+# nowhere else — Infisical keeps its durable state in PostgreSQL and uses this for caching and sessions,
+# so an empty cache costs a re-login, not a secret.
+keyValue:
+  - name: music-room-vault-cache
+    plan: free
+    region: frankfurt
+    maxmemoryPolicy: allkeys-lru
+
+    # No `ipAllowList` entry is needed for a service in the same region and account: Render connects
+    # them over its private network, and leaving the list empty is what keeps it off the public internet.
+    ipAllowList: []

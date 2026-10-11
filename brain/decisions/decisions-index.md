@@ -54,4 +54,6 @@ An `Open` entry is a decision we know we owe, with no answer yet — it is not a
 | [[ADR-0044-development-database-backup]] | The development database is dumped on demand into an ignored directory, seven kept | Accepted | not built, O23 |
 | [[ADR-0045-stable-error-codes]] | Every refusal carries a stable code; the text stays English and the client owns the language | Accepted | not built |
 
+| [[ADR-0046-live-deployment-render]] | The live deployment target is Render — the only one of the three free tiers the owner named that can host the API and a self-hosted Infisical | Accepted | built by SPEC-051, O11 closed |
+
 Related: [[MEMORY]] · [[system-overview]] · [[standards-router]]
