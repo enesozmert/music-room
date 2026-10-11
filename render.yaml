@@ -33,6 +33,21 @@ services:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
 
+      # Render terminates TLS at its proxy and forwards `X-Forwarded-Proto`. Without this the host sees
+      # every request as `http`, and two things are wrong at once — both found by driving the live
+      # deployment rather than by reading it:
+      #
+      #   * the discovery document and the ID token say `iss: http://…` while being served over HTTPS,
+      #     which a conforming client refuses — an issuer has to match the origin it was fetched from;
+      #   * `RemoteIpAddress` is the proxy's, so SPEC-006's per-IP credential limit partitions every
+      #     caller in the world into one bucket. That one is silent: nothing fails, the limit just stops
+      #     being a limit.
+      #
+      # The variable is ASP.NET Core's documented switch for a container behind a proxy. It is safe here
+      # because the container is reachable only through that proxy.
+      - key: ASPNETCORE_FORWARDEDHEADERS_ENABLED
+        value: "true"
+
       # Render routes to the port the service listens on, and ASP.NET listens where this says.
       - key: ASPNETCORE_HTTP_PORTS
         value: 10000

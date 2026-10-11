@@ -870,6 +870,14 @@ without them. **The live deployment is not where the capacity figure comes from*
 answered by the declared machine in `docs/load/REPORT.md`, and a 512 MB shared-CPU container that
 sleeps is a URL rather than a measurement.
 
+**A deployment behind a TLS-terminating proxy must forward its headers**, and the live one does
+(`ASPNETCORE_FORWARDEDHEADERS_ENABLED`). Without it the host reads every request as `http`: the
+discovery document and the ID token advertise an issuer that does not match the origin they were served
+from, which a conforming client refuses, and — the quieter half — `RemoteIpAddress` becomes the proxy's,
+so §13.3's per-IP credential limit partitions the whole internet into one bucket. Both were found by
+driving the live deployment; neither is visible from inside a test host, because a test host is not
+behind a proxy.
+
 The database being off-premise must be stated in the load report: network latency to Supabase is
 part of the measured numbers, not an excuse for them.
 
