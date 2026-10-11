@@ -5,7 +5,7 @@ SOLUTION := MusicRoom/MusicRoom.sln
 PERSISTENCE := MusicRoom/src/MusicRoom/Persistence/MusicRoom.Persistence.csproj
 WEBAPI := MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj
 
-.PHONY: up down migrate test lint load openapi agent-check
+.PHONY: up down migrate test lint load openapi e2e e2e-down agent-check
 
 up: ## build and start the full stack
 	docker compose up -d --build
@@ -160,6 +160,26 @@ progress: ## count how far the backend has got (WRITE=1 also writes the snapshot
 
 land: ## land the stack of open pull requests onto main, bottom first (READY=1 to act)
 	@./.agent/land-stack.sh $(if $(READY),--ready,--dry-run) $(if $(LIMIT),--limit $(LIMIT),)
+
+# The end-to-end check — SPEC-046. It composes the overlay on top of the ordinary stack, so what it
+# drives is the real runtime: Kestrel, PostgreSQL, the middleware order and the configuration a
+# container actually receives. Three things come from here rather than from .env, each for a reason
+# written in docker-compose.e2e.yml.
+#
+# The signing key is generated per run and thrown away, with its newlines escaped because that is the
+# shape `.env`, compose and a hosting platform's secret field all carry cleanly — the provider undoes
+# the escape, and SPEC-043's test covers that.
+E2E_COMPOSE := docker compose -f docker-compose.yml -f docker-compose.e2e.yml
+
+e2e: ## drive the whole identity surface against the composed stack
+	@test -f .env || { echo "make e2e: .env is missing. cp .env.example .env and fill it in — ADR-0026."; exit 1; }
+	OIDC_SIGNING_KEY="$$(openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 2>/dev/null | awk 'BEGIN { ORS = "\\n" } 1')" \
+	$(E2E_COMPOSE) up -d --build
+	$(MAKE) migrate
+	./scripts/e2e-oidc.sh
+
+e2e-down: ## stop the end-to-end stack
+	$(E2E_COMPOSE) down
 
 agent-check: ## the full local gate; every spec's Verification section calls this
 	dotnet restore $(SOLUTION)
