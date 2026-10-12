@@ -7,6 +7,12 @@ implements it.
 École 42 subject. .NET 10, PostgreSQL, SignalR. This README describes **what exists on `main`**, not
 what is planned; the planned work is in [`docs/DELIVERY-PLAN.md`](docs/DELIVERY-PLAN.md).
 
+**It is live**: [`music-room-api-regw.onrender.com`](https://music-room-api-regw.onrender.com/health),
+and it is an OpenID Provider — [its discovery
+document](https://music-room-api-regw.onrender.com/.well-known/openid-configuration) and [its
+keys](https://music-room-api-regw.onrender.com/.well-known/jwks.json) are public, so a token it issues
+can be verified by something that has never spoken to it.
+
 ---
 
 ## What works today
@@ -24,22 +30,25 @@ what is planned; the planned work is in [`docs/DELIVERY-PLAN.md`](docs/DELIVERY-
 | **Realtime** — three hubs, authorised on join, audited by one filter, broadcasting after the commit | `/hubs/playlists`, `/hubs/events`, `/hubs/control` | SPEC-016, SPEC-019, SPEC-022, ADR-0038 |
 | **Audit log** — every mutating action and every credential refusal, fail-closed in the same transaction | `audit_records` | SPEC-008, SPEC-009, ADR-0019, ADR-0033 |
 | **Interactive API documentation** — Swagger UI over the document the framework already generates, Development hosts only | `/swagger/index.html` | SPEC-032, ADR-0035 |
-| **Mail** — a hosted provider behind `IMailService`, with a logging sender for local work that is refused anywhere else | Brevo | SPEC-024, ADR-0013 |
+| **Mail** — a hosted provider behind `IMailService`; a verification message carries a link **and** a six-character code, in English or Turkish, from one black-on-white layout at WCAG AA | Brevo | SPEC-024, SPEC-052, ADR-0013 |
+| **Sign in with Google** — one discovery-driven validation core, the authorization code exchanged by this API with the client secret, an identity bound to exactly one account | `/api/v1/auth/sessions/social`, `/api/v1/auth/social-links` | SPEC-041, ADR-0008 |
+| **This API is an OpenID Provider** — discovery document, JWKS, authorization endpoint with PKCE `S256`, token endpoint, RS256 ID token, UserInfo, revocation | `/.well-known/*`, `/oauth2/*` | SPEC-043 to SPEC-045, ADR-0031 |
+| **A secret vault** — `SECRET_PROVIDER=infisical` reads configuration from a self-hosted Infisical, with `.env` as the floor beneath it and no fallback when the vault is unreachable | `ISecretProvider` | SPEC-030, SPEC-042, SPEC-047, ADR-0029 |
+| **A live deployment** — Render, Frankfurt, HTTPS, against Supabase, with the whole identity surface driven end to end over real HTTP | [music-room-api-regw.onrender.com](https://music-room-api-regw.onrender.com/health) | SPEC-046, SPEC-051, ADR-0046 |
 
-**69 of 82 endpoints** in [`docs/api/ENDPOINTS.md`](docs/api/ENDPOINTS.md) are implemented. The
-remaining 13 are the OpenID Connect surface of slice S8.
+**79 of the 82 endpoints** in [`docs/api/ENDPOINTS.md`](docs/api/ENDPOINTS.md) are implemented. The
+three that are not are Facebook's half of social sign-in.
 
 ## What is deliberately not here yet
 
-- **OpenID Connect, both roles** (slice S8): Google and Facebook sign-in through one
-  discovery-driven validation core, and this API becoming an OpenID Provider in its own right.
-  ADR-0008 and ADR-0031 decide the shape; the code is not written.
-- **The secret vault** (slice S1b): `ISecretProvider` and its environment implementation exist, so a
-  vault-backed second implementation is a registration rather than a rewrite. Infisical itself needs
-  a machine identity a person creates.
-- **The mobile client** (`MusicRoomApp/`): deliberately sequenced after the backend, by owner
-  decision. Nothing in it is written.
-- **A deployment**: no host, so no TLS, no WSS, and nothing to ship logs to. Issue O11.
+- **The mobile client** (`MusicRoomApp/`): sequenced after the backend by owner decision, and the
+  reason that root is empty. The contract it will read is published and drift-checked.
+- **Facebook sign-in**: the second acquisition against the same validation core. Google works; the
+  shape Facebook needs is decided (ADR-0008) and the credentials are not created.
+- **Row-level security in PostgreSQL** (O20): defence in depth behind gates that are already enforced
+  in every query.
+- **A capacity figure for the deployment**: subject V.7 is answered on the declared machine, and a
+  free-tier container that sleeps after fifteen minutes is a URL rather than a measurement platform.
 
 Every gap above is an issue row in [`docs/SDD.md`](docs/SDD.md) §17, with what it blocks and what it
 would cost.
@@ -60,6 +69,11 @@ The API answers on `http://localhost:8080`. On a Development host the interactiv
 `http://localhost:8080/swagger/index.html`; the raw OpenAPI document is at `/openapi/v1.json` in every
 environment.
 
+**It also runs live**, at [`music-room-api-regw.onrender.com`](https://music-room-api-regw.onrender.com/health)
+— Render, Frankfurt, HTTPS, against Supabase. The free tier sleeps after fifteen minutes, so the first
+request wakes it and takes about a minute; `/` is a `404` because this is a JSON API with no pages.
+`docs/deploy/RENDER.md` is the runbook, `render.yaml` is the stack.
+
 | Command | What it does |
 |---|---|
 | `make up` / `make down` | start and stop the full stack |
@@ -68,6 +82,9 @@ environment.
 | `make agent-check` | the local gate: format, build with warnings as errors, tests, vulnerable-package audit, OpenAPI drift, PDF drift |
 | `make openapi` | regenerate `docs/api/openapi.json` from the code |
 | `make load SCENARIO=vote-storm` | run one Gatling scenario against the stack |
+| `make e2e` | drive the whole identity surface against the composed stack over real HTTP — 47 assertions |
+| `make vault` | start the self-hosted Infisical, which `make up` deliberately does not |
+| `make oidc-key` | print an RS256 key pair for `OIDC_SIGNING_KEY`; nothing generates one for itself |
 | `make progress` | count how far the backend has got |
 
 `make agent-check` is what CI runs as its `gate` job, so a green local run means a green pull request.
@@ -113,8 +130,15 @@ Each control is implemented and tested, not aspirational.
 - **Passwords**: BCrypt at work factor 12, a 12-character minimum with no composition rules, and a
   64-character maximum. A chosen password is screened against a bundled breached set and against the
   caller's own context words. Login is deliberately not screened.
-- **Sessions**: a 15-minute access token and an opaque refresh token. Rotation is single-use and
-  reuse revokes the whole family; a family dies 30 days after its first token, absolutely.
+- **Sessions**: a 15-minute **RS256** access token and an opaque refresh token. One key pair signs
+  every token this API issues, its `kid` names it, and the public half is published at
+  `/.well-known/jwks.json` — so a token can be verified by something that has never spoken to this
+  API. Rotation is single-use and reuse revokes the whole family; a family dies 30 days after its
+  first token, absolutely.
+- **Verification**: a message carries a 256-bit link token **and** a six-character code from a
+  32-symbol alphabet with no character a person misreads. Five wrong codes spend the row, so the
+  sixth attempt is refused even when it is right — the budget, not the length, is what makes a short
+  code safe. Both last fifteen minutes. The password reset deliberately has no code.
 - **Rate limiting**: per-IP and per-account policies on every credential endpoint, with progressive
   backoff. The limiter runs **after** authentication, because a per-account policy that runs before
   it silently becomes per-address — a defect a load measurement found (ADR-0041).
@@ -125,14 +149,24 @@ Each control is implemented and tested, not aspirational.
   as the action it describes. It fails closed, deliberately.
 - **Client context**: a mutating request without `X-Client-Platform`, `X-Client-Device` and
   `X-Client-App-Version` is refused with a bodiless `400`, hubs included.
-- **Secrets**: read through one abstraction, from the environment that `docker compose` fills from
-  `.env`. No secret is in source, and `.env` is refused by a write-boundary hook as well as ignored
-  by git.
+- **Secrets**: read through one abstraction — the environment, or a self-hosted Infisical when
+  `SECRET_PROVIDER=infisical`. The vault outranks `.env` and `.env` is the floor beneath it, because
+  the credentials that open a vault cannot live inside it. **A vault that cannot be reached stops the
+  host**: a fallback would silently return the system to reading keys out of a file. No secret is in
+  source, and `.env` is refused by a write-boundary hook as well as ignored by git.
+- **Behind a proxy**: the deployment forwards `X-Forwarded-Proto` and `X-Forwarded-For`. Without it
+  the issuer advertised over HTTPS says `http`, which a conforming client refuses — and, more
+  quietly, the per-IP limiter sees the proxy's address and partitions the whole internet into one
+  bucket. Both were found by driving the live deployment, not by reading it.
 
-**OWASP ASVS**: 142 requirements committed, **70 met** with a named artifact, 5 partial, 43 not met —
-29 of those are the V10 federation chapter waiting on S8 and 3 are TLS waiting on a deployment.
-Outcomes per requirement are in [`docs/owasp/ASVS-CONFORMANCE.md`](docs/owasp/ASVS-CONFORMANCE.md);
-accepted residual risks are in [`docs/owasp/THREAT-REGISTER.md`](docs/owasp/THREAT-REGISTER.md).
+**OWASP ASVS**: 142 requirements committed, **70 met** with a named artifact, 5 partial, the rest not
+met. That assessment is dated **2026-10-04** and has not been re-run since — the OpenID Provider
+surface and the live deployment landed after it, so the V10 federation chapter and the TLS
+requirements are recorded as unmet by a pass that predates the code that answers them. Claiming them
+without a pass would be the kind of number this project does not publish; re-running it is its own
+unit. Outcomes per requirement are in
+[`docs/owasp/ASVS-CONFORMANCE.md`](docs/owasp/ASVS-CONFORMANCE.md); accepted residual risks are in
+[`docs/owasp/THREAT-REGISTER.md`](docs/owasp/THREAT-REGISTER.md).
 
 ---
 
@@ -153,7 +187,7 @@ on address instead of account, and a realtime limit nobody had built yet.
 
 ## Tests
 
-547 test cases across four projects, 15 migrations, 13 projects in the solution.
+717 test cases across four projects, 20 migrations, 13 projects in the solution.
 
 - **Domain and Application**: unit tests with NSubstitute for the abstractions.
 - **Persistence**: schema-convention tests over the built model, plus mapping tests against a real
@@ -217,14 +251,20 @@ after one stack cost nine hand-retargeted pull requests.
 
 | | |
 |---|---|
-| Slices merged | 10 of 13 |
-| Requirements built | 19 of 35, with 8 partly implemented |
-| Endpoints implemented | 69 of 82 |
-| ASVS requirements met | 70 of 142 committed |
-| Specs done | 35 |
-| Decisions landed | 27 of 42 |
+| Slices merged | **13 of 13** |
+| Endpoints implemented | 79 of 82 |
+| Specs done | 50 of 52 |
+| Decisions landed | 46 ADRs |
+| Tests | 717, 0 failing |
+| Live | [HTTPS, Frankfurt, since 2026-10-11](https://music-room-api-regw.onrender.com/health) |
 
-The critical path is slice S8. It carries both OpenID Connect roles, it rewrites the sign-in surface
-three earlier specs shipped, and the 29 unmet V10 requirements are waiting on it.
+**The backend is done.** Every slice in the plan is merged, including the one that carried both
+OpenID Connect roles and the one that put a secret vault in production. What remains is the client —
+`MusicRoomApp/`, sequenced after the backend by owner decision — and Facebook's half of social
+sign-in.
+
+Two things the records are honest about rather than quiet about: the ASVS pass predates the provider
+work and has not been re-run, and the capacity figure belongs to the declared machine rather than to
+the free-tier deployment.
 
 `make progress` prints these numbers from the records at any commit.
