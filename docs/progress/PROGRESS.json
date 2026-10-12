@@ -1,11 +1,11 @@
 {
-  "generated": "2026-10-01",
-  "commit": "4370500",
-  "slices":       { "total": 12, "merged": 3, "in_progress": 1, "blocked": 1, "not_started": 7 },
-  "requirements": { "total": 35, "built": 6, "done": 5, "implemented": 1, "partly": 7, "designed": 18, "other": 4 },
-  "adrs":         { "total": 31, "landed": 14, "partly": 3, "waiting": 14 },
-  "issues":       { "open": 9, "closed": 14 },
-  "specs":        { "total": 11, "done": 11 },
-  "surface":      { "endpoints_mapped": 15, "endpoints_inventory": 81 },
-  "size":         { "tests_declared": 174, "migrations": 7, "projects": 13 }
+  "generated": "2026-10-12",
+  "commit": "8c2496b",
+  "slices":       { "total": 13, "merged": 12, "in_progress": 0, "blocked": 0, "not_started": 0 },
+  "requirements": { "total": 36, "built": 18, "done": 6, "implemented": 12, "partly": 8, "designed": 5, "other": 5 },
+  "adrs":         { "total": 46, "landed": 27, "partly": 4, "waiting": 15 },
+  "issues":       { "open": 14, "closed": 22 },
+  "specs":        { "total": 52, "done": 50 },
+  "surface":      { "endpoints_mapped": 73, "endpoints_inventory": 82 },
+  "size":         { "tests_declared": 665, "migrations": 19, "projects": 13 }
 }
