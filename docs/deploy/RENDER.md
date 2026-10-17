@@ -136,6 +136,22 @@ Put this deployment's secrets into the Infisical project's `prod` environment:
 |---|---|
 | `DATABASE_URL`, `MAIL_API_KEY`, `MAIL_FROM`, `OIDC_SIGNING_KEY`, `YOUTUBE_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_DISCOVERY_URL`, `GOOGLE_ISSUER`, `CORS_ALLOWED_ORIGINS` | `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ACCESS_TOKEN_MINUTES`, `BCRYPT_WORK_FACTOR`, `MAIL_PROVIDER`, the ports, `ASPNETCORE_FORWARDEDHEADERS_ENABLED` — none of them is a secret, and a value in two places is a value that disagrees with itself |
 
+The ten values do not get typed into the vault's web form. Put them in a local `.env.prod` — git-ignored,
+and the write-boundary hook refuses to create one — and write them in one command (SPEC-054):
+
+```
+make vault-seed FILE=.env.prod DRY=1    # names only, nothing sent
+make vault-seed FILE=.env.prod          # create what is missing, update what exists
+```
+
+It prints names and outcomes and never a value, skips an absent name rather than writing an empty
+secret, and is idempotent — so rotating one secret later is the same command with one changed line. The
+file also carries the five `INFISICAL_*` values it needs to log in; those are **not** written to the
+vault, because they are what opens it.
+
+A `403` on a write means the machine identity is read-only in the project, which is the posture the
+application wants: grant write for the seed and take it back afterwards.
+
 Then, on the API service, **in this order**:
 
 ```
