@@ -93,7 +93,11 @@
          amendments: Microsoft-owned, **test projects only**, and the only way a test can be a real
          SignalR client rather than a mock of one. SignalR itself is in the shared framework and needs
          no package. -->
-    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.12" />
+    <!-- 10.0.13 rather than 10.0.12 since 2026-10-17: CVE-2026-70159 / GHSA-334f-vvp4-7g6p, a
+         denial of service in Microsoft.AspNetCore.SignalR.Common, which this package brings in
+         transitively. `dotnet restore` fails the build on a known high-severity advisory, which is
+         how it was found — the gate, not a person reading a feed. -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.13" />
   </ItemGroup>
 
 </Project>
