@@ -44,6 +44,15 @@ services:
       DATABASE_URL: Host=db;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
       OTEL_EXPORTER_ENABLED: ${OTEL_EXPORTER_ENABLED:-false}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+
+      # The vault's address **inside the compose network** — SPEC-047, ADR-0029. The same reasoning as
+      # DATABASE_URL above: `.env` holds `http://localhost:8090`, which is where a browser reaches the
+      # vault, and `localhost` inside this container is this container. One variable serves two readers
+      # with two different answers, so the one that is not a browser gets its answer here.
+      #
+      # Port 8080, not 8090: 8090 is the host port the compose file publishes, and inside the network
+      # the vault listens on its own 8080.
+      INFISICAL_SITE_URL: http://infisical:8080
     ports:
       - "8080:8080"
     depends_on:
