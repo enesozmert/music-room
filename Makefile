@@ -5,7 +5,7 @@ SOLUTION := MusicRoom/MusicRoom.sln
 PERSISTENCE := MusicRoom/src/MusicRoom/Persistence/MusicRoom.Persistence.csproj
 WEBAPI := MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj
 
-.PHONY: up down migrate test lint load openapi e2e e2e-down smoke smoke-live agent-check
+.PHONY: up down migrate test lint load openapi e2e e2e-down smoke smoke-live vault-seed agent-check
 
 up: ## build and start the full stack
 	docker compose up -d --build
@@ -96,6 +96,12 @@ vault: ## start the self-hosted Infisical vault — SPEC-042, ADR-0029
 
 vault-down: ## stop the vault, leaving the application stack running
 	docker compose --profile vault down
+
+# Writes secrets, so it names its source file rather than defaulting to one: seeding a production vault
+# from the development stack's .env is how a development key reaches a production host — SPEC-054.
+vault-seed: ## write secrets from FILE into the Infisical project (FILE=.env.prod, DRY=1 to list only)
+	@test -n "$(FILE)" || { echo "make vault-seed: FILE=.env.prod is required — SPEC-054."; exit 1; }
+	FILE=$(FILE) ./scripts/vault-seed.sh $(if $(DRY),--dry-run,)
 
 backup: ## dump the compose database into backups/, keeping the newest BACKUP_KEEP
 	@test -f $(BACKUP_ENV_FILE) || { echo "make backup: $(BACKUP_ENV_FILE) is missing. cp .env.example .env and fill it in — ADR-0026."; exit 1; }

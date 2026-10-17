@@ -921,6 +921,13 @@ Docker and nothing else -- [[ADR-0029-containerised-dev-and-secret-vault]]. No d
 requires a locally installed SDK, database client or CLI; `dotnet-ef` is pinned through
 `.config/dotnet-tools.json`.
 
+Secrets **go into** the vault by script — `make vault-seed FILE=.env.prod`, SPEC-054. It writes an
+allowlist of names over Infisical's API, idempotently, printing names and outcomes and never a value,
+and it refuses to run under shell tracing because a trace would echo every one. Typing ten values into
+a web form was the step in the live migration most likely to go wrong, and a mistyped `OIDC_SIGNING_KEY`
+— a PEM block carried as one line of `\n` escapes — costs an afternoon rather than a deploy. The five
+`INFISICAL_*` values are not among the names it writes: they are what opens the vault.
+
 Secrets are read through a provider abstraction, so the vault replaces the environment without
 touching a call site. The vault is **required scope** -- [[ADR-0029-containerised-dev-and-secret-vault]],
 amended 2026-09-27 -- and it **landed at S1b**: SPEC-030 the abstraction, SPEC-042 the vault in this
