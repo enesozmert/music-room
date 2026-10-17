@@ -166,6 +166,33 @@ limit simply stops being a limit. Both were found by driving the live deployment
 | **750 instance-hours per workspace per month** | two services awake continuously do not fit | let them sleep; warm on demand rather than on a schedule |
 | **Free Key Value is not persisted** | a restart empties the vault's cache | nothing — durable state is in PostgreSQL |
 | **Render's free PostgreSQL expires in 30 days** | not used here, deliberately | keep both databases on Supabase |
+| **A variable nobody set looks like a bug** | `YOUTUBE_API_KEY` was never added to this service, so every `GET /tracks` answered `503` for days | `make smoke-live` names it in one request; the start-up log says it in the first screen after a deploy |
+
+## Checking a deployment — `make smoke-live`
+
+```
+make smoke-live                              # the live service
+make smoke BASE=http://localhost:8080        # the composed stack, same checks
+SMOKE_EMAIL=… SMOKE_PASSWORD=… make smoke-live   # also the signed-in reads
+```
+
+What it checks is **configuration**, which is what a deployment gets wrong — SPEC-053. It creates
+nothing, registers nobody and sends no mail: the 723 tests in `make agent-check` prove the rules, and
+repeating them against production would leave rows nothing deletes. With `SMOKE_EMAIL` and
+`SMOKE_PASSWORD` for one already-verified account it also signs in, reads `GET /me`, runs one
+`GET /tracks`, and then ends its own session, so a run leaves no trace.
+
+| Finding | Cause, in practice |
+|---|---|
+| `catalog: Degraded` | `YOUTUBE_API_KEY` is not set on the service. Nothing else is affected, which is why readiness is still `200` |
+| `the database is reachable` fails | `DATABASE_URL` is wrong, Supabase has paused the project, or migrations were never applied |
+| the issuer does not match the base URL | `ASPNETCORE_FORWARDEDHEADERS_ENABLED` is missing — the trap above |
+| `track search answers` is `503` | the log names which cause: no key, a key the provider rejects, the daily quota, or the provider itself |
+
+A `503` from search with a key present is usually the key rather than the quota: YouTube answers `400`
+for one that is malformed, expired or restricted to referrers this host is not among. The development
+stack's key was in exactly that state while the live one worked, which is how the fourth cause was
+found. One `Warning` line per call says which it was; `Information` lines carry the quota units spent.
 
 ## Warming up before a defence
 
@@ -175,6 +202,8 @@ curl -fsS https://music-room-api-regw.onrender.com/health
 curl -fsS https://music-room-api-regw.onrender.com/health/ready
 curl -fsS https://music-room-api-regw.onrender.com/.well-known/openid-configuration
 ```
+
+Or `make smoke-live`, which does all of it and says what is wrong when something is.
 
 Render appends a suffix to a service's host name, so the URL is not the service name — `render.yaml`
 names the service and the platform names the host.
