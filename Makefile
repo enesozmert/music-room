@@ -5,7 +5,7 @@ SOLUTION := MusicRoom/MusicRoom.sln
 PERSISTENCE := MusicRoom/src/MusicRoom/Persistence/MusicRoom.Persistence.csproj
 WEBAPI := MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj
 
-.PHONY: up down migrate test lint load openapi e2e e2e-down agent-check
+.PHONY: up down migrate test lint load openapi e2e e2e-down smoke smoke-live agent-check
 
 up: ## build and start the full stack
 	docker compose up -d --build
@@ -189,6 +189,17 @@ e2e: ## drive the whole identity surface against the composed stack
 
 e2e-down: ## stop the end-to-end stack
 	$(E2E_COMPOSE) down
+
+# Where the deployment answers — ADR-0046, SPEC-051. A literal here rather than in .env because it is a
+# public URL, not a secret, and a smoke target nobody can run without first setting a variable is a
+# smoke target nobody runs.
+LIVE_BASE_URL ?= https://music-room-api-regw.onrender.com
+
+smoke: ## check a running stack's configuration (BASE=url to aim it elsewhere)
+	./scripts/smoke.sh $(if $(BASE),$(BASE),http://localhost:8080)
+
+smoke-live: ## the same checks against the deployment
+	./scripts/smoke.sh $(LIVE_BASE_URL)
 
 agent-check: ## the full local gate; every spec's Verification section calls this
 	dotnet restore $(SOLUTION)

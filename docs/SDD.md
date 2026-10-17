@@ -894,6 +894,26 @@ container serves `/health` and `/health/ready` against the compose PostgreSQL. B
 of [[delivery-plan]]; rules in [[ci-cd-containerization]]. Issue O10 is closed. CI builds and
 tests but does not deploy -- [[ADR-0015-hosting-and-deployment]].
 
+### 14.2.1 Checking a deployment
+
+A deployment can be wrong in ways no test can be: a variable nobody set, a proxy that hides the
+scheme, a database that is not migrated. `make smoke` — SPEC-053 — checks exactly those, against any
+base URL, in a few seconds: liveness, every member of the readiness body, the discovery document's
+issuer **including its scheme**, the published key set, and, with credentials for one already-verified
+account, a signed-in read and one catalog search. It creates nothing and sends no mail; the suite
+proves the rules, and this proves the configuration they run under. `make smoke-live` aims it at the
+hosted service. The runbook is `docs/deploy/RENDER.md`.
+
+Two live defects are the reason it exists. The issuer said `http://` behind a TLS-terminating proxy
+until `ASPNETCORE_FORWARDEDHEADERS_ENABLED` was set, which also silently collapsed the per-IP
+credential limit into one bucket. And `YOUTUBE_API_KEY` was never set on the service, so every
+`GET /tracks` answered `503` with nothing in the log to say why. `/health/ready` now reports
+`catalog` — **configuration only, never a call**, because a `search.list` costs 100 of 10,000 daily
+quota units — and `Degraded` there never makes readiness fail, because only search touches the
+provider. The provider's log now distinguishes four causes of a catalog `503`: no key, a key the
+provider rejects, the daily quota, and the provider's own trouble. The response is identical in all
+four; which one applied is the deployment's business, not the caller's.
+
 ### 14.3 Configuration
 
 Development is **fully containerised**: `docker compose up` brings up the stack and the host needs
@@ -1026,7 +1046,7 @@ table to walk through at defence.
 | V.2.3 | reorder race conditions | §12.1 #2, §12.2 | **implemented** -- every track write updates the playlist row inside its own transaction, keyed on the `xmin` the caller read, so that one statement is both the precondition and the lock. Twenty parallel moves of one track with one token produce exactly one `200`, nineteen `412`, and a final order that is still a permutation of the original with distinct positions; twenty parallel adds with one token add one track. Every refusal is decided before the parent is touched, so a refused write leaves the caller's `ETag` valid |
 | V.2 | at least 2 of the 3 services | §5.2, [[ADR-0010-service-scope]] | **implemented** -- all three ship. Playlist Editor at S5, Track Vote at S6, Control Delegation with Playback at S7; each one's own rows above carry the evidence |
 | V.3 | backend is the single source of truth | §4.2, §8.1 | designed |
-| V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **partly implemented** -- `docs/api/openapi.json` is generated from the code, committed, and guarded against drift by `make agent-check`: it documents every route that exists, across identity, profiles and the social graph, playlists and their tracks, events with their licence policy, roster, queue, votes and venue codes, devices and control delegation, playback sessions, the audit read and the two health probes. Each mutating route documents the `400` its mandatory client headers can produce and each authenticated route its `401`. **The generated document is the count; this row deliberately does not repeat it, because a number written here rots.** The three hubs are not in it — OpenAPI describes HTTP, and the realtime contract lives in §9.2 |
+| V.4 | REST, JSON, reference documentation | §9.1, [[endpoint-inventory]], [[ADR-0021-backend-dependency-set]] | **partly implemented** -- `docs/api/openapi.json` is generated from the code, committed, and guarded against drift by `make agent-check`: it documents every route that exists, across identity, profiles and the social graph, playlists and their tracks, events with their licence policy, roster, queue, votes and venue codes, devices and control delegation, playback sessions, the audit read and the two health probes. **The readiness body is specified per member** — SPEC-053, [[endpoint-inventory]] §8: `database` and `catalog`, each carrying a state and nothing else, with `503` reserved for `Unhealthy` so a reported `Degraded` does not take the service out of rotation. Each mutating route documents the `400` its mandatory client headers can produce and each authenticated route its `401`. **The generated document is the count; this row deliberately does not repeat it, because a number written here rots.** The three hubs are not in it — OpenAPI describes HTTP, and the realtime contract lives in §9.2 |
 | V.5 | client is a remote control | §4.1, §9.1 | designed |
 | V.5 | configurable backend address | §9.1, [[musicroom-mobile]] | designed |
 | V.5 | social authentication on mobile | §10.2 | designed |
@@ -1038,6 +1058,7 @@ table to walk through at defence.
 | V.7 | declare server specification | §14.4, `docs/load/REPORT.md` §1 | **done** — host and Docker VM both declared, because only one of them is the system under test. The hosted figure is a separate measurement once O11 and S4 land |
 | V.6 | OWASP conformance of all code | [[asvs-conformance]], §13 | target committed, evidence pending |
 | V.8 | per-layer tests | [[testing]], [[ADR-0012-test-stack]] | **partly implemented** -- tests in four projects, the count being whatever `make agent-check` prints rather than a number that rots here: validation and pipeline behaviours (`MusicRoom.Application.Tests`), infrastructure (`MusicRoom.Infrastructure.Tests`), persistence (`MusicRoom.Persistence.Tests`, which holds the built model to the schema naming conventions without needing an engine) and API integration (`MusicRoom.WebAPI.Tests`, Testcontainers-backed against a real PostgreSQL). Every slice with a contended write carries the parallel test AGENTS.md requires, each asserting final database state rather than status codes alone: one row from 20 parallel registrations of an address; one `204` and one `consumed_at_utc` from 20 verifications of a token; one `200`, one spent row and one replacement from 20 refresh-token rotations; one `204` and no live refresh token from 20 password resets; one friendship from 20 accepts; one `200` and nineteen `412` from 20 playlist reorders; twenty votes and a count of twenty from twenty accounts, against one row from 20 votes by one account; one spent venue code; one controller from 20 simultaneous claims; and one track advanced from 20 parallel advances. **The realtime layer is tested too** -- three hub suites and three broadcast suites drive a real SignalR client against the test host. The domain layer has no tests of its own: its types carry no behaviour worth isolating, which is a consequence of the anaemic shape ADR-0028 chose and is stated here rather than left as a gap |
+| V.8 | a deployment can be checked | §14.2.1, `scripts/smoke.sh`, `docs/deploy/RENDER.md` | **done**, SPEC-053 — `make smoke` against any base URL and `make smoke-live` against the hosted service: liveness, each readiness member, the discovery issuer including its scheme, the published key set, and with credentials one signed-in read plus one catalog search. Read-mostly and account-reusing on purpose: it creates nothing, registers nobody and sends no mail, because the suite proves the rules and only configuration is left to prove. It was written after two live defects that no test could have caught — an `http://` issuer behind the proxy, and a `YOUTUBE_API_KEY` nobody had set |
 | V.8 | continuous integration | [[ci-cd-containerization]] | **done** -- `.github/workflows/backend-dev.yml` and `backend-prod.yml`: restore, format, build -warnaserror, test, vulnerable-package scan, OpenAPI drift check; prod also builds the image. No deployment, by [[ADR-0015-hosting-and-deployment]] |
 | V.8 | credentials in a git-ignored `.env` | §14.3, `.env.example` | **done**, and past the floor since 2026-10-11: `SECRET_PROVIDER=infisical` reads configuration from the self-hosted vault in this compose stack, leaving `.env` holding the vault's own bootstrap credentials — SPEC-047, O18 closed |
 | V.8 | enforced code quality | [[dotnet-csharp]], `.editorconfig`, `MusicRoom/SonarLint.xml` | **done** -- proven live in S0: a 47-line method fails the build with `S138 ... greater than the 40 lines authorized`, and six parameters fail with `S107`. The thresholds moved to `SonarLint.xml`; in `.editorconfig` they were silently ignored |
