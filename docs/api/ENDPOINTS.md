@@ -514,11 +514,35 @@ Model and rationale: [[ADR-0017-playback-session]].
 |---|---|---|---|---|
 | GET | `/me/activity` | `200` paged own audit records | `self` | optional; the **write** side is the graded requirement (V.6), the read side is convenience |
 | GET | `/health` | `200` | `anon` | liveness, minimal body |
-| GET | `/health/ready` | `200` / `503` | `anon` | readiness: database and provider reachability |
+| GET | `/health/ready` | `200` / `503` | `anon` | readiness: one member per dependency — see below |
 | GET | `/openapi/v1.json` | `200` | `anon` | the generated contract; interactive UI only in `Development` |
 
 Audit records are **written** by a pipeline behaviour on every command — that is subject V.6, and
 it is not optional. See [[logging-observability]].
+
+#### The readiness body — SPEC-053
+
+`GET /health/ready` answers `{"status": "...", "<dependency>": "...", ...}`: one member per registered
+dependency, carrying its state and **nothing else** — no host, no connection string, no exception text,
+no key or part of one.
+
+| Member | States | Meaning |
+|---|---|---|
+| `status` | `Healthy`, `Degraded` | the worst state any member reports |
+| `database` | `Healthy`, `Unhealthy` | a connection was opened. `Unhealthy` is the only thing that makes this route answer `503` |
+| `catalog` | `Healthy`, `Degraded` | **whether a provider key is configured on this host.** It is never called |
+
+**`503` comes from `Unhealthy` alone.** A `Degraded` member is reported and the route still answers
+`200`, because readiness is about whether this service can serve. Signing in, profiles, playlists,
+events, votes, devices and playback touch no music provider; only `GET /tracks` does. A probe that
+failed here would take the service out of rotation for a third party's outage, or for one feature.
+
+**`catalog` never calls YouTube.** A `search.list` costs 100 of the 10,000 daily quota units
+([[ADR-0023-youtube-quota-budget]]), so a probe that reached the provider would spend the budget it
+exists to watch — and on a platform that wakes a sleeping instance per request, at a rate nobody chose.
+`Degraded` therefore means exactly one thing: `YOUTUBE_API_KEY` is not set, so `GET /tracks` answers
+`503`. Whether a configured key still works is what a real search finds out, and the host's log then
+says which cause applied — an absent key, a rejected key, the quota, or the provider itself.
 
 ---
 
