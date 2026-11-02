@@ -130,16 +130,30 @@ produces a `403` at fetch time rather than at login.
 
 ### 5. Switch the API onto the vault
 
-Put this deployment's secrets into the Infisical project, then set on the API service:
+Put this deployment's secrets into the Infisical project's `prod` environment:
+
+| Goes into the vault | Stays in `render.yaml` |
+|---|---|
+| `DATABASE_URL`, `MAIL_API_KEY`, `MAIL_FROM`, `OIDC_SIGNING_KEY`, `YOUTUBE_API_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_DISCOVERY_URL`, `GOOGLE_ISSUER`, `CORS_ALLOWED_ORIGINS` | `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ACCESS_TOKEN_MINUTES`, `BCRYPT_WORK_FACTOR`, `MAIL_PROVIDER`, the ports, `ASPNETCORE_FORWARDEDHEADERS_ENABLED` — none of them is a secret, and a value in two places is a value that disagrees with itself |
+
+Then, on the API service, **in this order**:
 
 ```
-SECRET_PROVIDER=infisical
 INFISICAL_SITE_URL=<the vault's URL>
-INFISICAL_CLIENT_ID=<machine identity>
+INFISICAL_CLIENT_ID=<the identity's client id, not its identity id>
 INFISICAL_CLIENT_SECRET=<its secret>
 INFISICAL_PROJECT_ID=<project id>
 INFISICAL_ENVIRONMENT=prod
 ```
+
+**and only then** `SECRET_PROVIDER=infisical`. The other way round the host finds no vault address,
+refuses to start, and Render rolls back to the previous deploy — SPEC-047's refusal working as designed,
+which looks exactly like a broken deploy while you are watching it happen.
+
+Deploy, then `make smoke-live`. **Remove the moved secrets from Render only after it passes**: while both
+hold a value the vault's wins (proven on the development stack by putting a deliberately invalid
+`JWT_ACCESS_TOKEN_MINUTES` in the vault and watching the host refuse to boot with a valid one in `.env`),
+so keeping them for one deploy costs nothing and leaves a way back.
 
 Those five stay in Render, and they are the only ones that have to: they are what opens the vault, so
 they cannot live inside it — ADR-0029 said that before any of it was built.

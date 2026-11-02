@@ -88,8 +88,36 @@ services:
 
       # `env` until the vault below is up and holds this deployment's secrets; then `infisical`, and the
       # five INFISICAL_* values become the only ones Render itself holds — SPEC-047, ADR-0029.
+      #
+      # **Order matters when switching.** Enter the five below first, then set this to `infisical`. The
+      # other way round, the host finds no vault address, refuses to start — SPEC-047's deliberate
+      # refusal, not a bug — and Render rolls back to the previous deploy.
       - key: SECRET_PROVIDER
         value: env
+
+      # What opens the vault, and therefore the only values that cannot live inside it — ADR-0029 said
+      # so before any of it was built. Entered in the dashboard, never written down here.
+      #
+      # The address is the vault service's own public URL rather than an internal one: the API reads it
+      # over HTTPS at start-up, and `fromService` would hand over a host name this account's private
+      # network resolves while the value also has to be the one Infisical itself answers on.
+      - key: INFISICAL_SITE_URL
+        sync: false
+
+      # The identity's **Client ID**, which is not its Identity ID. Both are UUIDs on the same screen in
+      # the vault's UI, and the wrong one logs in with `404 No identity with specified client ID` —
+      # found exactly that way on the development stack.
+      - key: INFISICAL_CLIENT_ID
+        sync: false
+      - key: INFISICAL_CLIENT_SECRET
+        sync: false
+      - key: INFISICAL_PROJECT_ID
+        sync: false
+
+      # The environment **slug**, as the vault spells it — `prod`, not "Production". A slug that does not
+      # exist fetches nothing and the host refuses to start.
+      - key: INFISICAL_ENVIRONMENT
+        value: prod
 
       - key: YOUTUBE_API_KEY
         sync: false
