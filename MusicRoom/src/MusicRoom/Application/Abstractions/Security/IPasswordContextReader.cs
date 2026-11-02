@@ -30,6 +30,18 @@ public interface IPasswordContextReader
     /// was before, so a replayed link still answers `400`.
     /// </remarks>
     Task<PasswordContextWords?> FindByPasswordResetTokenAsync(string tokenHash, CancellationToken cancellationToken);
+
+    /// <summary>Finds the context words for an account by its address — SPEC-055.</summary>
+    /// <param name="email">The address, lower-cased by the caller.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The words, or <see langword="null"/> when no account has that address.</returns>
+    /// <remarks>
+    /// The code path knows the address rather than a token digest, and the screen needs the same two
+    /// words either way. It decides which words to screen against and never decides the response: an
+    /// address with no account screens against the project's own words alone, and the write path still
+    /// answers `400` for it.
+    /// </remarks>
+    Task<PasswordContextWords?> FindByEmailAsync(string email, CancellationToken cancellationToken);
 }
 
 /// <summary>

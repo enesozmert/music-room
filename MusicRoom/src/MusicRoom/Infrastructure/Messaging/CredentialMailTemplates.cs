@@ -45,28 +45,28 @@ public static class CredentialMailTemplates
             CodeText(message.Language, message.Code) + ActionText(copy, link) + ValidityText(copy));
     }
 
-    /// <summary>Builds the password reset message — a link, and deliberately no code.</summary>
-    /// <param name="message">The recipient, the language and the token.</param>
+    /// <summary>Builds the password reset message — a code, and a link when one is configured.</summary>
+    /// <param name="message">The recipient, the language, the token and the code.</param>
     /// <param name="linkBaseUrl">Where the client serves the reset screen, or null.</param>
     /// <returns>The subject and both bodies.</returns>
+    /// <remarks>
+    /// **The token is never printed as text** — SPEC-055. Until this unit, a deployment with no reset
+    /// screen configured rendered the 43-character token inside the code block under the label *"Your
+    /// verification code"*, beneath a sentence telling the reader to press a button that was not there.
+    /// A token belongs in a link or nowhere; what a person types is the code.
+    /// </remarks>
     public static RenderedMail Reset(PasswordResetMail message, string? linkBaseUrl)
     {
         ArgumentNullException.ThrowIfNull(message);
 
-        MailCopy copy = MailCopyBook.Reset(message.Language, message.DisplayName);
+        MailCopy copy = MailCopyBook.Reset(message.Language, message.DisplayName, hasLink: linkBaseUrl is not null);
         string? link = Link(linkBaseUrl, message.Token);
 
-        // No link configured means the bare token, as it always has: the flow still completes through the
-        // API, and a link pointing at a machine nobody intended is worse than no link.
-        string html = link is null
-            ? CodeBlock(message.Language, message.Token) + Validity(copy)
-            : Action(copy, link) + Validity(copy);
-
-        string text = link is null
-            ? CodeText(message.Language, message.Token) + ValidityText(copy)
-            : ActionText(copy, link) + ValidityText(copy);
-
-        return Render(copy, message.Language, html, text);
+        return Render(
+            copy,
+            message.Language,
+            CodeBlock(message.Language, message.Code) + Action(copy, link) + Validity(copy),
+            CodeText(message.Language, message.Code) + ActionText(copy, link) + ValidityText(copy));
     }
 
     /// <summary>Builds the welcome message.</summary>

@@ -28,6 +28,9 @@ internal sealed class RecordingMailService : IMailService
     /// <summary>The plaintext password reset tokens, in order.</summary>
     internal IReadOnlyList<string> ResetTokens => [.. Snapshot(_resets).Select(mail => mail.Token)];
 
+    /// <summary>The six-character reset codes, in order — SPEC-055.</summary>
+    internal IReadOnlyList<string> ResetCodes => [.. Snapshot(_resets).Select(mail => mail.Code)];
+
     /// <summary>The welcome messages, in order. One per account, or the stamp is not doing its job.</summary>
     internal IReadOnlyList<WelcomeMail> Welcomes => Snapshot(_welcomes);
 

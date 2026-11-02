@@ -2,6 +2,7 @@ using MediatR;
 using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Persistence;
 using MusicRoom.Application.Abstractions.Security;
+using MusicRoom.Application.Features.Auth;
 
 namespace MusicRoom.Application.Features.Auth.Commands.ResetPassword;
 
@@ -55,14 +56,12 @@ internal sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswor
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        string tokenHash = OpaqueTokenHash.Of(request.Token);
-
-        // Before the write, and before BCrypt: a password refused here leaves the token spendable, so the
-        // caller can follow the same link again with a different passphrase — SPEC-035, ADR-0042. A token that
-        // matches no account screens against the project's own words alone, and the write path below still
-        // decides what an unknown, spent or expired token answers.
-        PasswordContextWords? context = await _passwordContext
-            .FindByPasswordResetTokenAsync(tokenHash, cancellationToken)
+        // Before the write, and before BCrypt: a password refused here leaves the credential spendable,
+        // so the caller can follow the same link, or type the same code, again with a different
+        // passphrase — SPEC-035, ADR-0042. A credential that matches no account screens against the
+        // project's own words alone, and the write path below still decides what an unknown, spent or
+        // expired one answers.
+        PasswordContextWords? context = await FindContextAsync(request, cancellationToken)
             .ConfigureAwait(false);
 
         if (PasswordContext.ContainsAContextWord(request.NewPassword, context?.Email, context?.DisplayName))
@@ -76,12 +75,7 @@ internal sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswor
         // BCrypt runs for a quarter of a second.
         string newPasswordHash = _passwordHasher.Hash(request.NewPassword);
 
-        PasswordResetResult result = await _users
-            .TryResetPasswordAsync(
-                tokenHash,
-                newPasswordHash,
-                DateTime.UtcNow,
-                cancellationToken)
+        PasswordResetResult result = await SpendAsync(request, newPasswordHash, cancellationToken)
             .ConfigureAwait(false);
 
         _audit.SetOutcome(result.Outcome switch
@@ -99,4 +93,63 @@ internal sealed class ResetPasswordCommandHandler : IRequestHandler<ResetPasswor
 
         return result.Outcome;
     }
+
+    /// <summary>
+    /// Reads the account's own words, by whichever credential the caller presented — SPEC-055.
+    /// </summary>
+    /// <remarks>
+    /// The token identifies its row and the row names the account; the code is scoped by an address and
+    /// the address names it directly. Both end at the same two words, which is all the screen wants.
+    /// </remarks>
+    private Task<PasswordContextWords?> FindContextAsync(
+        ResetPasswordCommand request,
+        CancellationToken cancellationToken) =>
+        request.Token is { Length: > 0 } token
+            ? _passwordContext.FindByPasswordResetTokenAsync(
+                OpaqueTokenHash.Of(token),
+                cancellationToken)
+            : _passwordContext.FindByEmailAsync(Normalise(request.Email), cancellationToken);
+
+    /// <summary>
+    /// Spends whichever credential was presented, preferring the token when both are.
+    /// </summary>
+    /// <remarks>
+    /// The shape of the code is checked here rather than in the validator, for the reason email
+    /// verification gives: a caller sending a sentence costs a comparison rather than a query, and the
+    /// attempt budget is then spent by guesses at a code rather than by malformed input.
+    /// </remarks>
+    private Task<PasswordResetResult> SpendAsync(
+        ResetPasswordCommand request,
+        string newPasswordHash,
+        CancellationToken cancellationToken)
+    {
+        DateTime nowUtc = DateTime.UtcNow;
+
+        if (request.Token is { Length: > 0 } token)
+        {
+            return _users.TryResetPasswordAsync(
+                OpaqueTokenHash.Of(token),
+                newPasswordHash,
+                nowUtc,
+                cancellationToken);
+        }
+
+        string code = VerificationCode.Normalise(request.Code ?? string.Empty);
+
+        if (!VerificationCode.IsWellFormed(code) || request.Email is not { Length: > 0 })
+        {
+            return Task.FromResult(new PasswordResetResult(ResetPasswordOutcome.Invalid, UserId: null));
+        }
+
+        return _users.TryResetPasswordByCodeAsync(
+            Normalise(request.Email),
+            OpaqueTokenHash.Of(code),
+            newPasswordHash,
+            nowUtc,
+            cancellationToken);
+    }
+
+    /// <summary>Lower-cases an address the way registration stored it, or returns empty for none.</summary>
+    private static string Normalise(string? email) =>
+        email is null ? string.Empty : email.Trim().ToLowerInvariant();
 }

@@ -77,7 +77,7 @@ Subject V.1, V.5. Rules: [[authentication-authorization]], [[social-oauth]].
 | GET | `/auth/sessions` | — | `200` list | `401` | `self` |
 | DELETE | `/auth/sessions/{sessionId}` | — | `204` | `401`, `404` | `self` |
 | POST | `/auth/password-reset-requests` | `email` | `202` | `422`, `429` | `anon` |
-| POST | `/auth/password-resets` | `token`, `newPassword` | `204` | `400`, `410`, `422`, `429` | `anon` |
+| POST | `/auth/password-resets` | `newPassword`, and **either** `token` **or** `email` + `code` | `204` | `400`, `410`, `422`, `429` | `anon` |
 | POST | `/me/password` | `currentPassword`, `newPassword` | `204` | `401`, `422`, `429` | `auth` |
 | GET | `/auth/social-links` | — | `200` list | `401` | `self` |
 | POST | `/auth/social-links` | `provider`, `code`, `codeVerifier`, `redirectUri` | `201` | `409` already linked, `422` | `auth` |
@@ -172,6 +172,22 @@ should not sit in one overnight. A message delayed past the window needs a resen
 
 **Case and spacing in a code do not matter.** `abc-234` and `ABC234` are the same code; what a mail
 client puts on the clipboard works.
+
+**The reset message carries a code too** — SPEC-055, which reverses SPEC-052's refusal of one. The
+same shape, the same alphabet, the same five-attempt budget, and the same rule that spending either
+credential spends the row: send `token`, or send `email` with `code`. Two differences from
+verification, both deliberate:
+
+- **the window is one hour**, as it always was for a reset, and the code shares it — one row, one
+  expiry, rather than a second window that eventually outlives the first;
+- **the code path never answers `410`.** An expired token identifies its own row, so telling its
+  holder it expired says nothing they did not know; a code is scoped by an address, and a `410` for
+  one would say that address has a reset outstanding. By code, every refusal is `400`.
+
+SPEC-052 refused a code here because six characters is a weak credential in front of the strongest
+action in the system. What makes it acceptable is what makes it acceptable for verification: five
+guesses out of 1.07e9 per issued row, and a sixth chance only through a rate-limited endpoint that
+mails the account's own address.
 
 **A wrong code, an unknown address, a spent row and an exhausted budget are one answer.** A caller
 who could tell them apart could learn which addresses have a verification outstanding.

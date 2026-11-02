@@ -61,17 +61,19 @@ public sealed class CredentialMailDispatcher
     /// <summary>Sends a password reset message, or logs why it could not be sent.</summary>
     /// <param name="emailAddress">The recipient.</param>
     /// <param name="displayName">What to call them, or empty.</param>
-    /// <param name="token">The reset token. Never logged here.</param>
+    /// <param name="token">The reset token, which the link carries. Never logged here.</param>
+    /// <param name="code">The six characters they may type instead — SPEC-055. Never logged here.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>A task that completes once the attempt is over, successful or not.</returns>
     public Task SendPasswordResetAsync(
         string emailAddress,
         string displayName,
         string token,
+        string code,
         CancellationToken cancellationToken) =>
         SendAsync(
             () => _mail.SendPasswordResetAsync(
-                new PasswordResetMail(emailAddress, displayName, token, Language()),
+                new PasswordResetMail(emailAddress, displayName, token, code, Language()),
                 cancellationToken),
             "Password reset mail could not be sent. The token was issued.");
 

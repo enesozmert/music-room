@@ -49,11 +49,12 @@ internal static class PasswordResetEndpoints
             .WithName("PostAuthPasswordReset")
             .WithSummary("Replace a forgotten password")
             .WithDescription(
-                "Spends the token from the reset mail exactly once, replaces the password and revokes "
-                + "every refresh token the account holds, so a password change ends every session "
-                + "opened with the old one. An access token issued moments earlier stays valid until it "
-                + "expires; that window is the 15 minutes the session design fixes. A 422 describes the "
-                + "new password only, never the token.")
+                "Takes either the token from the reset link or the address and the six-character code "
+                + "from the same mail, spends it exactly once, replaces the password and revokes every "
+                + "refresh token the account holds, so a password change ends every session opened with "
+                + "the old one. Five wrong codes spend the row. An access token issued moments earlier "
+                + "stays valid until it expires; that window is the 15 minutes the session design fixes. "
+                + "A 422 describes the new password only, never the credential.")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status410Gone)
@@ -91,7 +92,11 @@ internal static class PasswordResetEndpoints
         ISender sender,
         CancellationToken cancellationToken)
     {
-        ResetPasswordCommand command = new(request.Token, request.NewPassword);
+        ResetPasswordCommand command = new(
+            request.NewPassword,
+            request.Token,
+            request.Email,
+            request.Code);
 
         ResetPasswordOutcome outcome;
 
@@ -175,6 +180,13 @@ internal sealed record PasswordResetRequest(string Email);
 /// <summary>
 /// The reset payload — <c>docs/api/ENDPOINTS.md</c> §1.
 /// </summary>
-/// <param name="Token">The token from the reset mail.</param>
 /// <param name="NewPassword">The replacement password. Never logged or echoed back.</param>
-internal sealed record PasswordResetSubmission(string Token, string NewPassword);
+/// <param name="Token">The token from the reset link, or null when the code was typed.</param>
+/// <param name="Email">The address the code was sent to. Required with a code, which is not unique
+/// across accounts; omitted with a token, which identifies its own row — SPEC-055.</param>
+/// <param name="Code">The six characters from the mail, or null when the link was used.</param>
+internal sealed record PasswordResetSubmission(
+    string NewPassword,
+    string? Token = null,
+    string? Email = null,
+    string? Code = null);
