@@ -62,10 +62,7 @@ public class Program
         CallerServices.Add(builder.Services, builder.Configuration);
         RealtimeServices.Add(builder);
         Observability.AddTracing(builder.Services, builder.Configuration);
-        HealthRegistration.Add(
-            builder.Services,
-            connectionString,
-            EnvironmentConfiguration.ReadCatalogOptions(builder.Configuration).HasProvider);
+        HealthRegistration.Add(builder.Services, builder.Configuration, connectionString);
 
         WebApplication app = builder.Build();
 

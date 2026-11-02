@@ -150,6 +150,19 @@ if [ "$catalog" = "Degraded" ]; then
   advise "Everything else is unaffected, which is why readiness is still 200."
 fi
 
+# Reported, never fatal — SPEC-056, same rule as the catalog. Password sign-in works without it, and a
+# host with no provider answers `422 PROVIDER.UNKNOWN` to one route and serves everything else.
+social="$(body | member social)"
+check "the social provider reports its state" "reported" \
+  "$([ -n "$social" ] && echo reported || echo absent)"
+say "          social: ${social:-absent}"
+
+if [ "$social" = "Degraded" ]; then
+  advise "No social provider on this host: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,"
+  advise "GOOGLE_DISCOVERY_URL and GOOGLE_ISSUER are required together and at least one is missing."
+  advise "POST /api/v1/auth/sessions/social answers 422 PROVIDER.UNKNOWN until all four are set."
+fi
+
 # --- 3. what it publishes about itself ------------------------------------------------------------
 #
 # The issuer is the one value a deployment gets wrong silently. Behind a TLS-terminating proxy without

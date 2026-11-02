@@ -547,6 +547,7 @@ no key or part of one.
 | `status` | `Healthy`, `Degraded` | the worst state any member reports |
 | `database` | `Healthy`, `Unhealthy` | a connection was opened. `Unhealthy` is the only thing that makes this route answer `503` |
 | `catalog` | `Healthy`, `Degraded` | **whether a provider key is configured on this host.** It is never called |
+| `social` | `Healthy`, `Degraded` | **which social providers are configured**, by name — SPEC-056. The provider is never called, and no client id or secret appears here |
 
 **`503` comes from `Unhealthy` alone.** A `Degraded` member is reported and the route still answers
 `200`, because readiness is about whether this service can serve. Signing in, profiles, playlists,
@@ -557,7 +558,9 @@ failed here would take the service out of rotation for a third party's outage, o
 ([[ADR-0023-youtube-quota-budget]]), so a probe that reached the provider would spend the budget it
 exists to watch — and on a platform that wakes a sleeping instance per request, at a rate nobody chose.
 `Degraded` therefore means exactly one thing: `YOUTUBE_API_KEY` is not set, so `GET /tracks` answers
-`503`. Whether a configured key still works is what a real search finds out, and the host's log then
+`503`. **`social` works the same way** and for the same reasons: it reports the provider rows
+configuration produced, never fetches a discovery document, and `Degraded` means the four `GOOGLE_*`
+variables are not all set, so `POST /auth/sessions/social` answers `422 PROVIDER.UNKNOWN`. Whether a configured key still works is what a real search finds out, and the host's log then
 says which cause applied — an absent key, a rejected key, the quota, or the provider itself.
 
 ---
