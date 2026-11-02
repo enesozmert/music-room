@@ -85,7 +85,7 @@ internal sealed class RequestPasswordResetCommandHandler : IRequestHandler<Reque
         // No display name, for the reason the resend path gives: this is keyed on an address and reads
         // no account.
         await _mail
-            .SendPasswordResetAsync(email, string.Empty, issued.Plaintext, cancellationToken)
+            .SendPasswordResetAsync(email, string.Empty, issued.Plaintext, issued.Code, cancellationToken)
             .ConfigureAwait(false);
 
         return null;

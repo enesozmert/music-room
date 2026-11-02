@@ -30,6 +30,21 @@ internal sealed class PasswordResetTokenConfiguration : IEntityTypeConfiguration
             .IsFixedLength()
             .IsRequired();
 
+        // The code's digest, beside the token's and the same shape — SPEC-055. Not unique: six characters
+        // from a 32-symbol alphabet will collide across accounts eventually, and the consuming statement
+        // scopes the lookup by account rather than by digest alone.
+        builder.Property(token => token.CodeHash)
+            .HasColumnName("code_hash")
+            .HasMaxLength(tokenHashLength)
+            .IsFixedLength()
+            .IsRequired();
+
+        // The attempt budget. Not indexed: it is read and written through the row the account already
+        // found, never searched on.
+        builder.Property(token => token.Attempts)
+            .HasColumnName("attempts")
+            .HasDefaultValue(0);
+
         builder.Property(token => token.ExpiresAtUtc)
             .HasColumnName("expires_at_utc")
             .HasColumnType("timestamp with time zone");

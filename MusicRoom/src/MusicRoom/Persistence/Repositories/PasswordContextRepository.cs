@@ -43,4 +43,18 @@ internal sealed class PasswordContextRepository : IPasswordContextReader
                 (token, user) => new PasswordContextWords(user.Email, user.DisplayName))
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// No join: the address is the account's own column, which is what the code path has in hand.
+    /// </remarks>
+    public async Task<PasswordContextWords?> FindByEmailAsync(
+        string email,
+        CancellationToken cancellationToken) =>
+        await _context.Users
+            .AsNoTracking()
+            .Where(user => user.Email == email)
+            .Select(user => new PasswordContextWords(user.Email, user.DisplayName))
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
 }

@@ -571,7 +571,7 @@
           "PasswordResetEndpoints"
         ],
         "summary": "Replace a forgotten password",
-        "description": "Spends the token from the reset mail exactly once, replaces the password and revokes every refresh token the account holds, so a password change ends every session opened with the old one. An access token issued moments earlier stays valid until it expires; that window is the 15 minutes the session design fixes. A 422 describes the new password only, never the token.",
+        "description": "Takes either the token from the reset link or the address and the six-character code from the same mail, spends it exactly once, replaces the password and revokes every refresh token the account holds, so a password change ends every session opened with the old one. Five wrong codes spend the row. An access token issued moments earlier stays valid until it expires; that window is the 15 minutes the session design fixes. A 422 describes the new password only, never the credential.",
         "operationId": "PostAuthPasswordReset",
         "requestBody": {
           "content": {
@@ -4262,18 +4262,34 @@
       },
       "PasswordResetSubmission": {
         "required": [
-          "token",
           "newPassword"
         ],
         "type": "object",
         "properties": {
-          "token": {
-            "type": "string",
-            "description": "The token from the reset mail."
-          },
           "newPassword": {
             "type": "string",
             "description": "The replacement password. Never logged or echoed back."
+          },
+          "token": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The token from the reset link, or null when the code was typed."
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The address the code was sent to. Required with a code, which is not unique\n    across accounts; omitted with a token, which identifies its own row — SPEC-055."
+          },
+          "code": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "The six characters from the mail, or null when the link was used."
           }
         },
         "description": "The reset payload — `docs/api/ENDPOINTS.md` §1."

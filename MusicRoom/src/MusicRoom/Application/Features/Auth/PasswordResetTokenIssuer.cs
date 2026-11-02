@@ -31,6 +31,10 @@ internal static class PasswordResetTokenIssuer
         // base64url, so the value survives a URL untouched: no padding, no characters to escape.
         string plaintext = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(tokenByteLength));
 
+        // The same six characters verification uses — SPEC-055. One definition of the alphabet and the
+        // length, because a second one is a second thing to get wrong.
+        string code = VerificationCode.Create();
+
         PasswordResetToken token = new()
         {
             Id = Guid.NewGuid(),
@@ -38,13 +42,18 @@ internal static class PasswordResetTokenIssuer
             // The row holds the digest. The plaintext leaves this method only to reach the mail
             // sender, and a leaked database therefore hands nobody a working reset.
             TokenHash = OpaqueTokenHash.Of(plaintext),
+
+            // The code's digest sits beside the token's, sharing the row's one window, and the budget
+            // starts at zero. Five wrong codes spend the row.
+            CodeHash = OpaqueTokenHash.Of(code),
+            Attempts = 0,
             ExpiresAtUtc = nowUtc.AddHours(tokenLifetimeHours),
             ConsumedAtUtc = null,
             CreatedAtUtc = nowUtc,
             UpdatedAtUtc = nowUtc,
         };
 
-        return new IssuedPasswordResetToken(token, plaintext);
+        return new IssuedPasswordResetToken(token, plaintext, code);
     }
 }
 
@@ -52,6 +61,7 @@ internal static class PasswordResetTokenIssuer
 /// The stored token and the plaintext that must reach the mail sender, kept together for the one call
 /// that needs both.
 /// </summary>
-/// <param name="Token">The row to insert, holding only the digest.</param>
-/// <param name="Plaintext">The value the recipient submits. Never stored and never logged.</param>
-internal sealed record IssuedPasswordResetToken(PasswordResetToken Token, string Plaintext);
+/// <param name="Token">The row to insert, holding only the two digests.</param>
+/// <param name="Plaintext">The value the link carries. Never stored and never logged.</param>
+/// <param name="Code">The six characters the recipient may type instead. Never stored, never logged.</param>
+internal sealed record IssuedPasswordResetToken(PasswordResetToken Token, string Plaintext, string Code);

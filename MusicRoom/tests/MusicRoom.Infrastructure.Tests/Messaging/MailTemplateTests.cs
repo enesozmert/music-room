@@ -75,20 +75,40 @@ public sealed class MailTemplateTests
         Assert.Contains("ABC234", mail.Text, StringComparison.Ordinal);
     }
 
-    /// <summary>The reset message carries a link and **no** code — SPEC-052's refusal.</summary>
+    /// <summary>The reset message carries the code, and the token only inside the link — SPEC-055.</summary>
     /// <remarks>
-    /// A six-character code that replaces a password is a weak credential for the strongest action in the
-    /// system. This is the test that stops somebody adding one for symmetry.
+    /// SPEC-052 refused a code here and this reverses it, on the owner's instruction of 2026-11-02. What
+    /// does not change is where a token may appear: in a link, or nowhere.
     /// </remarks>
     [Fact]
-    public void TheResetMessage_CarriesNoCode()
+    public void TheResetMessage_CarriesTheCodeAndTheTokenOnlyInTheLink()
     {
-        PasswordResetMail message = new("reader@example.com", "Reader", "a-reset-token", MailLanguage.English);
+        RenderedMail mail = CredentialMailTemplates.Reset(Reset(MailLanguage.English), _linkBase);
 
-        RenderedMail mail = CredentialMailTemplates.Reset(message, _linkBase);
+        Assert.Contains("RST234", mail.Html, StringComparison.Ordinal);
+        Assert.Contains("RST234", mail.Text, StringComparison.Ordinal);
+        Assert.Contains($"{_linkBase}?token=a-reset-token", mail.Html, StringComparison.Ordinal);
+    }
 
-        Assert.Contains("a-reset-token", mail.Html, StringComparison.Ordinal);
-        Assert.DoesNotContain("Your verification code", mail.Html, StringComparison.Ordinal);
+    /// <summary>
+    /// With no reset screen configured, the message carries the code and no token at all — SPEC-055.
+    /// </summary>
+    /// <remarks>
+    /// The defect this unit started from, in the mail the owner received on 2026-11-02: the 43-character
+    /// token was printed inside the code block, labelled *"Your verification code"*, under a sentence
+    /// telling the reader to press a button that no deployment without a link renders.
+    /// </remarks>
+    [Fact]
+    public void TheResetMessage_WithNoLink_NeverPrintsTheToken()
+    {
+        RenderedMail mail = CredentialMailTemplates.Reset(Reset(MailLanguage.English), null);
+
+        Assert.Contains("RST234", mail.Html, StringComparison.Ordinal);
+        Assert.DoesNotContain("a-reset-token", mail.Html, StringComparison.Ordinal);
+        Assert.DoesNotContain("a-reset-token", mail.Text, StringComparison.Ordinal);
+
+        // And the words match what is in front of the reader: no button, so no sentence about one.
+        Assert.DoesNotContain("use the button", mail.Html, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>The welcome message carries no credential at all.</summary>
@@ -169,12 +189,15 @@ public sealed class MailTemplateTests
     private static VerificationMail Verification(MailLanguage language) =>
         new("reader@example.com", "Reader", "a-verification-token", "ABC234", language);
 
+    private static PasswordResetMail Reset(MailLanguage language) =>
+        new("reader@example.com", "Reader", "a-reset-token", "RST234", language);
+
     private static IEnumerable<RenderedMail> Everything(MailLanguage language)
     {
         yield return CredentialMailTemplates.Verification(Verification(language), _linkBase);
         yield return CredentialMailTemplates.Verification(Verification(language), null);
-        yield return CredentialMailTemplates.Reset(
-            new PasswordResetMail("reader@example.com", "Reader", "a-reset-token", language), _linkBase);
+        yield return CredentialMailTemplates.Reset(Reset(language), _linkBase);
+        yield return CredentialMailTemplates.Reset(Reset(language), null);
         yield return CredentialMailTemplates.Welcome(
             new WelcomeMail("reader@example.com", "Reader", language), _linkBase);
     }

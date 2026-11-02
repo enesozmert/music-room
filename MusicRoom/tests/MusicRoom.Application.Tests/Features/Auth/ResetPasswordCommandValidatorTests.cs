@@ -24,7 +24,7 @@ public sealed class ResetPasswordCommandValidatorTests
     public void Validate_AnIssuedTokenAndAStrongPassword_Passes()
     {
         // Arrange
-        ResetPasswordCommand command = new(Token(), NewPassword);
+        ResetPasswordCommand command = new(NewPassword, Token: Token());
 
         // Act
         ValidationResult result = _validator.Validate(command);
@@ -33,12 +33,12 @@ public sealed class ResetPasswordCommandValidatorTests
         Assert.True(result.IsValid);
     }
 
-    /// <summary>An empty token never reaches the database.</summary>
+    /// <summary>A request with neither credential never reaches the database — SPEC-055.</summary>
     [Fact]
     public void Validate_AnEmptyToken_Fails()
     {
         // Arrange
-        ResetPasswordCommand command = new(string.Empty, NewPassword);
+        ResetPasswordCommand command = new(NewPassword, Token: string.Empty);
 
         // Act
         ValidationResult result = _validator.Validate(command);
@@ -54,8 +54,8 @@ public sealed class ResetPasswordCommandValidatorTests
     {
         // Arrange — one character past the 43 of a base64url-encoded 32-byte token.
         ResetPasswordCommand command = new(
-            new string('t', ResetPasswordCommandValidator.TokenLength + 1),
-            NewPassword);
+            NewPassword,
+            Token: new string('t', ResetPasswordCommandValidator.TokenLength + 1));
 
         // Act
         ValidationResult result = _validator.Validate(command);
@@ -69,7 +69,7 @@ public sealed class ResetPasswordCommandValidatorTests
     public void Validate_APasswordBelowTheMinimum_FailsOnThePassword()
     {
         // Arrange
-        ResetPasswordCommand command = new(Token(), "short");
+        ResetPasswordCommand command = new("short", Token: Token());
 
         // Act
         ValidationResult result = _validator.Validate(command);
@@ -93,7 +93,63 @@ public sealed class ResetPasswordCommandValidatorTests
         string multiByte = new('€', 30);
         Assert.True(Encoding.UTF8.GetByteCount(multiByte) > PasswordRules.PasswordMaximumUtf8Bytes);
 
-        ResetPasswordCommand command = new(Token(), multiByte);
+        ResetPasswordCommand command = new(multiByte, Token: Token());
+
+        // Act
+        ValidationResult result = _validator.Validate(command);
+
+        // Assert
+        Assert.False(result.IsValid);
+    }
+
+    /// <summary>The address and a code are a complete request, with no token — SPEC-055.</summary>
+    [Fact]
+    public void Validate_AnAddressAndACode_Passes()
+    {
+        // Arrange
+        ResetPasswordCommand command = new(NewPassword, Email: "reader@example.com", Code: "RST234");
+
+        // Act
+        ValidationResult result = _validator.Validate(command);
+
+        // Assert
+        Assert.True(result.IsValid);
+    }
+
+    /// <summary>
+    /// A code without an address is refused: six characters are not unique across accounts, so there
+    /// would be no row to look at — SPEC-055 decision 4.
+    /// </summary>
+    [Fact]
+    public void Validate_ACodeWithNoAddress_Fails()
+    {
+        // Arrange
+        ResetPasswordCommand command = new(NewPassword, Code: "RST234");
+
+        // Act
+        ValidationResult result = _validator.Validate(command);
+
+        // Assert
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, failure => failure.PropertyName == "email");
+    }
+
+    /// <summary>
+    /// A code far longer than six characters is refused here rather than hashed and queried.
+    /// </summary>
+    /// <remarks>
+    /// The bound is 32 rather than 6: a person copying six characters out of a mail client brings
+    /// spaces and dashes with them, and the handler normalises those away. What this refuses is a
+    /// megabyte of "code".
+    /// </remarks>
+    [Fact]
+    public void Validate_ACodeLongerThanTheEndpointReads_Fails()
+    {
+        // Arrange
+        ResetPasswordCommand command = new(
+            NewPassword,
+            Email: "reader@example.com",
+            Code: new string('C', ResetPasswordCommandValidator.CodeLength + 1));
 
         // Act
         ValidationResult result = _validator.Validate(command);
@@ -109,7 +165,9 @@ public sealed class ResetPasswordCommandValidatorTests
     public void Validate_APasswordInTheBreachedSet_Fails()
     {
         // Arrange
-        ResetPasswordCommand command = new(Token(), RegisterCommandValidatorTests.BreachedPassword);
+        ResetPasswordCommand command = new(
+            RegisterCommandValidatorTests.BreachedPassword,
+            Token: Token());
 
         // Act
         ValidationResult result = _validator.Validate(command);

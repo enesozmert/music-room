@@ -65,15 +65,21 @@ public sealed record VerificationMail(
 /// <param name="DisplayName">What to call the reader.</param>
 /// <param name="Token">The <em>plaintext</em> reset token. A stronger credential than the verification
 /// token: whoever holds it can replace the account's password.</param>
+/// <param name="Code">The <em>plaintext</em> six-character code, for a reader who would rather type than
+/// click. Its digest is stored beside the token's, and five wrong attempts spend the row.</param>
 /// <param name="Language">Which language to write in.</param>
 /// <remarks>
-/// **No code here, deliberately** — SPEC-052. A six-character code that replaces a password is a weak
-/// credential for the strongest action in the system. Proving an address is what a code is for.
+/// **SPEC-052 refused a code here and SPEC-055 added one**, on the owner's instruction of 2026-11-02.
+/// The refusal's reasoning was that six characters is a weak credential in front of the strongest action
+/// in the system. What makes it acceptable is the same thing that makes it acceptable for verification:
+/// not the 1.07e9 combinations, but the five-attempt budget on the row, and an endpoint that will only
+/// mint a new code into the account holder's own inbox.
 /// </remarks>
 public sealed record PasswordResetMail(
     string EmailAddress,
     string DisplayName,
     string Token,
+    string Code,
     MailLanguage Language);
 
 /// <summary>

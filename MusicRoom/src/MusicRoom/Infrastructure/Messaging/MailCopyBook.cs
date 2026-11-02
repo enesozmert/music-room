@@ -50,29 +50,50 @@ internal static class MailCopyBook
     /// <summary>The words of the password reset message.</summary>
     /// <param name="language">Which language to write in.</param>
     /// <param name="displayName">What to call the reader, or empty.</param>
+    /// <param name="hasLink">Whether this deployment has a reset screen to send the reader to.</param>
     /// <returns>The copy, ready for the layout.</returns>
-    internal static MailCopy Reset(MailLanguage language, string displayName) =>
-        language == MailLanguage.Turkish
+    /// <remarks>
+    /// **The words follow what is actually in the message** — SPEC-055. The English copy told every
+    /// reader to "use the button" while deployments without a configured reset screen sent no button,
+    /// so a message that could not be acted on also explained how to act on it. A deployment without a
+    /// link says code only, and one with a link says both.
+    /// </remarks>
+    internal static MailCopy Reset(MailLanguage language, string displayName, bool hasLink)
+    {
+        // Pulled out of the record literals: a conditional inside one is a nested ternary, which S3358
+        // refuses, and the sentence is easier to read on its own anyway.
+        string turkish = hasLink
+            ? "Bu adresin parolasının sıfırlanması istendi. Yeni bir parola seçmek için aşağıdaki kodu "
+                + "uygulamaya gir ya da düğmeye bas."
+            : "Bu adresin parolasının sıfırlanması istendi. Yeni bir parola seçmek için aşağıdaki kodu "
+                + "uygulamaya gir.";
+
+        string english = hasLink
+            ? "Someone asked to reset the credentials for this address. Enter the code below in the app, "
+                + "or use the button, to choose a new password."
+            : "Someone asked to reset the credentials for this address. Enter the code below in the app "
+                + "to choose a new password.";
+
+        return language == MailLanguage.Turkish
             ? new MailCopy(
                 Subject: "Music Room parolanı sıfırla",
-                Preheader: "Parolanı değiştirmek için bağlantıyı kullan.",
+                Preheader: "Yeni bir parola seçmek için aşağıdaki kodu kullan.",
                 Heading: "Parolanı sıfırla",
                 Greeting: Greeting(language, displayName),
-                Explanation: "Bu adresin parolasının sıfırlanması istendi. Yeni bir parola seçmek için "
-                    + "düğmeye bas.",
+                Explanation: turkish,
                 CallToAction: "Yeni parola seç",
-                Validity: "Bağlantı 1 saat geçerlidir ve bir kez kullanılabilir.",
+                Validity: "Kod 1 saat geçerlidir ve bir kez kullanılabilir.",
                 Footer: "Bu isteği sen yapmadıysan bu iletiyi yok say; parolan değişmez.")
             : new MailCopy(
                 Subject: "Reset your Music Room password",
-                Preheader: "Use the link to choose a new password.",
+                Preheader: "Use the code below to choose a new password.",
                 Heading: "Reset your password",
                 Greeting: Greeting(language, displayName),
-                Explanation: "Someone asked to reset the credentials for this address. Use the button to "
-                    + "choose a new password.",
+                Explanation: english,
                 CallToAction: "Choose a new password",
-                Validity: "The link is valid for 1 hour and can be used once.",
+                Validity: "The code is valid for 1 hour and can be used once.",
                 Footer: "If it was not you, ignore this message and nothing changes.");
+    }
 
     /// <summary>The words of the welcome message, which carries no credential.</summary>
     /// <param name="language">Which language to write in.</param>

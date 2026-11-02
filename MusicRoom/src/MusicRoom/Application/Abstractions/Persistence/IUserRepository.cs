@@ -224,6 +224,33 @@ public interface IUserRepository
         string newPasswordHash,
         DateTime nowUtc,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Spends a typed reset code and replaces the password, in one transaction — SPEC-055.
+    /// </summary>
+    /// <param name="email">The address the code was sent to, lower-cased by the caller. Six characters
+    /// are not unique across accounts, so the address is what scopes the row.</param>
+    /// <param name="codeHash">The digest of the submitted code. The caller hashes it, so no
+    /// implementation of this interface can log the code.</param>
+    /// <param name="newPasswordHash">The replacement, already hashed.</param>
+    /// <param name="nowUtc">The instant expiry is measured against.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// The same outcomes the token path returns. Every refusal — an unknown address, a wrong code, a
+    /// spent row, a row out of attempts — is <see cref="ResetPasswordOutcome.Invalid"/>, because a
+    /// caller who could tell them apart could learn which addresses hold an account.
+    /// </returns>
+    /// <remarks>
+    /// **A wrong code costs an attempt**, and the fifth spends the row. That budget is what makes six
+    /// characters acceptable in front of the strongest action in the system: without it the code is one
+    /// in 1.07e9 per guess and guesses are free.
+    /// </remarks>
+    Task<PasswordResetResult> TryResetPasswordByCodeAsync(
+        string email,
+        string codeHash,
+        string newPasswordHash,
+        DateTime nowUtc,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>

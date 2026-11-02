@@ -271,7 +271,7 @@ public sealed class BrevoMailServiceTests
     private static VerificationMail Verification(MailLanguage language = MailLanguage.English) =>
         new(EmailAddress, "Reader", Token, "ABC234", language);
 
-    /// <summary>The reset message, which carries a token and deliberately no code.</summary>
+    /// <summary>The reset message, which carries a token for the link and a code to type — SPEC-055.</summary>
     private static PasswordResetMail Reset(MailLanguage language = MailLanguage.English) =>
-        new(EmailAddress, "Reader", Token, language);
+        new(EmailAddress, "Reader", Token, "RST234", language);
 }

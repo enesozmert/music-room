@@ -52,6 +52,11 @@ escalation: |
 
 # A six-character code beside the link, and mail that reads like the product
 
+> **Reversed in part by SPEC-055, 2026-11-02.** Decision 2 below refuses a code for the password reset.
+> The owner asked for one after receiving a reset mail, and SPEC-055 adds it with the same alphabet, the
+> same length and the same five-attempt budget. The refusal's reasoning is not disowned — it is the
+> reason the budget came with it — and this spec is left as written so the argument stays readable.
+
 ## Goal
 
 A person verifying an address can click a link **or** type a six-character code, in Turkish or in English,
