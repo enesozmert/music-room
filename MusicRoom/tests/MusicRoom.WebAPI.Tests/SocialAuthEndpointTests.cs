@@ -140,6 +140,77 @@ public sealed class SocialAuthEndpointTests : IAsyncLifetime
         Assert.Equal(ValidationCodes.SocialEmailUnverified, await ValidationProblems.CodeAsync(response));
     }
 
+    /// <summary>
+    /// A password account's address, verified by the provider, is refused with a code the client can act
+    /// on — SPEC-057.
+    /// </summary>
+    /// <remarks>
+    /// The refusal itself is ADR-0008: linking on a matching address is the takeover path, so the person
+    /// signs in and links deliberately. What SPEC-057 changed is that the answer says which refusal it is.
+    /// Safe to say, because the provider verified the address a moment earlier — the caller has proved
+    /// they control it, and learns nothing a password-reset request would not have told them.
+    /// </remarks>
+    [Fact]
+    public async Task AVerifiedAddressThatAlreadyHasAPasswordAccount_SaysSoAsync()
+    {
+        // Arrange — the account exists with a password first.
+        (HttpClient caller, TokenPair _) = await TestBearer.SignInAsync(
+            _factory, _mail, "has-password@example.com");
+        caller.Dispose();
+
+        _identities.Asserted = Identity("new-identity", "has-password@example.com");
+
+        using HttpClient client = _factory.CreateAuditedClient();
+
+        // Act
+        using HttpResponseMessage response = await SignInAsync(client);
+
+        // Assert — refused with the code, and no session.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal(ValidationCodes.SocialAddressHasAccount, await ValidationProblems.CodeAsync(response));
+
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("accessToken", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// And the way out the message names works: sign in with the password, link, then the provider signs
+    /// you in — SPEC-057's verification row.
+    /// </summary>
+    [Fact]
+    public async Task AfterLinkingDeliberately_TheProviderSignsThatAccountInAsync()
+    {
+        // Arrange
+        (HttpClient caller, TokenPair _) = await TestBearer.SignInAsync(
+            _factory, _mail, "links-after@example.com");
+
+        using HttpClient signedIn = caller;
+
+        _identities.Asserted = Identity("after-link", "links-after@example.com");
+
+        using HttpResponseMessage linked = await signedIn.PostAsJsonAsync(
+            new Uri(_socialLinksPath, UriKind.Relative),
+            Payload(_provider),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, linked.StatusCode);
+
+        // Act — the same identity that was refused a moment ago.
+        using HttpClient anonymous = _factory.CreateAuditedClient();
+        using HttpResponseMessage response = await SignInAsync(anonymous);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using IServiceScope scope = _factory.Services.CreateScope();
+        MusicRoomDbContext context = scope.ServiceProvider.GetRequiredService<MusicRoomDbContext>();
+
+        // One account, not a second one created by the provider.
+        int accounts = await context.Users.CountAsync(
+            candidate => candidate.Email == "links-after@example.com",
+            TestContext.Current.CancellationToken);
+        Assert.Equal(1, accounts);
+    }
+
     /// <summary>A provider nobody configured is a client mistake, said plainly.</summary>
     [Fact]
     public async Task AnUnknownProvider_IsRefusedWithItsCodeAsync()

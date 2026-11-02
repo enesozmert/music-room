@@ -223,6 +223,12 @@ public static class ValidationCodes
     /// <summary>The provider asserted an address it has not verified — ADR-0008's takeover path.</summary>
     public const string SocialEmailUnverified = "SOCIAL.EMAIL_UNVERIFIED";
 
+    /// <summary>
+    /// The provider verified an address that already belongs to an account — SPEC-057. The client's next
+    /// move is to sign in with the password and link the provider, which is what the message says.
+    /// </summary>
+    public const string SocialAddressHasAccount = "SOCIAL.ADDRESS_HAS_ACCOUNT";
+
     /// <summary>That identity already signs somebody in, or this account already has that provider.</summary>
     public const string SocialAlreadyLinked = "SOCIAL.ALREADY_LINKED";
 

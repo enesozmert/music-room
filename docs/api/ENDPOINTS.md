@@ -71,7 +71,7 @@ Subject V.1, V.5. Rules: [[authentication-authorization]], [[social-oauth]].
 | POST | `/auth/email-verifications` | `token`, **or** `email` + `code` | `204` | `400`, `410` expired, `429` | `anon` |
 | POST | `/auth/verification-requests` | `email` | `202` | `429` | `anon` |
 | POST | `/auth/sessions` | `email`, `password` | `200` token pair | `401` generic, `429` | `anon` |
-| POST | `/auth/sessions/social` | `provider`, `code`, `codeVerifier`, `redirectUri` | `200` token pair | `401`, `422`, `429` | `anon` |
+| POST | `/auth/sessions/social` | `provider`, `code`, `codeVerifier`, `redirectUri` | `200` token pair | `401`, `422` (`PROVIDER.UNKNOWN`, `SOCIAL.EMAIL_UNVERIFIED`, `SOCIAL.ADDRESS_HAS_ACCOUNT`), `429` | `anon` |
 | POST | `/auth/tokens` | `refreshToken` | `200` rotated pair | `401`, `429` | `anon` |
 | DELETE | `/auth/sessions/current` | — | `204` | `401` | `auth` |
 | GET | `/auth/sessions` | — | `200` list | `401` | `self` |
@@ -223,6 +223,15 @@ causes is in the language that request was made in.
   there is nothing to replace. Setting a first password is the reset flow, which already proves the address.
 - **An address the provider has not verified is refused** with `422` and `SOCIAL.EMAIL_UNVERIFIED`. Matching an
   unverified address to an existing account is the account-takeover path ADR-0008 names.
+- **An address that already has an account is refused** with `422` and `SOCIAL.ADDRESS_HAS_ACCOUNT` — SPEC-057.
+  Same reason: the provider verified the address, but the account was not created through this identity, and
+  linking on a matching address is the takeover path. **The way through is deliberate:** sign in with the
+  password, then `POST /auth/social-links`, after which the provider signs that account in. The message says
+  that and nothing about the account — no display name, no timestamp, no mention of how it signs in.
+  *Why this one speaks when the others do not:* the provider asserted `email_verified` for the address, so the
+  caller has already proved they control it. They learn nothing a password-reset request would not tell them.
+  Every other refusal on the route stays a bodiless `401` — a refused code, a mismatched `redirect_uri`, a
+  failed PKCE check — because in those the caller has proved nothing.
 - **A password that was accepted yesterday can be refused today** (SPEC-035). Every route that chooses a
   password — `/auth/registrations`, `/auth/password-resets` and `/me/password` — now screens it against a set of
   known breached passwords bundled with the application and against the caller's own words: the project name, the

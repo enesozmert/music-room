@@ -41,4 +41,16 @@ public enum SignInWithSocialOutcome
     /// would be the account-takeover path ADR-0008 names, so the attempt is refused rather than linked.
     /// </summary>
     EmailUnverified = 3,
+
+    /// <summary>
+    /// The provider verified an address that already belongs to an account this identity is not linked
+    /// to — SPEC-057. Still refused, for ADR-0008's reason, and now said out loud.
+    /// </summary>
+    /// <remarks>
+    /// The only refusal on this route that describes the state of an account, and it is safe precisely
+    /// because of what had to happen first: the provider asserted <c>email_verified</c> for this address,
+    /// so the caller has proved they control it. Telling the owner of an address that it has an account
+    /// tells them nothing a password-reset request would not.
+    /// </remarks>
+    AddressAlreadyRegistered = 4,
 }
