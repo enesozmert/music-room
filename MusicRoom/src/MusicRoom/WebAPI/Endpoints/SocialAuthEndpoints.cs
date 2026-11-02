@@ -130,6 +130,15 @@ internal static class SocialAuthEndpoints
                 "Address not verified",
                 "The provider has not verified the address on that identity."),
 
+            // The one refusal on this route that describes an account, and the provider's own verification
+            // is what makes it safe — SPEC-057. It names the next action rather than the account: no
+            // display name, no timestamp, nothing about how that account signs in.
+            SignInWithSocialOutcome.AddressAlreadyRegistered => CredentialEndpointResults.Refused(
+                ValidationCodes.SocialAddressHasAccount,
+                "Address already registered",
+                "That address already belongs to an account. Sign in with your password, then link this "
+                + "provider from account settings."),
+
             // Everything else is one bodiless 401, as password sign-in is: which check failed is in the
             // log, and a caller who learns it learns how to pass it.
             _ => Results.Unauthorized(),

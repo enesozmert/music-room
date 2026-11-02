@@ -159,9 +159,14 @@ internal sealed class SignInWithSocialCommandHandler
 
         // The address is registered to an account this identity is not linked to. Linking it here would be
         // matching on an address, which is the takeover path; the person signs in and links deliberately.
+        //
+        // Said out loud since SPEC-057, and only here: the provider verified this address a few lines
+        // above, so the caller has proved they control it and learns nothing a password-reset request
+        // would not have told them. Every other refusal on this route stays a bodiless 401, because in
+        // those the caller has proved nothing.
         _audit.SetOutcome(AuditOutcome.Refused);
 
-        return SignInWithSocialResult.Refused(SignInWithSocialOutcome.Refused);
+        return SignInWithSocialResult.Refused(SignInWithSocialOutcome.AddressAlreadyRegistered);
     }
 
     /// <summary>Opens a session for an account this provider just authenticated.</summary>
