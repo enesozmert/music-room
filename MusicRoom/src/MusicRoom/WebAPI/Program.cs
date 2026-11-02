@@ -1,7 +1,6 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Diagnostics.HealthChecks;
 using MusicRoom.Application;
 using MusicRoom.Application.Abstractions.Auditing;
 using MusicRoom.Application.Abstractions.Configuration;
@@ -15,8 +14,8 @@ using MusicRoom.Infrastructure.Messaging;
 using MusicRoom.Infrastructure.Security;
 using MusicRoom.Persistence;
 using MusicRoom.WebAPI.Endpoints;
-using MusicRoom.WebAPI.Hubs;
 using MusicRoom.WebAPI.HealthChecks;
+using MusicRoom.WebAPI.Hubs;
 using MusicRoom.WebAPI.Middleware;
 using MusicRoom.WebAPI.RateLimiting;
 using MusicRoom.WebAPI.Realtime;
@@ -63,7 +62,10 @@ public class Program
         CallerServices.Add(builder.Services, builder.Configuration);
         RealtimeServices.Add(builder);
         Observability.AddTracing(builder.Services, builder.Configuration);
-        HealthRegistration.Add(builder.Services, connectionString);
+        HealthRegistration.Add(
+            builder.Services,
+            connectionString,
+            EnvironmentConfiguration.ReadCatalogOptions(builder.Configuration).HasProvider);
 
         WebApplication app = builder.Build();
 
@@ -586,19 +588,4 @@ internal static class Observability
                 }
             });
     }
-}
-
-/// <summary>
-/// The readiness dependency set. One entry today; S4 adds the music provider.
-/// </summary>
-internal static class HealthRegistration
-{
-    /// <summary>Registers the PostgreSQL readiness probe behind <c>DATABASE_URL</c>.</summary>
-    internal static void Add(IServiceCollection services, string connectionString) =>
-        services.AddHealthChecks()
-            .Add(new HealthCheckRegistration(
-                name: "database",
-                factory: _ => new DatabaseReadinessCheck(connectionString),
-                failureStatus: HealthStatus.Unhealthy,
-                tags: null));
 }

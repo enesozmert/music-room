@@ -61,6 +61,8 @@ internal sealed class YouTubeCatalogProvider : ICatalogProvider
     {
         if (!_options.HasProvider)
         {
+            LogNoProvider("search.list");
+
             return CatalogResult<IReadOnlyList<string>>.Unavailable();
         }
 
@@ -105,6 +107,8 @@ internal sealed class YouTubeCatalogProvider : ICatalogProvider
 
         if (!_options.HasProvider)
         {
+            LogNoProvider("videos.list");
+
             return CatalogResult<IReadOnlyList<TrackMetadata>>.Unavailable();
         }
 
@@ -137,6 +141,23 @@ internal sealed class YouTubeCatalogProvider : ICatalogProvider
     }
 
     /// <summary>
+    /// Says that the call was never made, because no key was configured — SPEC-053 decision 2.
+    /// </summary>
+    /// <remarks>
+    /// This was the silent branch. `503` had three causes — no key, the quota, a transport failure — and the
+    /// other two each logged a warning, so the one an operator could fix in a minute was the one that said
+    /// nothing. The query is not logged: a search term is the caller's, not ours (API10).
+    /// <para>
+    /// Per call rather than once, even though the condition cannot change while the process runs: whoever reads
+    /// the logs after a `503` looks at the moment of the `503`, not at the boot line. The boot line exists too.
+    /// </para>
+    /// </remarks>
+    private void LogNoProvider(string call) =>
+        _logger.LogWarning(
+            "YouTube {CatalogCall} was not attempted: no provider key is configured on this host.",
+            call);
+
+    /// <summary>
     /// Reads one provider call, or returns null when the catalog is unavailable.
     /// </summary>
     /// <remarks>
@@ -163,22 +184,16 @@ internal sealed class YouTubeCatalogProvider : ICatalogProvider
                 (int)response.StatusCode,
                 quotaUnits);
 
-            if (response.StatusCode == HttpStatusCode.Forbidden)
+            if (!response.IsSuccessStatusCode)
             {
-                // The quota is the overwhelmingly likely reason for a 403 on a key-authenticated read, and it is
-                // the one the standard asks to handle as a first-class state.
-                _logger.LogWarning(
-                    "YouTube refused {CatalogCall} with 403. The daily quota is the usual cause.",
-                    call);
+                LogRefusal(call, response.StatusCode);
 
                 return null;
             }
 
-            return response.IsSuccessStatusCode
-                ? await response.Content
-                    .ReadFromJsonAsync<TResponse>(cancellationToken)
-                    .ConfigureAwait(false)
-                : null;
+            return await response.Content
+                .ReadFromJsonAsync<TResponse>(cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException
             && !cancellationToken.IsCancellationRequested)
@@ -189,6 +204,51 @@ internal sealed class YouTubeCatalogProvider : ICatalogProvider
 
             return null;
         }
+    }
+
+    /// <summary>
+    /// Says why the provider refused, in the words of the cause rather than of the status code — SPEC-053.
+    /// </summary>
+    /// <remarks>
+    /// Three refusals that read identically to a caller and not at all alike to an operator:
+    /// <list type="bullet">
+    /// <item><description>`403` — the daily quota, which the standard asks to treat as a first-class
+    /// state and which comes back tomorrow and not before;</description></item>
+    /// <item><description>`400` or `401` — the key itself: absent from the request, malformed, expired,
+    /// or restricted to referrers or addresses this host is not among. This one was found by running the
+    /// smoke against the development stack, whose key had stopped being valid while the live one worked;
+    /// before this branch existed it was an `Information` line saying the call answered 400;</description></item>
+    /// <item><description>anything else — the provider's own trouble, which the retry pipeline has
+    /// already given up on by the time this is reached.</description></item>
+    /// </list>
+    /// The body is never logged: an error document may echo our own request, key included (API10).
+    /// </remarks>
+    private void LogRefusal(string call, HttpStatusCode status)
+    {
+        if (status == HttpStatusCode.Forbidden)
+        {
+            _logger.LogWarning(
+                "YouTube refused {CatalogCall} with 403. The daily quota is the usual cause.",
+                call);
+
+            return;
+        }
+
+        if (status is HttpStatusCode.BadRequest or HttpStatusCode.Unauthorized)
+        {
+            _logger.LogWarning(
+                "YouTube rejected {CatalogCall} with {StatusCode}. The key is the usual cause: "
+                + "invalid, expired, or restricted to referrers or addresses this host is not among.",
+                call,
+                (int)status);
+
+            return;
+        }
+
+        _logger.LogWarning(
+            "YouTube answered {CatalogCall} with {StatusCode} and no result. The provider is unwell.",
+            call,
+            (int)status);
     }
 
     /// <summary>

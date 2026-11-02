@@ -207,6 +207,117 @@ public sealed class YouTubeCatalogProviderTests
         Assert.Equal(0, transport.CallCount);
     }
 
+    /// <summary>
+    /// A missing key is named in the log, and is not mistaken for the quota — SPEC-053 decision 1.
+    /// </summary>
+    /// <remarks>
+    /// This is the case that used to be silent. The deployment answered `503` to every search for days
+    /// because the key had never been set on it, and the logs said nothing at all.
+    /// </remarks>
+    [Fact]
+    public async Task SearchAsync_WithNoKey_LogsThatNothingWasAttemptedAsync()
+    {
+        // Arrange
+        (ICatalogProvider provider, _, LoggingMailServiceTests.MessageLog log) = Build(apiKey: null);
+
+        // Act
+        await provider.SearchAsync("never gonna", 10, TestContext.Current.CancellationToken);
+
+        // Assert — the call that was skipped is named, the cause is stated, and the other two causes are not.
+        string message = Assert.Single(log.Messages);
+        Assert.Contains("search.list", message, StringComparison.Ordinal);
+        Assert.Contains("no provider key", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("quota", message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A spent quota says quota, and is not mistaken for a missing key — SPEC-053 decision 1.
+    /// </summary>
+    [Fact]
+    public async Task SearchAsync_WhenTheQuotaIsSpent_LogsTheQuotaAsync()
+    {
+        // Arrange — a 403 on a key-authenticated read. Not retried, by configuration: see CatalogRegistration.
+        (ICatalogProvider provider, _, LoggingMailServiceTests.MessageLog log) = Build(
+            (HttpStatusCode.Forbidden, "{}"));
+
+        // Act
+        CatalogResult<IReadOnlyList<string>> result = await provider.SearchAsync(
+            "never gonna",
+            10,
+            TestContext.Current.CancellationToken);
+
+        // Assert — the response is the same 503 the other two causes produce; only the log tells them apart.
+        Assert.Equal(CatalogOutcome.Unavailable, result.Outcome);
+
+        Assert.Contains(log.Messages, message => message.Contains("quota", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            log.Messages,
+            message => message.Contains("no provider key", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A rejected key says key, and is mistaken for neither the quota nor an absent one — SPEC-053.
+    /// </summary>
+    /// <remarks>
+    /// The development stack's key had quietly stopped being valid while the live one worked, and the only
+    /// trace was an `Information` line saying the call answered 400. A fourth cause, found by running the
+    /// smoke test this unit added.
+    /// </remarks>
+    [Fact]
+    public async Task SearchAsync_WhenTheKeyIsRejected_LogsTheKeyAsync()
+    {
+        // Arrange — what YouTube answers for a key that is malformed, expired or restricted.
+        (ICatalogProvider provider, _, LoggingMailServiceTests.MessageLog log) = Build(
+            (HttpStatusCode.BadRequest, "{}"));
+
+        // Act
+        CatalogResult<IReadOnlyList<string>> result = await provider.SearchAsync(
+            "never gonna",
+            10,
+            TestContext.Current.CancellationToken);
+
+        // Assert — same 503 to the caller, a different line in the log.
+        Assert.Equal(CatalogOutcome.Unavailable, result.Outcome);
+        Assert.Contains(
+            log.Messages,
+            message => message.Contains("The key is the usual cause", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            log.Messages,
+            message => message.Contains("quota is the usual", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            log.Messages,
+            message => message.Contains("no provider key", StringComparison.Ordinal));
+        Assert.DoesNotContain(ApiKey, string.Join(' ', log.Messages), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A provider that cannot be reached says so, and names neither the quota nor a missing key — SPEC-053.
+    /// </summary>
+    [Fact]
+    public async Task GetAsync_WhenTheProviderCannotBeReached_LogsThatCauseAloneAsync()
+    {
+        // Arrange — the pipeline exhausts its attempts against a provider that answers 502 every time.
+        (ICatalogProvider provider, _, LoggingMailServiceTests.MessageLog log) = Build(
+            (HttpStatusCode.BadGateway, "{}"),
+            (HttpStatusCode.BadGateway, "{}"),
+            (HttpStatusCode.BadGateway, "{}"));
+
+        // Act
+        CatalogResult<IReadOnlyList<TrackMetadata>> result = await provider.GetAsync(
+            [VideoId],
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(CatalogOutcome.Unavailable, result.Outcome);
+        Assert.DoesNotContain(
+            log.Messages,
+            message => message.Contains("no provider key", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            log.Messages,
+            message => message.Contains("quota units", StringComparison.OrdinalIgnoreCase)
+                && message.Contains("refused", StringComparison.Ordinal));
+    }
+
     private static (ICatalogProvider Provider, CatalogTransport Transport, LoggingMailServiceTests.MessageLog Log)
         Build(params (HttpStatusCode Status, string Body)[] answers) =>
         Build(ApiKey, answers);
