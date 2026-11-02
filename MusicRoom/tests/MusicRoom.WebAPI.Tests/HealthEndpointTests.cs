@@ -21,6 +21,13 @@ public sealed class HealthEndpointTests
     /// <summary>A key-shaped value. Nothing calls YouTube with it: the check reads only whether it exists.</summary>
     internal const string CatalogApiKey = "a-key-that-stands-in-for-the-real-one";
 
+    /// <summary>Values shaped like Google's, which nothing here ever sends anywhere.</summary>
+    internal const string GoogleClientId = "123456789-abcdefghijklmnop.apps.googleusercontent.com";
+
+    internal const string GoogleClientSecret = "a-client-secret-that-stands-in-for-the-real-one";
+    internal const string GoogleDiscoveryUrl = "https://accounts.google.com/.well-known/openid-configuration";
+    internal const string GoogleIssuer = "https://accounts.google.com";
+
     internal const string TestConnectionString =
         "Host=localhost;Port=5432;Database=musicroom;Username=musicroom;Password=not-a-real-password";
 
@@ -150,7 +157,65 @@ public sealed class HealthEndpointTests
     /// Replaces the database probe and leaves every other registration alone, so the catalog check under test
     /// is the one the application registers.
     /// </summary>
-    private static WebApplicationFactory<Program> CreateFactoryWithCatalog(string? catalogApiKey)
+    /// <summary>
+    /// With no `GOOGLE_*` values the social member reports `Degraded` and readiness still answers 200 —
+    /// SPEC-056 decisions 1 and 2.
+    /// </summary>
+    /// <remarks>
+    /// Password sign-in, every product surface and the OpenID provider work without a social provider, so
+    /// a host with none is a host that serves. This is the state the live deployment was in while the
+    /// front-end team was reporting `422 PROVIDER.UNKNOWN` as an API defect.
+    /// </remarks>
+    [Fact]
+    public async Task GetHealthReady_WithNoSocialProvider_ReportsDegradedAndStaysReadyAsync()
+    {
+        // Arrange — the four GOOGLE_* values are deliberately not set.
+        using WebApplicationFactory<Program> factory = CreateFactoryWithCatalog(catalogApiKey: null);
+        using HttpClient client = factory.CreateClient();
+
+        // Act
+        using HttpResponseMessage response =
+            await client.GetAsync("/health/ready", TestContext.Current.CancellationToken);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"social\":\"Degraded\"", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// With a provider configured the member says so by name, and carries no credential — SPEC-056
+    /// decision 3.
+    /// </summary>
+    /// <remarks>
+    /// `google` is the string a client puts in a request body, so naming it tells a reader nothing they
+    /// could not already send. A client id is a different kind of value, and neither it nor a fragment
+    /// of it belongs in an anonymous response.
+    /// </remarks>
+    [Fact]
+    public async Task GetHealthReady_WithASocialProvider_NamesItAndLeaksNoCredentialAsync()
+    {
+        // Arrange
+        using WebApplicationFactory<Program> factory = CreateFactoryWithCatalog(
+            catalogApiKey: null,
+            withGoogle: true);
+        using HttpClient client = factory.CreateClient();
+
+        // Act
+        using HttpResponseMessage response =
+            await client.GetAsync("/health/ready", TestContext.Current.CancellationToken);
+        string body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"social\":\"Healthy\"", body, StringComparison.Ordinal);
+        Assert.DoesNotContain(GoogleClientId, body, StringComparison.Ordinal);
+        Assert.DoesNotContain(GoogleClientSecret, body, StringComparison.Ordinal);
+    }
+
+    private static WebApplicationFactory<Program> CreateFactoryWithCatalog(
+        string? catalogApiKey,
+        bool withGoogle = false)
     {
         IHealthCheck database = Substitute.For<IHealthCheck>();
         database.CheckHealthAsync(Arg.Any<HealthCheckContext>(), Arg.Any<CancellationToken>())
@@ -165,6 +230,17 @@ public sealed class HealthEndpointTests
             if (catalogApiKey is not null)
             {
                 webHost.UseSetting("YOUTUBE_API_KEY", catalogApiKey);
+            }
+
+            if (withGoogle)
+            {
+                // All four, because three of them is no provider at all: the reader returns an empty set
+                // rather than a half-configured row — SPEC-041, and the reason SPEC-056's notice names
+                // every one of them.
+                webHost.UseSetting("GOOGLE_CLIENT_ID", GoogleClientId);
+                webHost.UseSetting("GOOGLE_CLIENT_SECRET", GoogleClientSecret);
+                webHost.UseSetting("GOOGLE_DISCOVERY_URL", GoogleDiscoveryUrl);
+                webHost.UseSetting("GOOGLE_ISSUER", GoogleIssuer);
             }
 
             webHost.ConfigureTestServices(services =>

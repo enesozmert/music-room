@@ -196,7 +196,7 @@ limit simply stops being a limit. Both were found by driving the live deployment
 | **750 instance-hours per workspace per month** | two services awake continuously do not fit | let them sleep; warm on demand rather than on a schedule |
 | **Free Key Value is not persisted** | a restart empties the vault's cache | nothing — durable state is in PostgreSQL |
 | **Render's free PostgreSQL expires in 30 days** | not used here, deliberately | keep both databases on Supabase |
-| **A variable nobody set looks like a bug** | `YOUTUBE_API_KEY` was never added to this service, so every `GET /tracks` answered `503` for days | `make smoke-live` names it in one request; the start-up log says it in the first screen after a deploy |
+| **A variable nobody set looks like a bug** | `YOUTUBE_API_KEY` was never added to this service, so every `GET /tracks` answered `503` for days. The same happened to the four `GOOGLE_*` values, and the front-end team reported the refusal as an API defect | `make smoke-live` names both in one request; the start-up log says each in the first screen after a deploy |
 
 ## Checking a deployment — `make smoke-live`
 
@@ -215,6 +215,7 @@ repeating them against production would leave rows nothing deletes. With `SMOKE_
 | Finding | Cause, in practice |
 |---|---|
 | `catalog: Degraded` | `YOUTUBE_API_KEY` is not set on the service. Nothing else is affected, which is why readiness is still `200` |
+| `social: Degraded` | the four `GOOGLE_*` variables are not all set, so `POST /auth/sessions/social` answers `422 PROVIDER.UNKNOWN`. They are required **together**: three of them is no provider |
 | `the database is reachable` fails | `DATABASE_URL` is wrong, Supabase has paused the project, or migrations were never applied |
 | the issuer does not match the base URL | `ASPNETCORE_FORWARDEDHEADERS_ENABLED` is missing — the trap above |
 | `track search answers` is `503` | the log names which cause: no key, a key the provider rejects, the daily quota, or the provider itself |
