@@ -6,6 +6,7 @@
 #         docs/SDD.md
 #         docs/DELIVERY-PLAN.md
 #         docs/api/ENDPOINTS.md
+#         docs/api/API-REFERENCE.md  (generated from openapi.json)
 #         docs/USER-MANUAL.md
 #         docs/prompt-library/PROMPTS.md  (+ PROMPTS.tr.md, Turkish reading aid)
 #         docs/owasp/*.md  (except the index and the link list)
@@ -44,6 +45,8 @@ find technical-guide -name STANDARD.md -print0 | while IFS= read -r -d '' md; do
 render SDD.md
 render DELIVERY-PLAN.md
 render api/ENDPOINTS.md
+# Generated from openapi.json by `make openapi`, which is where the drift check lives — SPEC-060.
+render api/API-REFERENCE.md
 render USER-MANUAL.md
 render prompt-library/PROMPTS.md
 render prompt-library/PROMPTS.tr.md
