@@ -155,6 +155,9 @@ openapi: ## regenerate docs/api/openapi.json from the code
 	dotnet build \
 		MusicRoom/src/MusicRoom/WebAPI/MusicRoom.WebAPI.csproj \
 		$(OPENAPI_BUILD_FLAGS) -p:GenerateOpenApiDocument=true
+	# The human-readable reference comes from the same file a generated client would — SPEC-060. It is
+	# regenerated here rather than by hand, so `agent-check`'s drift check covers both.
+	./scripts/openapi-markdown.py docs/api/openapi.json docs/api/API-REFERENCE.md
 
 CYCLES ?= 3
 
@@ -214,7 +217,7 @@ agent-check: ## the full local gate; every spec's Verification section calls thi
 	dotnet test --solution $(SOLUTION) --no-build
 	dotnet list $(SOLUTION) package --vulnerable --include-transitive
 	$(MAKE) openapi
-	git diff --exit-code -- docs/api/openapi.json
+	git diff --exit-code -- docs/api/openapi.json docs/api/API-REFERENCE.md
 	# Same guard for the distribution PDFs: Markdown is the source of truth, so a PDF that does
 	# not match its source is a stale artifact shipped to a reader. SOURCE_DATE_EPOCH keeps the
 	# output byte-stable, so any diff here is a real content difference.
