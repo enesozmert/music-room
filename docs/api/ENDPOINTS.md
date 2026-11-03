@@ -502,6 +502,7 @@ Model and rationale: [[ADR-0017-playback-session]].
 |---|---|---|---|---|---|
 | POST | `/playback-sessions` | `deviceId`, `sourceType`, `sourceId` | `201` + `ETag` | `404`, `409` device already has a session, `422` | `owner` of the device |
 | GET | `/playback-sessions/{sessionId}` | — | `200` + `ETag` | `404` | `member` of the source |
+| GET | `/events/{eventId}/playback-session` | — | `200` + `ETag` | `404` | `member` of the event |
 | GET | `/devices/{deviceId}/playback-session` | — | `200` + `ETag` | `404` | `self` or controller |
 | POST | `/playback-sessions/{sessionId}/advances` | `expectedNowPlayingId` | `200` new now-playing | `404`, `409` queue empty, `412` stale | controller |
 | PATCH | `/playback-sessions/{sessionId}` | `nowPlayingId` (explicit jump) | `200` | `404`, `412` | controller |
@@ -525,6 +526,19 @@ Model and rationale: [[ADR-0017-playback-session]].
   grant in one place and SPEC-021 keeps it there.
 - **A device holds at most one *live* session**, enforced by a unique index filtered on `ended_at_utc IS NULL`.
   A stopped session keeps its row.
+- **A guest can ask the event itself what it is playing** — `GET /events/{eventId}/playback-session`,
+  SPEC-058. Same rule as the session route: whoever may see the event may see what it is playing, and a
+  caller who may not see it gets the same `404` as an event with nothing on. The route exists because a
+  guest has the event id and not the session id, and without it they had to wait for the next
+  `NowPlayingChanged` — so somebody arriving mid-track missed the rest of the track. The index is per
+  **device**, so two devices can legitimately play one event; the newest live session answers.
+- **`PlaybackSessionDetail` carries two clocks** — SPEC-058:
+  `nowPlayingStartedAtUtc`, stamped by the server in the same statement that moves `now_playing_id`, and
+  `serverNowUtc`, what the server's clock read while answering. A client seeking to the right second
+  computes `serverNowUtc − nowPlayingStartedAtUtc` and corrects for its own clock with the second value
+  rather than trusting it. `nowPlayingStartedAtUtc` is null when nothing is playing, and on sessions that
+  predate the column — a client reading null plays from the beginning, which is what it did before.
+  `NowPlayingChanged` carries the same stamp, so a listener and a late joiner compute from one number.
 - The server picks the next item: for an `Event`, the highest vote count with ties broken by
   earliest suggestion; for a `Playlist`, the next ordering key. **The client reports that the
   track ended; it never chooses what plays next.**

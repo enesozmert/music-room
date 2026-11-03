@@ -178,10 +178,14 @@ internal static class PlaybackRequests
     /// <param name="SourceId">The source.</param>
     /// <param name="NowPlayingId">What is playing now.</param>
     /// <param name="EndedAtUtc">When it stopped, or null while live.</param>
+    /// <param name="NowPlayingStartedAtUtc">When the current track started, by the server's clock.</param>
+    /// <param name="ServerNowUtc">What the server's clock read while answering.</param>
     internal sealed record SessionBody(
         Guid SessionId,
         Guid DeviceId,
         Guid SourceId,
         Guid? NowPlayingId,
-        DateTime? EndedAtUtc);
+        DateTime? EndedAtUtc,
+        DateTime? NowPlayingStartedAtUtc = null,
+        DateTime ServerNowUtc = default);
 }

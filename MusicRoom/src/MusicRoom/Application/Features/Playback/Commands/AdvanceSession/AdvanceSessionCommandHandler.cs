@@ -111,6 +111,10 @@ internal sealed class AdvanceSessionCommandHandler
             session.SourceId,
             sessionId,
             nowPlayingId,
-            DateTime.UtcNow));
+
+            // When this message was raised, and — from the row that was just written — when the track it
+            // names started. A listener synchronising playback wants the second one (SPEC-058).
+            DateTime.UtcNow,
+            session.NowPlayingStartedAtUtc));
     }
 }

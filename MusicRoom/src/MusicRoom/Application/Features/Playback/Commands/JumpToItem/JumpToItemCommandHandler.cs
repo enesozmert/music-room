@@ -83,7 +83,8 @@ internal sealed class JumpToItemCommandHandler : IRequestHandler<JumpToItemComma
                 session.SourceId,
                 request.SessionId,
                 request.NowPlayingId,
-                DateTime.UtcNow));
+                DateTime.UtcNow,
+                session.NowPlayingStartedAtUtc));
         }
 
         return result;

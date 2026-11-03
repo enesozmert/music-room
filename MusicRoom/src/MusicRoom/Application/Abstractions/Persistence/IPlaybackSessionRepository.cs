@@ -29,16 +29,29 @@ public interface IPlaybackSessionRepository
     /// <returns>The live session, or null when the device is not playing.</returns>
     Task<PlaybackSessionDetail?> FindByDeviceAsync(Guid deviceId, CancellationToken cancellationToken);
 
+    /// <summary>The live session an event is playing through, newest first — SPEC-058.</summary>
+    /// <param name="eventId">The event.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The newest live session of that event, or null when nothing is playing.</returns>
+    /// <remarks>
+    /// Newest rather than only: the live-session index is per device, so two devices can legitimately
+    /// play one event, and a guest arriving now should follow the one that started last.
+    /// </remarks>
+    Task<PlaybackSessionDetail?> FindLiveByEventAsync(Guid eventId, CancellationToken cancellationToken);
+
     /// <summary>Moves a live session's now-playing, if the caller still holds its version.</summary>
     /// <param name="sessionId">The session.</param>
     /// <param name="nowPlayingId">What to play.</param>
     /// <param name="expectedVersion">The `xmin` the caller last read.</param>
+    /// <param name="nowUtc">The instant the move is stamped with — SPEC-058 decision 1. Passed in rather
+    /// than read here, so the value written to the row is the same one the broadcast carries.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>True when the row moved.</returns>
     Task<bool> TrySetNowPlayingAsync(
         Guid sessionId,
         Guid nowPlayingId,
         uint expectedVersion,
+        DateTime nowUtc,
         CancellationToken cancellationToken);
 
     /// <summary>Ends a live session, if the caller still holds its version.</summary>

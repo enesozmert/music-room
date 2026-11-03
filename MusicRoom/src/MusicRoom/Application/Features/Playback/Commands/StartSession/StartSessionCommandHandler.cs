@@ -71,7 +71,8 @@ internal sealed class StartSessionCommandHandler : IRequestHandler<StartSessionC
             request.Source.SourceId,
             start.SessionId.Value,
             start.NowPlayingId,
-            DateTime.UtcNow));
+            DateTime.UtcNow,
+            start.NowPlayingStartedAtUtc));
 
         return start;
     }

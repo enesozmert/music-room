@@ -53,6 +53,12 @@ internal sealed class PlaybackSessionConfiguration : IEntityTypeConfiguration<Pl
             .HasColumnName("ended_at_utc")
             .HasColumnType("timestamp with time zone");
 
+        // Moves with the now-playing id and with nothing else — SPEC-058. Not indexed: it is read through
+        // the row the session id or the source already found, and never searched on.
+        builder.Property(session => session.NowPlayingStartedAtUtc)
+            .HasColumnName("now_playing_started_at_utc")
+            .HasColumnType("timestamp with time zone");
+
         builder.Property(session => session.CreatedAtUtc)
             .HasColumnName("created_at_utc")
             .HasColumnType("timestamp with time zone");

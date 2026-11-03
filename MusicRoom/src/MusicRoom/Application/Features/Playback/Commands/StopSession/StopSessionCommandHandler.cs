@@ -70,7 +70,10 @@ internal sealed class StopSessionCommandHandler : IRequestHandler<StopSessionCom
             stopped.SourceId,
             stopped.SessionId,
             NowPlayingId: null,
-            DateTime.UtcNow));
+            DateTime.UtcNow,
+
+            // Nothing is playing, so nothing started — the listener stops rather than seeking.
+            NowPlayingStartedAtUtc: null));
 
         return true;
     }

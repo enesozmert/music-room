@@ -807,6 +807,10 @@ namespace MusicRoom.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("now_playing_id");
 
+                    b.Property<DateTime?>("NowPlayingStartedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("now_playing_started_at_utc");
+
                     b.Property<Guid>("SourceId")
                         .HasColumnType("uuid")
                         .HasColumnName("source_id");

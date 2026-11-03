@@ -90,12 +90,16 @@ public sealed class PlaybackSessionWriter
             // anybody has suggested a track is a room waiting for the first suggestion, not an error.
             NowPlayingId = first,
             StartedAtUtc = nowUtc,
+
+            // Null when the room started the music before anybody suggested a track: nothing is playing,
+            // so nothing started — SPEC-058 decision 2.
+            NowPlayingStartedAtUtc = first is null ? null : nowUtc,
         };
 
         bool started = await _sessions.TryStartAsync(session, cancellationToken).ConfigureAwait(false);
 
         return started
-            ? new SessionStart(SessionStartOutcome.Started, session.Id, first)
+            ? new SessionStart(SessionStartOutcome.Started, session.Id, first, session.NowPlayingStartedAtUtc)
             : new SessionStart(SessionStartOutcome.AlreadyPlaying, null, null);
     }
 
@@ -248,12 +252,16 @@ public sealed class PlaybackSessionWriter
         uint expectedVersion,
         CancellationToken cancellationToken)
     {
+        // One instant for the row and for the broadcast — SPEC-058 decision 3. Read here rather than in
+        // the repository, which is the only way the two can be the same number.
+        DateTime nowUtc = DateTime.UtcNow;
+
         bool moved = await _sessions
-            .TrySetNowPlayingAsync(sessionId, nowPlayingId, expectedVersion, cancellationToken)
+            .TrySetNowPlayingAsync(sessionId, nowPlayingId, expectedVersion, nowUtc, cancellationToken)
             .ConfigureAwait(false);
 
         return moved
-            ? new PlaybackWriteResult(PlaybackWriteOutcome.Advanced, nowPlayingId, sessionId)
+            ? new PlaybackWriteResult(PlaybackWriteOutcome.Advanced, nowPlayingId, sessionId, nowUtc)
             : PlaybackWriteResult.Stale;
     }
 }

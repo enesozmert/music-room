@@ -18,5 +18,6 @@ internal static class EventChildRoutes
         EventRosterEndpoints.Map(group);
         EventQueueEndpoints.Map(group);
         EventVoteEndpoints.Map(group);
+        EventPlaybackEndpoints.Map(group);
     }
 }
