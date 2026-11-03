@@ -3368,6 +3368,54 @@
           }
         }
       }
+    },
+    "/api/v1/playback-sessions/{sessionId}/position": {
+      "put": {
+        "tags": [
+          "PlaybackEndpoints"
+        ],
+        "summary": "Report where the playing device is",
+        "description": "The controller's route, as the jump is: only the thing playing the music can honestly say where it is. The server stamps its own clock on the report and broadcasts PlaybackPositionChanged, so a guest can seek to the same second. A report naming a track that is no longer playing is discarded — it was in flight while the session advanced, and acting on it would drag every listener backwards. An ended session, and a caller who may not command this one, both answer 404. The session's own ETag is untouched: a report is not a move, and a controller's If-Match keeps working. One report per second per session; above that is 429.",
+        "operationId": "PutPlaybackPosition",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlaybackPositionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4364,6 +4412,35 @@
         },
         "description": "The jump payload."
       },
+      "PlaybackPositionRequest": {
+        "required": [
+          "nowPlayingId",
+          "positionMs",
+          "paused"
+        ],
+        "type": "object",
+        "properties": {
+          "nowPlayingId": {
+            "type": "string",
+            "description": "The track the position is measured in. A report naming a track that is no\n    longer playing is discarded rather than applied.",
+            "format": "uuid"
+          },
+          "positionMs": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "How far into that track the device is.",
+            "format": "int32"
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Whether it is paused. A paused device's position does not advance, which is why\n    a listener needs the flag and not only the number."
+          }
+        },
+        "description": "One report from the playing device — `docs/api/ENDPOINTS.md` §7, SPEC-059."
+      },
       "PlaybackSessionDetail": {
         "required": [
           "sessionId",
@@ -4440,6 +4517,31 @@
             "type": "string",
             "description": "What the server's clock read while answering — SPEC-058 decision 4. The\n            client's offset is only as good as its own clock, and this is what lets it correct for the difference\n            instead of tolerating it.",
             "format": "date-time"
+          },
+          "positionMs": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "description": "How far into the current track the playing device last said it was — SPEC-059.\n            Null when it has not reported, or when the track changed since it did.",
+            "format": "int32"
+          },
+          "positionAtUtc": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "When that report reached the server, by the server's clock.",
+            "format": "date-time"
+          },
+          "paused": {
+            "type": [
+              "null",
+              "boolean"
+            ],
+            "description": "Whether the device said it was paused when it reported."
           }
         },
         "description": "One playback session, as a caller who may see its source reads it."

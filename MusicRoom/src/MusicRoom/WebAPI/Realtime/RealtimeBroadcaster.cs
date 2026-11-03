@@ -29,6 +29,9 @@ internal sealed class RealtimeBroadcaster : IRealtimeBroadcaster
     /// </remarks>
     internal const string NowPlayingChangedEvent = "NowPlayingChanged";
 
+    /// <summary>The `PlaybackPositionChanged` event name, which both hubs publish — SPEC-059.</summary>
+    internal const string PlaybackPositionChangedEvent = "PlaybackPositionChanged";
+
     private readonly IHubContext<PlaylistHub> _playlists;
     private readonly IHubContext<EventHub> _events;
     private readonly IHubContext<ControlHub> _control;
@@ -102,6 +105,13 @@ internal sealed class RealtimeBroadcaster : IRealtimeBroadcaster
 
         // The one payload that belongs to both: a session plays from an event or from a playlist, and its
         // listeners are grouped by whichever it is — SDD §9.2.
+        // Same two hubs, same reasoning, and the same group key — SPEC-059.
+        PlaybackPositionChanged position => (
+            position.SourceType == PlaybackSourceType.Event
+                ? EventGroup(broadcast)
+                : PlaylistGroup(broadcast),
+            PlaybackPositionChangedEvent),
+
         NowPlayingChanged playback => (
             playback.SourceType == PlaybackSourceType.Event
                 ? EventGroup(broadcast)

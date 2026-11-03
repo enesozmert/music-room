@@ -35,3 +35,36 @@ public sealed record NowPlayingChanged(
     /// <inheritdoc />
     public Guid AggregateId => SourceId;
 }
+
+/// <summary>
+/// The playing device said where it is — `PlaybackPositionChanged`, SPEC-059.
+/// </summary>
+/// <param name="SourceType">Whether the listeners are grouped by an event or a playlist.</param>
+/// <param name="SourceId">The event or the playlist, which is also the group key.</param>
+/// <param name="SessionId">The session being reported on.</param>
+/// <param name="NowPlayingId">The track the position is measured in. A listener whose own idea of the
+/// current track differs ignores the message rather than seeking into a song nobody is playing.</param>
+/// <param name="PositionMs">How far into that track the device said it was.</param>
+/// <param name="PositionAtUtc">When the report reached the server, by the server's clock. A listener
+/// computes `positionMs + (now − positionAtUtc)` while playing, and `positionMs` alone while paused.</param>
+/// <param name="Paused">Whether the device said it was paused.</param>
+/// <remarks>
+/// **Telemetry, not a command.** It carries no row version, by ADR-0036's rule and for a sharper reason
+/// than `NowPlayingChanged` has: the next one is along in fifteen seconds, so a message that arrives out
+/// of order or not at all costs a listener nothing it will not have again shortly.
+/// <para>
+/// It is broadcast on the hub that owns the playback source, exactly as `NowPlayingChanged` is.
+/// </para>
+/// </remarks>
+public sealed record PlaybackPositionChanged(
+    PlaybackSourceType SourceType,
+    Guid SourceId,
+    Guid SessionId,
+    Guid NowPlayingId,
+    int PositionMs,
+    DateTime PositionAtUtc,
+    bool Paused) : IRealtimeBroadcast
+{
+    /// <inheritdoc />
+    public Guid AggregateId => SourceId;
+}

@@ -353,6 +353,11 @@ internal static class TestRateLimitSettings
         }
 
         webHost.UseSetting("RATE_LIMIT_ACCOUNT_PERMITS", Permits);
+
+        // The playback position limit is one a second in production — SPEC-059. A suite that drives
+        // fifty reports through that route is testing the route, so it raises the ceiling here and the
+        // limit itself is proven by its own test, which does not call this.
+        webHost.UseSetting("RATE_LIMIT_PLAYBACK_POSITION_PERMITS", Permits);
     }
 }
 

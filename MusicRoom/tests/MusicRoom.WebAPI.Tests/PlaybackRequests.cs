@@ -180,6 +180,9 @@ internal static class PlaybackRequests
     /// <param name="EndedAtUtc">When it stopped, or null while live.</param>
     /// <param name="NowPlayingStartedAtUtc">When the current track started, by the server's clock.</param>
     /// <param name="ServerNowUtc">What the server's clock read while answering.</param>
+    /// <param name="PositionMs">Where the playing device last said it was — SPEC-059.</param>
+    /// <param name="PositionAtUtc">When that report reached the server.</param>
+    /// <param name="Paused">Whether the device said it was paused.</param>
     internal sealed record SessionBody(
         Guid SessionId,
         Guid DeviceId,
@@ -187,5 +190,8 @@ internal static class PlaybackRequests
         Guid? NowPlayingId,
         DateTime? EndedAtUtc,
         DateTime? NowPlayingStartedAtUtc = null,
-        DateTime ServerNowUtc = default);
+        DateTime ServerNowUtc = default,
+        int? PositionMs = null,
+        DateTime? PositionAtUtc = null,
+        bool? Paused = null);
 }

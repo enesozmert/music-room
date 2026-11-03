@@ -2,6 +2,7 @@ using MediatR;
 using MusicRoom.Application.Abstractions.Persistence;
 using MusicRoom.Application.Features.Playback.Commands.AdvanceSession;
 using MusicRoom.Application.Features.Playback.Commands.JumpToItem;
+using MusicRoom.Application.Features.Playback.Commands.ReportPosition;
 using MusicRoom.Application.Features.Playback.Commands.StartSession;
 using MusicRoom.Application.Features.Playback.Commands.StopSession;
 using MusicRoom.Application.Features.Playback.Queries.GetSession;
@@ -35,6 +36,7 @@ public static class PlaybackEndpoints
         MapAdvance(group);
         MapJump(group);
         MapStop(group);
+        MapPosition(group);
 
         return endpoints;
     }
@@ -104,6 +106,46 @@ public static class PlaybackEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status404NotFound);
+
+    private static void MapPosition(RouteGroupBuilder group) =>
+        group.MapPut("/{sessionId:guid}/position", ReportPositionAsync)
+            .RequireAuthorization()
+            .RequireRateLimiting(RateLimiting.PlaybackRateLimiterPolicies.Positions)
+            .WithName("PutPlaybackPosition")
+            .WithSummary("Report where the playing device is")
+            .WithDescription(
+                "The controller's route, as the jump is: only the thing playing the music can honestly "
+                + "say where it is. The server stamps its own clock on the report and broadcasts "
+                + "PlaybackPositionChanged, so a guest can seek to the same second. A report naming a "
+                + "track that is no longer playing is discarded — it was in flight while the session "
+                + "advanced, and acting on it would drag every listener backwards. An ended session, and "
+                + "a caller who may not command this one, both answer 404. The session's own ETag is "
+                + "untouched: a report is not a move, and a controller's If-Match keeps working. One "
+                + "report per second per session; above that is 429.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status429TooManyRequests);
+
+    private static async Task<IResult> ReportPositionAsync(
+        Guid sessionId,
+        PlaybackPositionRequest request,
+        ISender sender,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        bool written = await sender.Send(
+            new ReportPositionCommand(
+                sessionId,
+                request.NowPlayingId,
+                request.PositionMs,
+                request.Paused),
+            cancellationToken);
+
+        return written ? Results.NoContent() : Results.NotFound();
+    }
 
     private static async Task<IResult> StartAsync(
         PlaybackStartRequest request,
@@ -227,3 +269,13 @@ internal sealed record PlaybackAdvanceRequest(Guid? ExpectedNowPlayingId);
 /// <summary>The jump payload.</summary>
 /// <param name="NowPlayingId">The item to play, which must belong to the session's source.</param>
 internal sealed record PlaybackJumpRequest(Guid NowPlayingId);
+
+/// <summary>
+/// One report from the playing device — <c>docs/api/ENDPOINTS.md</c> §7, SPEC-059.
+/// </summary>
+/// <param name="NowPlayingId">The track the position is measured in. A report naming a track that is no
+/// longer playing is discarded rather than applied.</param>
+/// <param name="PositionMs">How far into that track the device is.</param>
+/// <param name="Paused">Whether it is paused. A paused device's position does not advance, which is why
+/// a listener needs the flag and not only the number.</param>
+internal sealed record PlaybackPositionRequest(Guid NowPlayingId, int PositionMs, bool Paused);
