@@ -37,6 +37,23 @@ public sealed class PlaybackSession : Entity
     /// <summary>When playback began. Always UTC.</summary>
     public DateTime StartedAtUtc { get; set; }
 
+    /// <summary>
+    /// When <see cref="NowPlayingId" /> last changed, by the server's clock — SPEC-058. Null while
+    /// nothing is playing.
+    /// </summary>
+    /// <remarks>
+    /// Written in the same statement that moves the now-playing id, so the two cannot disagree about when
+    /// a track started. It is what lets a guest who arrives mid-track start from the right second rather
+    /// than from the beginning, and it is the server's stamp rather than a client's because V.3 makes the
+    /// backend the keeper of the truth — a start time computed on a phone is the one number in this
+    /// feature that must not be.
+    /// <para>
+    /// Different from <see cref="StartedAtUtc" />, which is when the **session** began and does not move.
+    /// Rows written before SPEC-058's migration are null: nobody stamped them.
+    /// </para>
+    /// </remarks>
+    public DateTime? NowPlayingStartedAtUtc { get; set; }
+
     /// <summary>When it stopped, or null while it is live.</summary>
     public DateTime? EndedAtUtc { get; set; }
 

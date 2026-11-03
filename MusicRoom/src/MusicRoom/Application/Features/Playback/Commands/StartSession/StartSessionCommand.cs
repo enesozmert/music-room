@@ -26,7 +26,13 @@ public sealed record StartSessionCommand(PlaybackSource Source)
 /// <param name="Outcome">Started, refused, or the device is already playing.</param>
 /// <param name="SessionId">The new session, when one was opened.</param>
 /// <param name="NowPlayingId">What it started on, when anything was there to play.</param>
-public sealed record SessionStart(SessionStartOutcome Outcome, Guid? SessionId, Guid? NowPlayingId);
+/// <param name="NowPlayingStartedAtUtc">When the first track started, or null when the source had
+/// nothing to play — SPEC-058.</param>
+public sealed record SessionStart(
+    SessionStartOutcome Outcome,
+    Guid? SessionId,
+    Guid? NowPlayingId,
+    DateTime? NowPlayingStartedAtUtc = null);
 
 /// <summary>The three ways starting a session ends.</summary>
 public enum SessionStartOutcome

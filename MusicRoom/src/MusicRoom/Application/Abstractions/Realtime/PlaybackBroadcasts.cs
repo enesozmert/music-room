@@ -10,6 +10,11 @@ namespace MusicRoom.Application.Abstractions.Realtime;
 /// <param name="SessionId">The session that moved.</param>
 /// <param name="NowPlayingId">What is playing now, or null once the queue is exhausted and the session ended.</param>
 /// <param name="OccurredAtUtc">Server time when the move committed.</param>
+/// <param name="NowPlayingStartedAtUtc">The instant stamped on the session row for this track, or null
+/// when nothing is playing — SPEC-058. The same number `GET /playback-sessions/{id}` reports, so a
+/// listener and a guest who reads the session a minute later compute the same offset. Distinct from
+/// <paramref name="OccurredAtUtc" /> on purpose: that is when this message was raised, this is what the
+/// row says, and a client synchronising playback wants the row's answer.</param>
 /// <remarks>
 /// Broadcast on the hub owning the playback source — `EventHub` or `PlaylistHub` — which is why the payload
 /// carries the source type as well as its id.
@@ -24,7 +29,8 @@ public sealed record NowPlayingChanged(
     Guid SourceId,
     Guid SessionId,
     Guid? NowPlayingId,
-    DateTime OccurredAtUtc) : IRealtimeBroadcast
+    DateTime OccurredAtUtc,
+    DateTime? NowPlayingStartedAtUtc = null) : IRealtimeBroadcast
 {
     /// <inheritdoc />
     public Guid AggregateId => SourceId;

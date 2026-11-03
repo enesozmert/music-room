@@ -11,6 +11,12 @@ namespace MusicRoom.Application.Abstractions.Persistence;
 /// <param name="StartedAtUtc">When playback began.</param>
 /// <param name="EndedAtUtc">When it stopped, or null while it is live.</param>
 /// <param name="Version">The `xmin`, which the endpoint publishes as the `ETag`.</param>
+/// <param name="NowPlayingStartedAtUtc">When the current track started, by the server's clock — SPEC-058.
+/// Null while nothing is playing. A guest who arrives mid-track starts from here rather than from the
+/// beginning.</param>
+/// <param name="ServerNowUtc">What the server's clock read while answering — SPEC-058 decision 4. The
+/// client's offset is only as good as its own clock, and this is what lets it correct for the difference
+/// instead of tolerating it.</param>
 public sealed record PlaybackSessionDetail(
     Guid SessionId,
     Guid DeviceId,
@@ -19,7 +25,9 @@ public sealed record PlaybackSessionDetail(
     Guid? NowPlayingId,
     DateTime StartedAtUtc,
     DateTime? EndedAtUtc,
-    uint Version);
+    uint Version,
+    DateTime? NowPlayingStartedAtUtc,
+    DateTime ServerNowUtc);
 
 /// <summary>What to play, and from where.</summary>
 /// <param name="DeviceId">The device, which the caller must own.</param>
@@ -31,10 +39,14 @@ public sealed record PlaybackSource(Guid DeviceId, PlaybackSourceType SourceType
 /// <param name="Outcome">The outcome.</param>
 /// <param name="NowPlayingId">What is playing after the write, when anything is.</param>
 /// <param name="SessionId">The session the write touched.</param>
+/// <param name="NowPlayingStartedAtUtc">The instant the row was stamped with, when anything moved —
+/// SPEC-058. The broadcast carries this rather than its own reading of the clock, so a listener and a
+/// later reader of the session compute from one number.</param>
 public sealed record PlaybackWriteResult(
     PlaybackWriteOutcome Outcome,
     Guid? NowPlayingId,
-    Guid? SessionId)
+    Guid? SessionId,
+    DateTime? NowPlayingStartedAtUtc = null)
 {
     /// <summary>No such session, or none this caller may command.</summary>
     public static PlaybackWriteResult NotFound { get; } = new(PlaybackWriteOutcome.NotFound, null, null);
