@@ -506,6 +506,7 @@ Model and rationale: [[ADR-0017-playback-session]].
 | GET | `/devices/{deviceId}/playback-session` | — | `200` + `ETag` | `404` | `self` or controller |
 | POST | `/playback-sessions/{sessionId}/advances` | `expectedNowPlayingId` | `200` new now-playing | `404`, `409` queue empty, `412` stale | controller |
 | PATCH | `/playback-sessions/{sessionId}` | `nowPlayingId` (explicit jump) | `200` | `404`, `412` | controller |
+| PUT | `/playback-sessions/{sessionId}/position` | `nowPlayingId`, `positionMs`, `paused` | `204` | `404`, `429` | controller |
 | DELETE | `/playback-sessions/{sessionId}` | — | `204` stop playback | `404` | `owner` of the device |
 
 ### Design notes
@@ -539,12 +540,34 @@ Model and rationale: [[ADR-0017-playback-session]].
   rather than trusting it. `nowPlayingStartedAtUtc` is null when nothing is playing, and on sessions that
   predate the column — a client reading null plays from the beginning, which is what it did before.
   `NowPlayingChanged` carries the same stamp, so a listener and a late joiner compute from one number.
+- **The playing device reports where it is** — `PUT /playback-sessions/{sessionId}/position`, SPEC-059.
+  The controller's route, as the jump is: only the thing playing the music can honestly say where it is,
+  and a guest who could write it could make every other guest seek to a lie. The body names the track —
+  `nowPlayingId` — and a report naming a track that is no longer playing is **discarded**, because it was
+  in flight while the session advanced and acting on it would drag every listener backwards. The server
+  stamps its own clock: two phones reporting "now" would disagree about the same instant.
+  The detail then carries `positionMs`, `positionAtUtc` and `paused`, and a client computes
+  `paused ? positionMs : positionMs + (serverNowUtc − positionAtUtc)`. All three are null until a report
+  arrives and again after every track change.
+- **A report does not move the session's `ETag`.** The position lives in its own table, one row per
+  session, for exactly this reason: on the session row a report every fifteen seconds would bump `xmin`
+  four times a minute and answer every controller's `If-Match` with `412`. **One report per second per
+  session**, partitioned by session rather than by account, and above that `429` — one party's speaker
+  must not spend the allowance of somebody running two rooms.
+- **A position report writes no audit record**, deliberately — SPEC-059 decision 3. Subject V.6 asks for a
+  record of what a person did in the app; a timer reporting four times a minute is not that, and auditing
+  it would bury the records V.6 exists to produce. The command does not implement `IAuditableCommand`,
+  which is the mechanism that marker exists for.
 - The server picks the next item: for an `Event`, the highest vote count with ties broken by
   earliest suggestion; for a `Playlist`, the next ordering key. **The client reports that the
   track ended; it never chooses what plays next.**
 - `controllerUserId` on the session is what `PUT /devices/{id}/control` changes. That is the
   concrete meaning of "delegating music control".
-- `NowPlayingChanged` broadcasts on `EventHub` or `PlaylistHub` **after** commit.
+- `NowPlayingChanged` broadcasts on `EventHub` or `PlaylistHub` **after** commit, and so does
+  `PlaybackPositionChanged` — `{sourceId, sessionId, nowPlayingId, positionMs, positionAtUtc, paused}`,
+  SPEC-059. It carries no row version: the next one is fifteen seconds away, so a message that arrives
+  late or not at all costs a listener nothing it will not have again shortly. A listener whose own idea
+  of the current track differs ignores it rather than seeking into a song nobody is playing.
 - A device holds at most one active session.
 
 ## 8. Audit and operations

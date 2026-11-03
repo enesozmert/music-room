@@ -17,6 +17,10 @@ namespace MusicRoom.Application.Abstractions.Persistence;
 /// <param name="ServerNowUtc">What the server's clock read while answering — SPEC-058 decision 4. The
 /// client's offset is only as good as its own clock, and this is what lets it correct for the difference
 /// instead of tolerating it.</param>
+/// <param name="PositionMs">How far into the current track the playing device last said it was — SPEC-059.
+/// Null when it has not reported, or when the track changed since it did.</param>
+/// <param name="PositionAtUtc">When that report reached the server, by the server's clock.</param>
+/// <param name="Paused">Whether the device said it was paused when it reported.</param>
 public sealed record PlaybackSessionDetail(
     Guid SessionId,
     Guid DeviceId,
@@ -27,13 +31,24 @@ public sealed record PlaybackSessionDetail(
     DateTime? EndedAtUtc,
     uint Version,
     DateTime? NowPlayingStartedAtUtc,
-    DateTime ServerNowUtc);
+    DateTime ServerNowUtc,
+    int? PositionMs = null,
+    DateTime? PositionAtUtc = null,
+    bool? Paused = null);
 
 /// <summary>What to play, and from where.</summary>
 /// <param name="DeviceId">The device, which the caller must own.</param>
 /// <param name="SourceType">Whether the source is an event or a playlist.</param>
 /// <param name="SourceId">The event or the playlist.</param>
 public sealed record PlaybackSource(Guid DeviceId, PlaybackSourceType SourceType, Guid SourceId);
+
+/// <summary>One report from the device that is playing — SPEC-059.</summary>
+/// <param name="SessionId">The session being reported on.</param>
+/// <param name="NowPlayingId">The track the position is measured in. A report naming a track that is no
+/// longer playing is discarded: it was in flight while the session advanced.</param>
+/// <param name="PositionMs">How far into that track the device said it was.</param>
+/// <param name="Paused">Whether it said it was paused.</param>
+public sealed record PlaybackPositionReport(Guid SessionId, Guid NowPlayingId, int PositionMs, bool Paused);
 
 /// <summary>What a guarded playback write did, and where the session now is.</summary>
 /// <param name="Outcome">The outcome.</param>

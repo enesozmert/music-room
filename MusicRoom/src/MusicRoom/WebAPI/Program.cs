@@ -503,6 +503,7 @@ internal static class ApiServices
         CredentialRateLimiterPolicies.Add(services, configuration);
         EventRateLimiterPolicies.Add(services);
         CatalogRateLimiterPolicies.Add(services);
+        PlaybackRateLimiterPolicies.Add(services, configuration);
         AddCors(services, configuration);
     }
 

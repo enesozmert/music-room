@@ -29,6 +29,20 @@ public interface IPlaybackSessionRepository
     /// <returns>The live session, or null when the device is not playing.</returns>
     Task<PlaybackSessionDetail?> FindByDeviceAsync(Guid deviceId, CancellationToken cancellationToken);
 
+    /// <summary>Records where the playing device says it is — SPEC-059.</summary>
+    /// <param name="report">The session, the track, the milliseconds and whether it is paused.</param>
+    /// <param name="nowUtc">The instant the report reached the server, which is the one stamped.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>True when a row was written; false when the session has ended or has moved on.</returns>
+    /// <remarks>
+    /// It writes to its own table, never to the session: `playback_sessions.xmin` is the `If-Match` of
+    /// advance and jump, and a report arriving four times a minute would answer every controller `412`.
+    /// </remarks>
+    Task<bool> TryReportPositionAsync(
+        PlaybackPositionReport report,
+        DateTime nowUtc,
+        CancellationToken cancellationToken);
+
     /// <summary>The live session an event is playing through, newest first — SPEC-058.</summary>
     /// <param name="eventId">The event.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>

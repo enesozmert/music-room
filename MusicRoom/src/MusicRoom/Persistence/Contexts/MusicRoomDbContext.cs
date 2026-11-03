@@ -32,6 +32,9 @@ public sealed class MusicRoomDbContext : DbContext
     /// <summary>The mandatory audit log — subject V.6, SDD §13.4.</summary>
     public DbSet<AuditRecord> AuditRecords => Set<AuditRecord>();
 
+    // `PlaybackPosition` has no property here either, for the same reason and with the same answer —
+    // SPEC-059. `PlaybackSessionRepository` reaches it through `Set<PlaybackPosition>()`.
+    //
     // `SocialLink` has no property here on purpose — SPEC-041. S1200 caps this class's coupling and one
     // more entity type crosses it; the mapping is discovered by `ApplyConfigurationsFromAssembly` either way,
     // and `SocialLinkRepository` reaches it through `Set<SocialLink>()`. A property is sugar, and the cap is
@@ -84,6 +87,7 @@ public sealed class MusicRoomDbContext : DbContext
 
     /// <summary>Who is playing what, on which device — ADR-0017. One live session per device.</summary>
     public DbSet<PlaybackSession> PlaybackSessions => Set<PlaybackSession>();
+
 
     // The catalog's two tables — `track_refs` and `track_search_cache`, ADR-0023's L2 — deliberately have no
     // property here. This class is at the 30-type coupling limit `SonarLint.xml` enforces (S1200), and two more

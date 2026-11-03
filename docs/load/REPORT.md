@@ -77,6 +77,16 @@ describe the system that shipped.
 | `fan-out` | SignalR `PlaylistHub`: 200 connections in one group while one writer moves a track every 500 ms | open, 50 connections over 20 s then 150 over 40 s, held |
 | `login` | `POST /auth/sessions` — the deliberately rate-limited path | open, 5 → 50 attempts/s, then 50/s for 30 s |
 
+**What these scenarios do not contain: position reporting.** SPEC-059 added
+`PUT /playback-sessions/{id}/position`, which a playing device calls every fifteen seconds while the
+music plays — the first write in this system paced by a timer rather than by a person. Every figure
+below was measured before that route existed, and this report does not pretend otherwise. Two things
+bound the gap rather than closing it: the route is limited to **one call per second per session**, so
+the arithmetic ceiling is known even where the measurement is absent, and the write lands on
+`playback_positions`, a single-row-per-session table with no contended index, rather than on the
+session row the controller's `If-Match` depends on. A re-measurement belongs on the declared machine
+in §1, as its own run, and not inside the unit that added the traffic.
+
 `vote-storm` is paced at one vote per 1.2 seconds per voter because one account may cast sixty a minute
 (SPEC-018). Above that pace every step reports the limiter refusing, which measures the limiter and not the
 write. The vote path's own ceiling is therefore a decided number, not a measured one.

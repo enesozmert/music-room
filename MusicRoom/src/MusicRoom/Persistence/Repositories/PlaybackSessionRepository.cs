@@ -26,6 +26,10 @@ internal sealed class PlaybackSessionRepository : IPlaybackSessionRepository
     /// </remarks>
     public PlaybackSessionRepository(MusicRoomDbContext context) => _context = context;
 
+    /// <summary>The position rows, which have no property on the context — SPEC-059, S1200.</summary>
+    /// <remarks>A property rather than a field, so the naming rule asks for no underscore.</remarks>
+    private IQueryable<PlaybackPosition> Positions => _context.Set<PlaybackPosition>().AsNoTracking();
+
     /// <inheritdoc />
     public async Task<bool> TryStartAsync(PlaybackSession session, CancellationToken cancellationToken)
     {
@@ -65,6 +69,49 @@ internal sealed class PlaybackSessionRepository : IPlaybackSessionRepository
                 .Where(session => session.DeviceId == deviceId && session.EndedAtUtc == null))
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<bool> TryReportPositionAsync(
+        PlaybackPositionReport report,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        // The track is in the predicate, not checked before it — SPEC-059 decision 6. A report that was in
+        // flight while the track advanced matches nothing and is discarded, rather than dragging every
+        // listener backwards into the previous song.
+        bool playing = await _context.PlaybackSessions
+            .AsNoTracking()
+            .AnyAsync(
+                session => session.Id == report.SessionId
+                    && session.EndedAtUtc == null
+                    && session.NowPlayingId == report.NowPlayingId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!playing)
+        {
+            return false;
+        }
+
+        // An update first, an insert when it matched nothing. The session row is never touched: its `xmin`
+        // is the `If-Match` of advance and jump, and a report four times a minute would answer every
+        // controller `412` — SPEC-059 decision 1.
+        int updated = await _context.Set<PlaybackPosition>()
+            .Where(position => position.SessionId == report.SessionId)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(position => position.NowPlayingId, report.NowPlayingId)
+                    .SetProperty(position => position.PositionMs, report.PositionMs)
+                    .SetProperty(position => position.Paused, report.Paused)
+                    .SetProperty(position => position.ReportedAtUtc, nowUtc)
+                    .SetProperty(position => position.UpdatedAtUtc, nowUtc),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        return updated > 0 || await InsertPositionAsync(report, nowUtc, cancellationToken).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public async Task<PlaybackSessionDetail?> FindLiveByEventAsync(
@@ -168,10 +215,13 @@ internal sealed class PlaybackSessionRepository : IPlaybackSessionRepository
     /// translated into whatever the provider makes of it. What the client needs is the instant this
     /// response was composed, which is this one.
     /// </remarks>
-    private static IQueryable<PlaybackSessionDetail> Detail(IQueryable<PlaybackSession> sessions)
+    private IQueryable<PlaybackSessionDetail> Detail(IQueryable<PlaybackSession> sessions)
     {
         DateTime nowUtc = DateTime.UtcNow;
 
+        // The position is joined rather than carried on the session row — SPEC-059 decision 1 — and only
+        // when it belongs to the track that is playing now. A position for a track that has ended is not
+        // stale data to be interpreted by a client; it is nothing, and it reads as null.
         return sessions
             .AsNoTracking()
             .Select(session => new PlaybackSessionDetail(
@@ -184,7 +234,61 @@ internal sealed class PlaybackSessionRepository : IPlaybackSessionRepository
                 session.EndedAtUtc,
                 session.Version,
                 session.NowPlayingStartedAtUtc,
-                nowUtc));
+                nowUtc,
+                Positions
+                    .Where(position => position.SessionId == session.Id
+                        && position.NowPlayingId == session.NowPlayingId)
+                    .Select(position => (int?)position.PositionMs)
+                    .FirstOrDefault(),
+                Positions
+                    .Where(position => position.SessionId == session.Id
+                        && position.NowPlayingId == session.NowPlayingId)
+                    .Select(position => (DateTime?)position.ReportedAtUtc)
+                    .FirstOrDefault(),
+                Positions
+                    .Where(position => position.SessionId == session.Id
+                        && position.NowPlayingId == session.NowPlayingId)
+                    .Select(position => (bool?)position.Paused)
+                    .FirstOrDefault()));
+    }
+
+    /// <summary>Writes the first report of a session, losing a race rather than throwing.</summary>
+    /// <remarks>
+    /// The unique index on `session_id` is what makes one row mean one row. Two first reports arriving
+    /// together leave one winner; the loser's value is a quarter of a second old and the next report is a
+    /// quarter of a second away, so it is dropped rather than retried.
+    /// </remarks>
+    private async Task<bool> InsertPositionAsync(
+        PlaybackPositionReport report,
+        DateTime nowUtc,
+        CancellationToken cancellationToken)
+    {
+        PlaybackPosition position = new()
+        {
+            Id = Guid.NewGuid(),
+            SessionId = report.SessionId,
+            NowPlayingId = report.NowPlayingId,
+            PositionMs = report.PositionMs,
+            Paused = report.Paused,
+            ReportedAtUtc = nowUtc,
+            CreatedAtUtc = nowUtc,
+            UpdatedAtUtc = nowUtc,
+        };
+
+        _context.Add(position);
+
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            _context.Entry(position).State = EntityState.Detached;
+
+            return false;
+        }
     }
 
     private static bool IsAlreadyPlaying(DbUpdateException exception) =>
